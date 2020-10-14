@@ -1,15 +1,18 @@
 type Decoder<T> = (input: Json) => T;
 
-type primitive = string | number;
 type encodeH<decoder> = [decoder] extends [Decoder<infer T>]
-  ? [encodeH<T>[0]]
-  : [decoder] extends [primitive]
-  ? [decoder]
-  : [{ [key in keyof decoder]: encodeH<decoder[key]>[0] }];
+  ? // recur
+    [encodeH<T>[0]]
+  : // objects are special because we use the literal syntax
+  // to describe them, which is the point of the library
+  [decoder] extends [{}]
+  ? [{ [key in keyof decoder]: encodeH<decoder[key]>[0] }]
+  : // end recursion
+    [decoder];
 
+// encodeH (helper) always needs wrapping and unrwapping
+// because direct recursion is not allowed in types
 type encode<decoder> = encodeH<decoder>[0];
-
-type a = encode<{ x: () => string; foo: () => { bar: () => string } }>;
 
 type JsonPrimitive = string | boolean | number | null | undefined;
 type JsonObject = { [key: string]: Json };
@@ -90,14 +93,25 @@ type IEmployee = encode<typeof employeeDecoder>;
 const employeeDecoder = recordDecoder({
   employeeId: numberDecoder,
   name: stringDecoder,
-  address: { city: stringDecoder },
+  address: {
+    city: stringDecoder,
+  },
   phoneNumbers: arrayDecoder(stringDecoder),
+  isEmployed: booleanDecoder,
 });
 
 const x: IEmployee = employeeDecoder({
   employeeId: 2,
   name: 'asdfasd',
   address: { city: 'asdf' },
-  phoneNumbers: ['733', 5, '4'],
+  phoneNumbers: ['733', '', '4'],
+  isEmployed: true,
 });
 console.log(x);
+
+// TODO
+// tuple decoder
+// undefined / null decoders
+// optionality decoders
+// union decoder
+// maybe intersection?
