@@ -12,7 +12,7 @@ type encodeH<decoder> = [decoder] extends [Decoder<infer T>]
 
 // encodeH (helper) always needs wrapping and unrwapping
 // because direct recursion is not allowed in types
-type encode<decoder> = encodeH<decoder>[0];
+type decoded<decoder> = encodeH<decoder>[0];
 
 type JsonPrimitive = string | boolean | number | null | undefined;
 type JsonObject = { [key: string]: Json };
@@ -46,18 +46,25 @@ const arrayDecoder = <T>(decoder: Decoder<T>) => (xs: Json): T[] => {
   }
   // TOOD pretty print array
   const arrayToString = (arr: any) => `${JSON.stringify(arr)}`;
+  let index = 0;
   try {
-    return xs.map(decoder);
+    return xs.map((x, i) => {
+      index = i;
+      return decoder(x);
+    });
   } catch (message) {
     throw (
-      message + `\nwhen trying to decode the array \`${arrayToString(xs)}\``
+      message +
+      `\nwhen trying to decode the array (at index ${index}) \`${arrayToString(
+        xs
+      )}\``
     );
   }
 };
 
 const recordDecoder = <schema extends {}>(
   s: schema
-): Decoder<encode<schema>> => (value: Json) => {
+): Decoder<decoded<schema>> => (value: Json) => {
   // TOOD fix pretty print object
   const objectToString = (obj: any) =>
     Object.keys(obj).length === 0 ? `{}` : `${JSON.stringify(obj)}`;
@@ -89,7 +96,7 @@ const recordDecoder = <schema extends {}>(
     .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
 };
 
-type IEmployee = encode<typeof employeeDecoder>;
+type IEmployee = decoded<typeof employeeDecoder>;
 const employeeDecoder = recordDecoder({
   employeeId: numberDecoder,
   name: stringDecoder,
@@ -104,7 +111,7 @@ const x: IEmployee = employeeDecoder({
   employeeId: 2,
   name: 'asdfasd',
   address: { city: 'asdf' },
-  phoneNumbers: ['733', '', '4'],
+  phoneNumbers: ['733', 'dsfadadsa', '', '4'],
   isEmployed: true,
 });
 console.log(x);
@@ -115,3 +122,4 @@ console.log(x);
 // optionality decoders
 // union decoder
 // maybe intersection?
+// date
