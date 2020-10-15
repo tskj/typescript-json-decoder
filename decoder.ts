@@ -6,17 +6,38 @@ type getTypeofDecoderList<t extends Decoder<unknown>[]> = getT<
   t
 >;
 
+// FIDDLE
+
+type a = decoded<Decoder<undefined>>;
+type ts<t> = [t] extends [primitive]
+  ? [t] extends [undefined]
+    ? [undefined]
+    : [string]
+  : number;
+type b = ts<string>;
+type A = { a: string };
+type c = getTypeofDecoderList<Array<Decoder<null> | Decoder<string>>>;
+type d = getT<Array<_>, (string | undefined | number)[]>;
+
+type extract<T> = T extends { value: undefined } ? undefined : T;
+type sadfs = extract<{ value: undefined } | string>;
+
+// FIDDLE
+
 type Decoder<T> = (input: Json) => T;
 
-type encodeHelper<decoder> = [decoder] extends [Decoder<infer T>]
-  ? // recur
-    [encodeHelper<T>[0]]
+type primitive = string | boolean | number | null | undefined;
+
+// TOOD better indirection
+type encodeHelper<decoder> = [decoder] extends [primitive]
+  ? [decoder]
+  : // recur
+  [decoder] extends [Decoder<infer T>]
+  ? [encodeHelper<T>[0]]
   : // objects are special because we use the literal syntax
-  // to describe them, which is the point of the library
-  [decoder] extends [{}]
-  ? [{ [key in keyof decoder]: encodeHelper<decoder[key]>[0] }]
-  : // end recursion
-    [decoder];
+    // to describe them, which is the point of the library
+    [{ [key in keyof decoder]: encodeHelper<decoder[key]>[0] }];
+// end recursion
 
 // encodeHelper always needs wrapping and unrwapping
 // because direct recursion is not allowed in types
@@ -45,13 +66,22 @@ const number: Decoder<number> = (n: Json) => {
   return n;
 };
 
-const boolean: Decoder<boolean> = (boolean: Json) => {
-  if (typeof boolean !== 'boolean') {
+const boolean: Decoder<boolean> = (b: Json) => {
+  if (typeof b !== 'boolean') {
     throw `The value \`${JSON.stringify(
-      boolean
-    )}\` is not of type \`boolean\`, but is of type \`${typeof boolean}\``;
+      b
+    )}\` is not of type \`boolean\`, but is of type \`${typeof b}\``;
   }
-  return boolean;
+  return b;
+};
+
+const undef: Decoder<undefined> = (u: Json) => {
+  if (typeof u !== 'undefined') {
+    throw `The value \`${JSON.stringify(
+      u
+    )}\` is not of type \`undefined\`, but is of type \`${typeof u}\``;
+  }
+  return u;
 };
 
 const union = <decoders extends Decoder<unknown>[]>(...decoders: decoders) => (
@@ -72,7 +102,7 @@ const union = <decoders extends Decoder<unknown>[]>(...decoders: decoders) => (
   }
 };
 
-const array = <T>(decoder: Decoder<T>) => (xs: Json): T[] => {
+const array = <T extends unknown>(decoder: Decoder<T>) => (xs: Json): T[] => {
   // TOOD pretty print array
   const arrayToString = (arr: any) => `${JSON.stringify(arr)}`;
   if (!Array.isArray(xs)) {
@@ -103,9 +133,13 @@ const record = <schema extends {}>(s: schema): Decoder<decoded<schema>> => (
   const objectToString = (obj: any) =>
     Object.keys(obj).length === 0 ? `{}` : `${JSON.stringify(obj)}`;
   return Object.entries(s)
-    .map(([key, decoder]: any) => {
-      // TOOD fails on undefined and null
-      if (!value.hasOwnProperty(key)) {
+    .map(([key, decoder]: [string, any]) => {
+      if (
+        Array.isArray(value) ||
+        typeof value !== 'object' ||
+        value === null ||
+        !value.hasOwnProperty(key)
+      ) {
         throw `Cannot find key \`${key}\` in \`${objectToString(value)}\``;
       }
 
@@ -139,7 +173,7 @@ const employeeDecoder = record({
   },
   phoneNumbers: array(string),
   isEmployed: boolean,
-  ssn: union(string, number),
+  ssn: union(undef, string),
 });
 
 // test
@@ -150,7 +184,7 @@ const x: IEmployee = employeeDecoder({
   address: { city: 'asdf' },
   phoneNumbers: ['733', 'dsfadadsa', '', '4'],
   isEmployed: true,
-  ssn: 3,
+  ssn: undefined,
 });
 console.log(x);
 

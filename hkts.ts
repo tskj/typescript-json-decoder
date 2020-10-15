@@ -28,27 +28,31 @@ export interface Fixed<T> {
 }
 
 /**
+ * Used as a level of indirection to avoid circularity errors.
+ */
+declare const indirect: unique symbol;
+type indirect<t> = { [indirect]: t };
+
+/**
  * Type application (simultaneously substitutes all placeholders within the target type)
  */
 // prettier-ignore
 export type $<T, S extends any[]> = (
-  T extends Fixed<infer U> ? { [indirect]: U } :
-  T extends _<infer N> ? { [indirect]: S[N] } :
-  T extends undefined | null | boolean | string | number ? { [indirect]: T } :
-  T extends (infer A)[] & { length: infer L } ? {
-    [indirect]: L extends keyof TupleTable
-      ? TupleTable<T, S>[L]
-      : $<A, S>[]
-  } :
-  T extends (...x: infer I) => infer O ? { [indirect]: (...x: $<I, S>) => $<O, S> } :
-  T extends object ? { [indirect]: { [K in keyof T]: $<T[K], S> } } :
-  { [indirect]: T }
+  T extends Fixed<infer U> ? indirect<U> :
+  T extends _<infer N> ? indirect<S[N]> :
+  T extends undefined | null | boolean | string | number ? indirect<T> :
+  T extends (infer A)[] & { length: infer L } ?
+      indirect<
+        L extends keyof TupleTable
+          ? TupleTable<T, S>[L]
+          : $<A, S>[]
+      > :
+  T extends (...x: infer I) => infer O ? indirect< (...x: $<I, S>) => $<O, S> > :
+  T extends object ? indirect< { [K in keyof T]: $<T[K], S> } > :
+      
+  // otherwise
+    indirect< T >
 )[typeof indirect];
-
-/**
- * Used as a level of indirection to avoid circularity errors.
- */
-declare const indirect: unique symbol;
 
 /**
  * Allows looking up the type for a tuple based on its `length`, instead of trying
