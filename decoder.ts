@@ -65,6 +65,15 @@ const undef: Decoder<undefined> = (u: Json) => {
   return u;
 };
 
+const nil: Decoder<null> = (u: Json) => {
+  if (u !== null) {
+    throw `The value \`${JSON.stringify(
+      u
+    )}\` is not of type \`null\`, but is of type \`${typeof u}\``;
+  }
+  return u as null;
+};
+
 const union = <decoders extends Decoder<unknown>[]>(...decoders: decoders) => (
   value: Json
 ): getTypeofDecoderList<decoders> => {
@@ -154,7 +163,7 @@ const employeeDecoder = record({
   },
   phoneNumbers: array(string),
   isEmployed: boolean,
-  ssn: union(undef, string),
+  ssn: union(undef, string, nil),
 });
 
 // test
