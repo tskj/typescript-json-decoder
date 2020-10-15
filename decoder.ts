@@ -7,9 +7,7 @@ type getTypeofDecoderList<t extends Decoder<unknown>[]> = getT<
 >;
 
 const optionDecoder: unique symbol = Symbol('optional-decoder');
-type Decoder<T> = { [optionDecoder]?: boolean | undefined } & ((
-  input: Json
-) => T);
+type Decoder<T> = { [optionDecoder]?: true } & ((input: Json) => T);
 
 type primitive = string | boolean | number | null | undefined;
 // TOOD better indirection
@@ -22,11 +20,7 @@ type eval<decoder> = [decoder] extends [primitive]
     // to describe them, which is the point of the library
     [
       {
-        [key in keyof decoder]: typeof optionDecoder extends keyof decoder[key]
-          ? decoder[key][typeof optionDecoder] extends true
-            ? never
-            : eval<decoder[key]>[0]
-          : eval<decoder[key]>[0];
+        [key in keyof decoder]: eval<decoder[key]>[0];
       }
     ];
 
@@ -205,7 +199,5 @@ console.log(x);
 
 // TODO
 // tuple decoder
-// optionality decoders
 // maybe intersection?
 // date
-// allow record literals everywhere as decoders
