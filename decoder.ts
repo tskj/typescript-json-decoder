@@ -186,9 +186,25 @@ const tuple = <A, B>(
   return [decoderA(a), decoderB(b)];
 };
 
+const literal = <p extends primitive>(literal: p): Decoder<p> => (
+  value: Json
+) => {
+  if (literal !== value) {
+    throw `The value \`${JSON.stringify(
+      value
+    )}\` is not the literal \`${JSON.stringify(literal)}\``;
+  }
+  return literal;
+};
+
+const discriminatedUnion = union(
+  record({ discriminant: literal('one') }),
+  record({ discriminant: literal('two'), data: string })
+);
+
 const message = union(
-  tuple(string, string),
-  tuple(number, record({ somestuff: string }))
+  tuple(literal('message'), string),
+  tuple(literal('something-else'), record({ somestuff: string }))
 );
 
 type IEmployee = decoded<typeof employeeDecoder>;
@@ -196,6 +212,7 @@ const employeeDecoder = record({
   employeeId: number,
   name: string,
   message,
+  discriminatedUnion,
   address: {
     city: string,
   },
@@ -211,7 +228,8 @@ const employeeDecoder = record({
 const x: IEmployee = employeeDecoder({
   employeeId: 2,
   name: 'asdfasd',
-  message: [23, { somestuff: 'lol' }],
+  message: ['message', 'hei'],
+  discriminatedUnion: { discriminant: 'two', data: '2' },
   address: { city: 'asdf' },
   secondAddrese: undefined,
   phoneNumbers: ['733', 'dsfadadsa', '', '4'],
@@ -221,7 +239,11 @@ const x: IEmployee = employeeDecoder({
 console.log(x);
 
 // TODO
-// variadic tuple decoder
-// literal decoder
-// maybe intersection?
-// date
+
+// maybe variadic tuple decoder
+// maybe question mark on optional key
+
+// use tagged templates to abstract out the stringifying
+// clean up eval
+// tidy up file structure
+// date decoder
