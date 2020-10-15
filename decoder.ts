@@ -6,28 +6,9 @@ type getTypeofDecoderList<t extends Decoder<unknown>[]> = getT<
   t
 >;
 
-// FIDDLE
-
-type a = decoded<Decoder<undefined>>;
-type ts<t> = [t] extends [primitive]
-  ? [t] extends [undefined]
-    ? [undefined]
-    : [string]
-  : number;
-type b = ts<string>;
-type A = { a: string };
-type c = getTypeofDecoderList<Array<Decoder<null> | Decoder<string>>>;
-type d = getT<Array<_>, (string | undefined | number)[]>;
-
-type extract<T> = T extends { value: undefined } ? undefined : T;
-type sadfs = extract<{ value: undefined } | string>;
-
-// FIDDLE
-
 type Decoder<T> = (input: Json) => T;
 
 type primitive = string | boolean | number | null | undefined;
-
 // TOOD better indirection
 type encodeHelper<decoder> = [decoder] extends [primitive]
   ? [decoder]
