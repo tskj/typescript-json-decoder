@@ -1,51 +1,85 @@
+import { $, _ } from './hkts';
+
+type getT<A, X> = X extends $<A, [infer T]> ? T : never;
+type getTypeofDecoderList<t extends Decoder<unknown>[]> = getT<
+  Array<Decoder<_>>,
+  t
+>;
+
 type Decoder<T> = (input: Json) => T;
 
-type encodeH<decoder> = [decoder] extends [Decoder<infer T>]
+type encodeHelper<decoder> = [decoder] extends [Decoder<infer T>]
   ? // recur
-    [encodeH<T>[0]]
+    [encodeHelper<T>[0]]
   : // objects are special because we use the literal syntax
   // to describe them, which is the point of the library
   [decoder] extends [{}]
-  ? [{ [key in keyof decoder]: encodeH<decoder[key]>[0] }]
+  ? [{ [key in keyof decoder]: encodeHelper<decoder[key]>[0] }]
   : // end recursion
     [decoder];
 
-// encodeH (helper) always needs wrapping and unrwapping
+// encodeHelper always needs wrapping and unrwapping
 // because direct recursion is not allowed in types
-type decoded<decoder> = encodeH<decoder>[0];
+type decoded<decoder> = encodeHelper<decoder>[0];
 
 type JsonPrimitive = string | boolean | number | null | undefined;
 type JsonObject = { [key: string]: Json };
 type JsonArray = Json[];
 type Json = JsonPrimitive | JsonObject | JsonArray;
 
-const stringDecoder: Decoder<string> = (s: Json) => {
+const string: Decoder<string> = (s: Json) => {
   if (typeof s !== 'string') {
-    throw `The value \`${s}\` is not of type \`string\`, but is of type \`${typeof s}\``;
+    throw `The value \`${JSON.stringify(
+      s
+    )}\` is not of type \`string\`, but is of type \`${typeof s}\``;
   }
   return s;
 };
 
-const numberDecoder: Decoder<number> = (n: Json) => {
+const number: Decoder<number> = (n: Json) => {
   if (typeof n !== 'number') {
-    throw `The value \`${n}\` is not of type \`number\`, but is of type \`${typeof n}\``;
+    throw `The value \`${JSON.stringify(
+      n
+    )}\` is not of type \`number\`, but is of type \`${typeof n}\``;
   }
   return n;
 };
 
-const booleanDecoder: Decoder<boolean> = (boolean: Json) => {
+const boolean: Decoder<boolean> = (boolean: Json) => {
   if (typeof boolean !== 'boolean') {
-    throw `The value \`${boolean}\` is not of type \`boolean\`, but is of type \`${typeof boolean}\``;
+    throw `The value \`${JSON.stringify(
+      boolean
+    )}\` is not of type \`boolean\`, but is of type \`${typeof boolean}\``;
   }
   return boolean;
 };
 
-const arrayDecoder = <T>(decoder: Decoder<T>) => (xs: Json): T[] => {
-  if (!Array.isArray(xs)) {
-    throw `The value \`${xs}\` is not of type \`array\`, but is of type \`${typeof xs}\``;
+const union = <decoders extends Decoder<unknown>[]>(...decoders: decoders) => (
+  value: Json
+): getTypeofDecoderList<decoders> => {
+  if (decoders.length === 0) {
+    throw `Could not match any of the union cases`;
   }
+  const [decoder, ...rest] = decoders;
+  try {
+    return decoder(value) as any;
+  } catch (messageFromThisDecoder) {
+    try {
+      return union(...rest)(value) as any;
+    } catch (message) {
+      throw `${messageFromThisDecoder}\n${message}`;
+    }
+  }
+};
+
+const array = <T>(decoder: Decoder<T>) => (xs: Json): T[] => {
   // TOOD pretty print array
   const arrayToString = (arr: any) => `${JSON.stringify(arr)}`;
+  if (!Array.isArray(xs)) {
+    throw `The value \`${arrayToString(
+      xs
+    )}\` is not of type \`array\`, but is of type \`${typeof xs}\``;
+  }
   let index = 0;
   try {
     return xs.map((x, i) => {
@@ -62,9 +96,9 @@ const arrayDecoder = <T>(decoder: Decoder<T>) => (xs: Json): T[] => {
   }
 };
 
-const recordDecoder = <schema extends {}>(
-  s: schema
-): Decoder<decoded<schema>> => (value: Json) => {
+const record = <schema extends {}>(s: schema): Decoder<decoded<schema>> => (
+  value: Json
+) => {
   // TOOD fix pretty print object
   const objectToString = (obj: any) =>
     Object.keys(obj).length === 0 ? `{}` : `${JSON.stringify(obj)}`;
@@ -77,8 +111,8 @@ const recordDecoder = <schema extends {}>(
 
       if (typeof decoder !== 'function') {
         // This let's us define records in records without
-        // manually calling recordDecoder(.)
-        decoder = recordDecoder(decoder);
+        // manually calling recordDecoder(.) on them
+        decoder = record(decoder);
       }
 
       try {
@@ -97,15 +131,18 @@ const recordDecoder = <schema extends {}>(
 };
 
 type IEmployee = decoded<typeof employeeDecoder>;
-const employeeDecoder = recordDecoder({
-  employeeId: numberDecoder,
-  name: stringDecoder,
+const employeeDecoder = record({
+  employeeId: number,
+  name: string,
   address: {
-    city: stringDecoder,
+    city: string,
   },
-  phoneNumbers: arrayDecoder(stringDecoder),
-  isEmployed: booleanDecoder,
+  phoneNumbers: array(string),
+  isEmployed: boolean,
+  ssn: union(string, number),
 });
+
+// test
 
 const x: IEmployee = employeeDecoder({
   employeeId: 2,
@@ -113,6 +150,7 @@ const x: IEmployee = employeeDecoder({
   address: { city: 'asdf' },
   phoneNumbers: ['733', 'dsfadadsa', '', '4'],
   isEmployed: true,
+  ssn: 3,
 });
 console.log(x);
 
@@ -120,6 +158,5 @@ console.log(x);
 // tuple decoder
 // undefined / null decoders
 // optionality decoders
-// union decoder
 // maybe intersection?
 // date
