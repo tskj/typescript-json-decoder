@@ -6,23 +6,35 @@ type getTypeofDecoderList<t extends Decoder<unknown>[]> = getT<
   t
 >;
 
-type Decoder<T> = (input: Json) => T;
+const optionDecoder: unique symbol = Symbol('optional-decoder');
+type Decoder<T> = { [optionDecoder]?: boolean | undefined } & ((
+  input: Json
+) => T);
 
 type primitive = string | boolean | number | null | undefined;
 // TOOD better indirection
-type encodeHelper<decoder> = [decoder] extends [primitive]
+type eval<decoder> = [decoder] extends [primitive]
   ? [decoder]
   : // recur
   [decoder] extends [Decoder<infer T>]
-  ? [encodeHelper<T>[0]]
+  ? [eval<T>[0]]
   : // objects are special because we use the literal syntax
     // to describe them, which is the point of the library
-    [{ [key in keyof decoder]: encodeHelper<decoder[key]>[0] }];
+    [
+      {
+        [key in keyof decoder]: typeof optionDecoder extends keyof decoder[key]
+          ? decoder[key][typeof optionDecoder] extends true
+            ? never
+            : eval<decoder[key]>[0]
+          : eval<decoder[key]>[0];
+      }
+    ];
+
 // end recursion
 
 // encodeHelper always needs wrapping and unrwapping
 // because direct recursion is not allowed in types
-type decoded<decoder> = encodeHelper<decoder>[0];
+type decoded<decoder> = eval<decoder>[0];
 
 type JsonPrimitive = string | boolean | number | null | undefined;
 type JsonObject = { [key: string]: Json };
@@ -56,23 +68,23 @@ const boolean: Decoder<boolean> = (b: Json) => {
   return b;
 };
 
-const undef: Decoder<undefined> = (u: Json) => {
+const undef: Decoder<undefined> = ((u: Json) => {
   if (typeof u !== 'undefined') {
     throw `The value \`${JSON.stringify(
       u
     )}\` is not of type \`undefined\`, but is of type \`${typeof u}\``;
   }
   return u;
-};
+}) as any;
 
-const nil: Decoder<null> = (u: Json) => {
+const nil: Decoder<null> = ((u: Json) => {
   if (u !== null) {
     throw `The value \`${JSON.stringify(
       u
     )}\` is not of type \`null\`, but is of type \`${typeof u}\``;
   }
   return u as null;
-};
+}) as any;
 
 const union = <decoders extends Decoder<unknown>[]>(...decoders: decoders) => (
   value: Json
@@ -92,11 +104,12 @@ const union = <decoders extends Decoder<unknown>[]>(...decoders: decoders) => (
   }
 };
 
-const optionDecoder: unique symbol = Symbol('optional-decoder');
-const option = <decoder extends Decoder<unknown>>(decoder: decoder) => {
+const option = <T extends unknown>(
+  decoder: Decoder<T>
+): { [optionDecoder]: true } & Decoder<T | undefined> => {
   let _optionDecoder = union(undef, decoder);
   (_optionDecoder as any)[optionDecoder] = true;
-  return _optionDecoder;
+  return _optionDecoder as any;
 };
 
 const array = <T extends unknown>(decoder: Decoder<T>) => (xs: Json): T[] => {
@@ -172,6 +185,7 @@ const employeeDecoder = record({
   address: {
     city: string,
   },
+  secondAddrese: union(record({ city: string }), undef),
   phoneNumbers: array(string),
   isEmployed: boolean,
   ssn: option(string),
@@ -183,6 +197,7 @@ const x: IEmployee = employeeDecoder({
   employeeId: 2,
   name: 'asdfasd',
   address: { city: 'asdf' },
+  secondAddrese: undefined,
   phoneNumbers: ['733', 'dsfadadsa', '', '4'],
   isEmployed: true,
 });
@@ -193,3 +208,4 @@ console.log(x);
 // optionality decoders
 // maybe intersection?
 // date
+// allow record literals everywhere as decoders
