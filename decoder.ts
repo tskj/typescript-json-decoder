@@ -23,9 +23,7 @@ type eval<decoder> = [decoder] extends [primitive]
       }
     ];
 
-// end recursion
-
-// encodeHelper always needs wrapping and unrwapping
+// eval always needs wrapping and unrwapping
 // because direct recursion is not allowed in types
 type decoded<decoder> = eval<decoder>[0];
 
@@ -170,16 +168,41 @@ const record = <schema extends {}>(s: schema): Decoder<decoded<schema>> => (
     .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
 };
 
+const tuple = <A, B>(
+  decoderA: Decoder<A>,
+  decoderB: Decoder<B>
+): Decoder<[A, B]> => (value: Json) => {
+  if (!Array.isArray(value)) {
+    throw `The value \`${JSON.stringify(
+      value
+    )}\` is not a list and can therefore not be parsed as a tuple`;
+  }
+  if (value.length !== 2) {
+    throw `The array \`${JSON.stringify(
+      value
+    )}\` is not the proper length for a tuple`;
+  }
+  const [a, b] = value;
+  return [decoderA(a), decoderB(b)];
+};
+
+const message = union(
+  tuple(string, string),
+  tuple(number, record({ somestuff: string }))
+);
+
 type IEmployee = decoded<typeof employeeDecoder>;
 const employeeDecoder = record({
   employeeId: number,
   name: string,
+  message,
   address: {
     city: string,
   },
   secondAddrese: union(record({ city: string }), undef),
   phoneNumbers: array(string),
   isEmployed: boolean,
+  ageAndReputation: tuple(number, string),
   ssn: option(string),
 });
 
@@ -188,14 +211,17 @@ const employeeDecoder = record({
 const x: IEmployee = employeeDecoder({
   employeeId: 2,
   name: 'asdfasd',
+  message: [23, { somestuff: 'lol' }],
   address: { city: 'asdf' },
   secondAddrese: undefined,
   phoneNumbers: ['733', 'dsfadadsa', '', '4'],
+  ageAndReputation: [12, 'good'],
   isEmployed: true,
 });
 console.log(x);
 
 // TODO
-// tuple decoder
+// variadic tuple decoder
+// literal decoder
 // maybe intersection?
 // date
