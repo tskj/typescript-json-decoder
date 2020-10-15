@@ -92,6 +92,13 @@ const union = <decoders extends Decoder<unknown>[]>(...decoders: decoders) => (
   }
 };
 
+const optionDecoder: unique symbol = Symbol('optional-decoder');
+const option = <decoder extends Decoder<unknown>>(decoder: decoder) => {
+  let _optionDecoder = union(undef, decoder);
+  (_optionDecoder as any)[optionDecoder] = true;
+  return _optionDecoder;
+};
+
 const array = <T extends unknown>(decoder: Decoder<T>) => (xs: Json): T[] => {
   // TOOD pretty print array
   const arrayToString = (arr: any) => `${JSON.stringify(arr)}`;
@@ -124,12 +131,16 @@ const record = <schema extends {}>(s: schema): Decoder<decoded<schema>> => (
     Object.keys(obj).length === 0 ? `{}` : `${JSON.stringify(obj)}`;
   return Object.entries(s)
     .map(([key, decoder]: [string, any]) => {
-      if (
-        Array.isArray(value) ||
-        typeof value !== 'object' ||
-        value === null ||
-        !value.hasOwnProperty(key)
-      ) {
+      if (Array.isArray(value) || typeof value !== 'object' || value === null) {
+        throw `Value \`${objectToString(
+          value
+        )}\` is not of type \`object\` but rather \`${typeof value}\``;
+      }
+
+      if (!value.hasOwnProperty(key)) {
+        if (decoder[optionDecoder]) {
+          return [key, undefined];
+        }
         throw `Cannot find key \`${key}\` in \`${objectToString(value)}\``;
       }
 
@@ -163,7 +174,7 @@ const employeeDecoder = record({
   },
   phoneNumbers: array(string),
   isEmployed: boolean,
-  ssn: union(undef, string, nil),
+  ssn: option(string),
 });
 
 // test
@@ -174,13 +185,11 @@ const x: IEmployee = employeeDecoder({
   address: { city: 'asdf' },
   phoneNumbers: ['733', 'dsfadadsa', '', '4'],
   isEmployed: true,
-  ssn: undefined,
 });
 console.log(x);
 
 // TODO
 // tuple decoder
-// undefined / null decoders
 // optionality decoders
 // maybe intersection?
 // date
