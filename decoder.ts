@@ -6,8 +6,7 @@ type getTypeofDecoderList<t extends Decoder<unknown>[]> = getT<
   t
 >;
 
-const optionDecoder: unique symbol = Symbol('optional-decoder');
-type Decoder<T> = { [optionDecoder]?: true } & ((input: Json) => T);
+type Decoder<T> = (input: Json) => T;
 
 type primitive = string | boolean | number | null | undefined;
 // TOOD better indirection
@@ -98,12 +97,11 @@ const union = <decoders extends Decoder<unknown>[]>(...decoders: decoders) => (
   }
 };
 
-const option = <T extends unknown>(
-  decoder: Decoder<T>
-): { [optionDecoder]: true } & Decoder<T | undefined> => {
+const optionDecoder: unique symbol = Symbol('optional-decoder');
+const option = <T extends unknown>(decoder: Decoder<T>) => {
   let _optionDecoder = union(undef, decoder);
   (_optionDecoder as any)[optionDecoder] = true;
-  return _optionDecoder as any;
+  return _optionDecoder;
 };
 
 const array = <T extends unknown>(decoder: Decoder<T>) => (xs: Json): T[] => {
