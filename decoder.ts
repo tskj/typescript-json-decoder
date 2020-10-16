@@ -32,6 +32,21 @@ type JsonObject = { [key: string]: Json };
 type JsonArray = Json[];
 type Json = JsonPrimitive | JsonObject | JsonArray;
 
+type NativeJsonDecoder = string;
+const isNativeJsonDecoder = (
+  decoder: unknown
+): decoder is NativeJsonDecoder => {
+  return typeof decoder === 'string';
+};
+const jsonDecoder = <json extends NativeJsonDecoder>(
+  decoder: json
+): Decoder<json> => {
+  if (typeof decoder === 'string') {
+    return literal(decoder);
+  }
+  throw `shouldn't happen`;
+};
+
 const string: Decoder<string> = (s: Json) => {
   if (typeof s !== 'string') {
     throw `The value \`${JSON.stringify(
@@ -168,23 +183,51 @@ const record = <schema extends {}>(s: schema): Decoder<decoded<schema>> => (
     .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
 };
 
-const tuple = <A, B>(
-  decoderA: Decoder<A>,
+function tuple<
+  jsonA extends NativeJsonDecoder,
+  jsonB extends NativeJsonDecoder
+>(deocderA: jsonA, decoderB: jsonB): Decoder<[jsonA, jsonB]>;
+function tuple<A, jsonB extends NativeJsonDecoder>(
+  deocderA: Decoder<A>,
+  decoderB: jsonB
+): Decoder<[A, jsonB]>;
+function tuple<jsonA extends NativeJsonDecoder, B>(
+  deocderA: jsonA,
   decoderB: Decoder<B>
-): Decoder<[A, B]> => (value: Json) => {
-  if (!Array.isArray(value)) {
-    throw `The value \`${JSON.stringify(
-      value
-    )}\` is not a list and can therefore not be parsed as a tuple`;
+): Decoder<[jsonA, B]>;
+function tuple<A, B>(
+  deocderA: Decoder<A>,
+  decoderB: Decoder<B>
+): Decoder<[A, B]>;
+function tuple(
+  decoderA: Decoder<unknown> | NativeJsonDecoder,
+  decoderB: Decoder<unknown> | NativeJsonDecoder
+) {
+  if (isNativeJsonDecoder(decoderA) && isNativeJsonDecoder(decoderB)) {
+    return tuple(jsonDecoder(decoderA), jsonDecoder(decoderB));
   }
-  if (value.length !== 2) {
-    throw `The array \`${JSON.stringify(
-      value
-    )}\` is not the proper length for a tuple`;
+  if (isNativeJsonDecoder(decoderA) && !isNativeJsonDecoder(decoderB)) {
+    return tuple(jsonDecoder(decoderA), decoderB);
   }
-  const [a, b] = value;
-  return [decoderA(a), decoderB(b)];
-};
+  if (!isNativeJsonDecoder(decoderA) && isNativeJsonDecoder(decoderB)) {
+    return tuple(decoderA, jsonDecoder(decoderB));
+  }
+  if (!isNativeJsonDecoder(decoderA) && !isNativeJsonDecoder(decoderB))
+    return (value: Json) => {
+      if (!Array.isArray(value)) {
+        throw `The value \`${JSON.stringify(
+          value
+        )}\` is not a list and can therefore not be parsed as a tuple`;
+      }
+      if (value.length !== 2) {
+        throw `The array \`${JSON.stringify(
+          value
+        )}\` is not the proper length for a tuple`;
+      }
+      const [a, b] = value;
+      return [decoderA(a), decoderB(b)];
+    };
+}
 
 const literal = <p extends primitive>(literal: p): Decoder<p> => (
   value: Json
@@ -203,8 +246,8 @@ const discriminatedUnion = union(
 );
 
 const message = union(
-  tuple(literal('message'), string),
-  tuple(literal('something-else'), record({ somestuff: string }))
+  tuple('message', string),
+  tuple('something-else', record({ somestuff: string }))
 );
 
 type IEmployee = decoded<typeof employeeDecoder>;
@@ -243,6 +286,7 @@ console.log(x);
 // maybe variadic tuple decoder
 // maybe question mark on optional key
 
+// accept records as decoders in all the standard decoders
 // use tagged templates to abstract out the stringifying
 // clean up eval
 // tidy up file structure
