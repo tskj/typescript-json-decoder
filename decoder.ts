@@ -32,17 +32,29 @@ type JsonObject = { [key: string]: Json };
 type JsonArray = Json[];
 type Json = JsonPrimitive | JsonObject | JsonArray;
 
-type NativeJsonDecoder = string;
+type NativeJsonDecoder =
+  | string
+  | { [key: string]: NativeJsonDecoder | Decoder<unknown> };
 const isNativeJsonDecoder = (
   decoder: unknown
 ): decoder is NativeJsonDecoder => {
-  return typeof decoder === 'string';
+  return (
+    typeof decoder === 'string' ||
+    (typeof decoder === 'object' &&
+      decoder !== null &&
+      Object.values(decoder).every(
+        (x) => isNativeJsonDecoder(x) || typeof x === 'function'
+      ))
+  );
 };
 const jsonDecoder = <json extends NativeJsonDecoder>(
   decoder: json
 ): Decoder<json> => {
   if (typeof decoder === 'string') {
     return literal(decoder);
+  }
+  if (typeof decoder === 'object') {
+    return record(decoder as any);
   }
   throw `shouldn't happen`;
 };
@@ -118,7 +130,6 @@ const option = <T extends unknown>(decoder: Decoder<T>) => {
 };
 
 const array = <T extends unknown>(decoder: Decoder<T>) => (xs: Json): T[] => {
-  // TOOD pretty print array
   const arrayToString = (arr: any) => `${JSON.stringify(arr)}`;
   if (!Array.isArray(xs)) {
     throw `The value \`${arrayToString(
@@ -141,10 +152,11 @@ const array = <T extends unknown>(decoder: Decoder<T>) => (xs: Json): T[] => {
   }
 };
 
-const record = <schema extends {}>(s: schema): Decoder<decoded<schema>> => (
-  value: Json
-) => {
-  // TOOD fix pretty print object
+const record = <
+  schema extends { [key: string]: NativeJsonDecoder | Decoder<unknown> }
+>(
+  s: schema
+): Decoder<decoded<schema>> => (value: Json) => {
   const objectToString = (obj: any) =>
     Object.keys(obj).length === 0 ? `{}` : `${JSON.stringify(obj)}`;
   return Object.entries(s)
@@ -162,10 +174,10 @@ const record = <schema extends {}>(s: schema): Decoder<decoded<schema>> => (
         throw `Cannot find key \`${key}\` in \`${objectToString(value)}\``;
       }
 
-      if (typeof decoder !== 'function') {
+      if (isNativeJsonDecoder(decoder)) {
         // This let's us define records in records without
         // manually calling recordDecoder(.) on them
-        decoder = record(decoder);
+        decoder = jsonDecoder(decoder);
       }
 
       try {
@@ -247,7 +259,7 @@ const discriminatedUnion = union(
 
 const message = union(
   tuple('message', string),
-  tuple('something-else', record({ somestuff: string }))
+  tuple('something-else', { somestuff: literal('a') })
 );
 
 type IEmployee = decoded<typeof employeeDecoder>;
@@ -271,7 +283,7 @@ const employeeDecoder = record({
 const x: IEmployee = employeeDecoder({
   employeeId: 2,
   name: 'asdfasd',
-  message: ['message', 'hei'],
+  message: ['something-else', { somestuff: 'a' }],
   discriminatedUnion: { discriminant: 'two', data: '2' },
   address: { city: 'asdf' },
   secondAddrese: undefined,
