@@ -1,10 +1,13 @@
 import { $, _ } from './hkts';
 
 type getT<A, X> = X extends $<A, [infer T]> ? T : never;
-type getTypeofDecoderList<t extends Decoder<unknown>[]> = getT<
-  Array<Decoder<_>>,
-  t
->;
+type getTypeofDecoderList<
+  t extends (Decoder<unknown> | NativeJsonDecoder)[]
+> =gett<getT<Array<_>, t>>;
+type gett<t extends Decoder<unknown> | NativeJsonDecoder> =
+    t extends Decoder<unknown>
+      ? getT<Decoder<_>, t>
+      : t
 
 type Decoder<T> = (input: Json) => T;
 
@@ -114,13 +117,17 @@ const nil: Decoder<null> = ((u: Json) => {
   return u as null;
 }) as any;
 
-const union = <decoders extends Decoder<unknown>[]>(...decoders: decoders) => (
-  value: Json
-): getTypeofDecoderList<decoders> => {
+const union = <decoders extends (Decoder<unknown> | NativeJsonDecoder)[]>(
+  ...decoders: decoders
+) => (value: Json): getTypeofDecoderList<decoders> => {
   if (decoders.length === 0) {
     throw `Could not match any of the union cases`;
   }
   const [decoder, ...rest] = decoders;
+  if (isNativeJsonDecoder(decoder)) {
+    // TODO can be shorter
+    return union(...[jsonDecoder(decoder), ...rest])(value) as any;
+  }
   try {
     return decoder(value) as any;
   } catch (messageFromThisDecoder) {
@@ -133,7 +140,12 @@ const union = <decoders extends Decoder<unknown>[]>(...decoders: decoders) => (
 };
 
 const optionDecoder: unique symbol = Symbol('optional-decoder');
-const option = <T extends unknown>(decoder: Decoder<T>) => {
+function option <T extends NativeJsonDecoder>(decoder: T): Decoder<T | undefined>;
+function option <T extends unknown>(decoder: Decoder<T>): Decoder<T | undefined>;
+function option <T extends unknown>(decoder: Decoder<T>): Decoder<T | undefined> {
+  if (isNativeJsonDecoder(decoder)) {
+    return option(jsonDecoder(decoder)) as any;
+  }
   let _optionDecoder = union(undef, decoder);
   (_optionDecoder as any)[optionDecoder] = true;
   return _optionDecoder;
@@ -268,19 +280,21 @@ const literal = <p extends primitive>(literal: p): Decoder<p> => (
 };
 
 const discriminatedUnion = union(
-  record({ discriminant: literal('one') }),
-  record({ discriminant: literal('two'), data: string })
+  { discriminant: literal('one') },
+  { discriminant: literal('two'), data: string }
 );
 
 const message = union(
   tuple('message', string),
-  tuple('something-else', { somestuff: literal('a') })
+  tuple('something-else', { somestuff: string })
 );
 
 type IEmployee = decoded<typeof employeeDecoder>;
 const employeeDecoder = record({
   employeeId: number,
   name: string,
+  secondAddrese: option({ city: string }),
+  uni: union(string, { lol: string }),
   ageAndReputation: [number, string],
   likes: array([literal('likt'), number]),
   address: {
@@ -288,7 +302,6 @@ const employeeDecoder = record({
   },
   message,
   discriminatedUnion,
-  secondAddrese: union(record({ city: string }), undef),
   phoneNumbers: array(string),
   isEmployed: boolean,
   ssn: option(string),
@@ -302,7 +315,8 @@ const x: IEmployee = employeeDecoder({
   message: ['something-else', { somestuff: 'a' }],
   discriminatedUnion: { discriminant: 'two', data: '2' },
   address: { city: 'asdf' },
-  secondAddrese: undefined,
+  secondAddrese: { city: "secondcity" },
+  uni: "test",
   likes: [
     ['likt', 3],
     ['likt', 0],
@@ -318,8 +332,16 @@ console.log(x);
 // maybe variadic tuple decoder
 // maybe question mark on optional key
 
-// accept records as decoders in all the standard decoders
 // use tagged templates to abstract out the stringifying
 // clean up eval
 // tidy up file structure
 // date decoder
+
+
+// caveats around inference of literals
+// Sometimes using tuple literal decoder results in a string being inferred
+// instead of the literal. The solution is either to use tuple() function call
+// or wrap the literal in literal().
+// Other times a too general type is also inferred, such as in records some times.
+// Here the only solution is a literal() call, but this is only necessary for proper
+// type inference - the inferred type is still a super type.
