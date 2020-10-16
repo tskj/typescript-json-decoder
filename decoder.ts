@@ -129,28 +129,35 @@ const option = <T extends unknown>(decoder: Decoder<T>) => {
   return _optionDecoder;
 };
 
-const array = <T extends unknown>(decoder: Decoder<T>) => (xs: Json): T[] => {
-  const arrayToString = (arr: any) => `${JSON.stringify(arr)}`;
-  if (!Array.isArray(xs)) {
-    throw `The value \`${arrayToString(
-      xs
-    )}\` is not of type \`array\`, but is of type \`${typeof xs}\``;
+function array<T extends unknown>(decoder: Decoder<T>): Decoder<T[]>;
+function array<T extends NativeJsonDecoder>(decoder: T): Decoder<T[]>;
+function array<T extends unknown>(decoder: Decoder<T> | NativeJsonDecoder) {
+  if (isNativeJsonDecoder(decoder)) {
+    return array(jsonDecoder(decoder));
   }
-  let index = 0;
-  try {
-    return xs.map((x, i) => {
-      index = i;
-      return decoder(x);
-    });
-  } catch (message) {
-    throw (
-      message +
-      `\nwhen trying to decode the array (at index ${index}) \`${arrayToString(
+  return (xs: Json): T[] => {
+    const arrayToString = (arr: any) => `${JSON.stringify(arr)}`;
+    if (!Array.isArray(xs)) {
+      throw `The value \`${arrayToString(
         xs
-      )}\``
-    );
-  }
-};
+      )}\` is not of type \`array\`, but is of type \`${typeof xs}\``;
+    }
+    let index = 0;
+    try {
+      return xs.map((x, i) => {
+        index = i;
+        return decoder(x);
+      });
+    } catch (message) {
+      throw (
+        message +
+        `\nwhen trying to decode the array (at index ${index}) \`${arrayToString(
+          xs
+        )}\``
+      );
+    }
+  };
+}
 
 const record = <
   schema extends { [key: string]: NativeJsonDecoder | Decoder<unknown> }
@@ -175,8 +182,6 @@ const record = <
       }
 
       if (isNativeJsonDecoder(decoder)) {
-        // This let's us define records in records without
-        // manually calling recordDecoder(.) on them
         decoder = jsonDecoder(decoder);
       }
 
@@ -266,11 +271,12 @@ type IEmployee = decoded<typeof employeeDecoder>;
 const employeeDecoder = record({
   employeeId: number,
   name: string,
-  message,
-  discriminatedUnion,
+  likes: array({ isLiked: boolean }),
   address: {
     city: string,
   },
+  message,
+  discriminatedUnion,
   secondAddrese: union(record({ city: string }), undef),
   phoneNumbers: array(string),
   isEmployed: boolean,
@@ -287,6 +293,7 @@ const x: IEmployee = employeeDecoder({
   discriminatedUnion: { discriminant: 'two', data: '2' },
   address: { city: 'asdf' },
   secondAddrese: undefined,
+  likes: [{ isLiked: true }, { isLiked: false }],
   phoneNumbers: ['733', 'dsfadadsa', '', '4'],
   ageAndReputation: [12, 'good'],
   isEmployed: true,
