@@ -34,7 +34,11 @@ type Json = JsonPrimitive | JsonObject | JsonArray;
 
 type NativeJsonDecoder =
   | string
-  | { [key: string]: NativeJsonDecoder | Decoder<unknown> };
+  | { [key: string]: NativeJsonDecoder | Decoder<unknown> }
+  | [
+      NativeJsonDecoder | Decoder<unknown>,
+      NativeJsonDecoder | Decoder<unknown>
+    ];
 const isNativeJsonDecoder = (
   decoder: unknown
 ): decoder is NativeJsonDecoder => {
@@ -44,7 +48,10 @@ const isNativeJsonDecoder = (
       decoder !== null &&
       Object.values(decoder).every(
         (x) => isNativeJsonDecoder(x) || typeof x === 'function'
-      ))
+      )) ||
+    (Array.isArray(decoder) &&
+      decoder.length === 2 &&
+      decoder.every((x) => isNativeJsonDecoder(x) || typeof x === 'function'))
   );
 };
 const jsonDecoder = <json extends NativeJsonDecoder>(
@@ -52,6 +59,9 @@ const jsonDecoder = <json extends NativeJsonDecoder>(
 ): Decoder<json> => {
   if (typeof decoder === 'string') {
     return literal(decoder);
+  }
+  if (Array.isArray(decoder)) {
+    return tuple(decoder[0] as any, decoder[1] as any) as Decoder<json>;
   }
   if (typeof decoder === 'object') {
     return record(decoder as any);
@@ -271,7 +281,8 @@ type IEmployee = decoded<typeof employeeDecoder>;
 const employeeDecoder = record({
   employeeId: number,
   name: string,
-  likes: array({ isLiked: boolean }),
+  ageAndReputation: [number, string],
+  likes: array([literal('likt'), number]),
   address: {
     city: string,
   },
@@ -280,7 +291,6 @@ const employeeDecoder = record({
   secondAddrese: union(record({ city: string }), undef),
   phoneNumbers: array(string),
   isEmployed: boolean,
-  ageAndReputation: tuple(number, string),
   ssn: option(string),
 });
 
@@ -293,7 +303,10 @@ const x: IEmployee = employeeDecoder({
   discriminatedUnion: { discriminant: 'two', data: '2' },
   address: { city: 'asdf' },
   secondAddrese: undefined,
-  likes: [{ isLiked: true }, { isLiked: false }],
+  likes: [
+    ['likt', 3],
+    ['likt', 0],
+  ],
   phoneNumbers: ['733', 'dsfadadsa', '', '4'],
   ageAndReputation: [12, 'good'],
   isEmployed: true,
