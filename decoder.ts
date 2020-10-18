@@ -279,6 +279,15 @@ const literal = <p extends primitive>(literal: p): Decoder<p> => (
   return literal;
 };
 
+const date = (value: Json) => {
+  const dateString = string(value);
+  const timeStampSinceEpoch = Date.parse(dateString);
+  if (isNaN(timeStampSinceEpoch)) {
+    throw `String \`${dateString}\` is not a valid date string`;
+  }
+  return new Date(timeStampSinceEpoch);
+}
+
 const discriminatedUnion = union(
   { discriminant: literal('one') },
   { discriminant: literal('two'), data: string }
@@ -304,6 +313,7 @@ const employeeDecoder = record({
   discriminatedUnion,
   phoneNumbers: array(string),
   isEmployed: boolean,
+  dateOfBirth: date,
   ssn: option(string),
 });
 
@@ -323,6 +333,7 @@ const x: IEmployee = employeeDecoder({
   ],
   phoneNumbers: ['733', 'dsfadadsa', '', '4'],
   ageAndReputation: [12, 'good'],
+  dateOfBirth: "1995-12-14T00:00:00.0Z",
   isEmployed: true,
 });
 console.log(x);
