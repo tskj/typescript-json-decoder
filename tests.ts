@@ -63,11 +63,8 @@ console.log(x);
 // clean up eval
 // refactor type guards and stuff around eval and type definitions
 // better union type, at least understand current implementation
+// rename json -> jsob
 
-// caveats around inference of literals
-// Sometimes using tuple literal decoder results in a string being inferred
-// instead of the literal. The solution is either to use tuple() function call
-// or wrap the literal in literal().
-// Other times a too general type is also inferred, such as in records some times.
-// Here the only solution is a literal() call, but this is only necessary for proper
-// type inference - the inferred type is still a super type.
+// two map decoders, both from a json map
+// and from a list of tuples
+// maybe even one from a list of objects and key functions
