@@ -1,47 +1,23 @@
 import { $, _ } from './hkts';
+import { Json } from './json-types';
+import { decoded, Decoder, primitive } from './types';
 
 type getT<A, X> = X extends $<A, [infer T]> ? T : never;
 type getTypeofDecoderList<
   t extends (Decoder<unknown> | NativeJsonDecoder)[]
-> =gett<getT<Array<_>, t>>;
-type gett<t extends Decoder<unknown> | NativeJsonDecoder> =
-    t extends Decoder<unknown>
-      ? getT<Decoder<_>, t>
-      : t
-
-type Decoder<T> = (input: Json) => T;
-
-type primitive = string | boolean | number | null | undefined;
-// TOOD better indirection
-type eval<decoder> = [decoder] extends [primitive]
-  ? [decoder]
-  : // recur
-  [decoder] extends [Decoder<infer T>]
-  ? [eval<T>[0]]
-  : // objects are special because we use the literal syntax
-    // to describe them, which is the point of the library
-    [
-      {
-        [key in keyof decoder]: eval<decoder[key]>[0];
-      }
-    ];
-
-// eval always needs wrapping and unrwapping
-// because direct recursion is not allowed in types
-type decoded<decoder> = eval<decoder>[0];
-
-type JsonPrimitive = string | boolean | number | null | undefined;
-type JsonObject = { [key: string]: Json };
-type JsonArray = Json[];
-type Json = JsonPrimitive | JsonObject | JsonArray;
+  > = getTypeOfDecoder<getT<Array<_>, t>>;
+type getTypeOfDecoder<t extends Decoder<unknown> | NativeJsonDecoder> =
+  t extends Decoder<unknown>
+  ? getT<Decoder<_>, t>
+  : t
 
 type NativeJsonDecoder =
   | string
   | { [key: string]: NativeJsonDecoder | Decoder<unknown> }
   | [
-      NativeJsonDecoder | Decoder<unknown>,
-      NativeJsonDecoder | Decoder<unknown>
-    ];
+    NativeJsonDecoder | Decoder<unknown>,
+    NativeJsonDecoder | Decoder<unknown>
+  ];
 const isNativeJsonDecoder = (
   decoder: unknown
 ): decoder is NativeJsonDecoder => {
@@ -140,9 +116,9 @@ const union = <decoders extends (Decoder<unknown> | NativeJsonDecoder)[]>(
 };
 
 const optionDecoder: unique symbol = Symbol('optional-decoder');
-function option <T extends NativeJsonDecoder>(decoder: T): Decoder<T | undefined>;
-function option <T extends unknown>(decoder: Decoder<T>): Decoder<T | undefined>;
-function option <T extends unknown>(decoder: Decoder<T>): Decoder<T | undefined> {
+function option<T extends NativeJsonDecoder>(decoder: T): Decoder<T | undefined>;
+function option<T extends unknown>(decoder: Decoder<T>): Decoder<T | undefined>;
+function option<T extends unknown>(decoder: Decoder<T>): Decoder<T | undefined> {
   if (isNativeJsonDecoder(decoder)) {
     return option(jsonDecoder(decoder)) as any;
   }
