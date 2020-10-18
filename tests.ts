@@ -18,13 +18,13 @@ export const employeeDecoder = record({
   employeeId: number,
   name: string,
   phoneNumbers: array(string),
+  address: {
+    city: string,
+  },
   secondAddrese: option({ city: string, option: option(number) }),
   uni: union('uni', { lol: string }),
   ageAndReputation: [number, string],
   likes: array([literal('likt'), number]),
-  address: {
-    city: string,
-  },
   message,
   discriminatedUnion,
   isEmployed: boolean,
@@ -55,12 +55,14 @@ console.log(x);
 
 // TODO
 
+// Goals
 // maybe variadic tuple decoder
 // maybe question mark on optional key
 
 // use tagged templates to abstract out the stringifying
 // clean up eval
-// tidy up file structure
+// refactor type guards and stuff around eval and type definitions
+// better union type, at least understand current implementation
 
 // caveats around inference of literals
 // Sometimes using tuple literal decoder results in a string being inferred
