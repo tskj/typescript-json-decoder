@@ -346,8 +346,6 @@ console.log(x);
 // use tagged templates to abstract out the stringifying
 // clean up eval
 // tidy up file structure
-// date decoder
-
 
 // caveats around inference of literals
 // Sometimes using tuple literal decoder results in a string being inferred
