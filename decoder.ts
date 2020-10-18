@@ -1,52 +1,5 @@
-import { $, _ } from './hkts';
 import { Json } from './json-types';
 import { decoded, Decoder, primitive } from './types';
-
-type getT<A, X> = X extends $<A, [infer T]> ? T : never;
-type getTypeofDecoderList<
-  t extends (Decoder<unknown> | NativeJsonDecoder)[]
-  > = getTypeOfDecoder<getT<Array<_>, t>>;
-type getTypeOfDecoder<t extends Decoder<unknown> | NativeJsonDecoder> =
-  t extends Decoder<unknown>
-  ? getT<Decoder<_>, t>
-  : t
-
-type NativeJsonDecoder =
-  | string
-  | { [key: string]: NativeJsonDecoder | Decoder<unknown> }
-  | [
-    NativeJsonDecoder | Decoder<unknown>,
-    NativeJsonDecoder | Decoder<unknown>
-  ];
-const isNativeJsonDecoder = (
-  decoder: unknown
-): decoder is NativeJsonDecoder => {
-  return (
-    typeof decoder === 'string' ||
-    (typeof decoder === 'object' &&
-      decoder !== null &&
-      Object.values(decoder).every(
-        (x) => isNativeJsonDecoder(x) || typeof x === 'function'
-      )) ||
-    (Array.isArray(decoder) &&
-      decoder.length === 2 &&
-      decoder.every((x) => isNativeJsonDecoder(x) || typeof x === 'function'))
-  );
-};
-const jsonDecoder = <json extends NativeJsonDecoder>(
-  decoder: json
-): Decoder<json> => {
-  if (typeof decoder === 'string') {
-    return literal(decoder);
-  }
-  if (Array.isArray(decoder)) {
-    return tuple(decoder[0] as any, decoder[1] as any) as Decoder<json>;
-  }
-  if (typeof decoder === 'object') {
-    return record(decoder as any);
-  }
-  throw `shouldn't happen`;
-};
 
 const string: Decoder<string> = (s: Json) => {
   if (typeof s !== 'string') {
@@ -102,7 +55,7 @@ const union = <decoders extends (Decoder<unknown> | NativeJsonDecoder)[]>(
   const [decoder, ...rest] = decoders;
   if (isNativeJsonDecoder(decoder)) {
     // TODO can be shorter
-    return union(...[jsonDecoder(decoder), ...rest])(value) as any;
+    return union(jsonDecoder(decoder), ...rest)(value) as any;
   }
   try {
     return decoder(value) as any;
@@ -116,16 +69,20 @@ const union = <decoders extends (Decoder<unknown> | NativeJsonDecoder)[]>(
 };
 
 const optionDecoder: unique symbol = Symbol('optional-decoder');
-function option<T extends NativeJsonDecoder>(decoder: T): Decoder<T | undefined>;
+function option<T extends NativeJsonDecoder>(
+  decoder: T
+): Decoder<T | undefined>;
 function option<T extends unknown>(decoder: Decoder<T>): Decoder<T | undefined>;
-function option<T extends unknown>(decoder: Decoder<T>): Decoder<T | undefined> {
+function option<T extends unknown>(
+  decoder: Decoder<T>
+): Decoder<T | undefined> {
   if (isNativeJsonDecoder(decoder)) {
     return option(jsonDecoder(decoder)) as any;
   }
   let _optionDecoder = union(undef, decoder);
   (_optionDecoder as any)[optionDecoder] = true;
   return _optionDecoder;
-};
+}
 
 function array<T extends unknown>(decoder: Decoder<T>): Decoder<T[]>;
 function array<T extends NativeJsonDecoder>(decoder: T): Decoder<T[]>;
@@ -157,104 +114,6 @@ function array<T extends unknown>(decoder: Decoder<T> | NativeJsonDecoder) {
   };
 }
 
-const record = <
-  schema extends { [key: string]: NativeJsonDecoder | Decoder<unknown> }
->(
-  s: schema
-): Decoder<decoded<schema>> => (value: Json) => {
-  const objectToString = (obj: any) =>
-    Object.keys(obj).length === 0 ? `{}` : `${JSON.stringify(obj)}`;
-  return Object.entries(s)
-    .map(([key, decoder]: [string, any]) => {
-      if (Array.isArray(value) || typeof value !== 'object' || value === null) {
-        throw `Value \`${objectToString(
-          value
-        )}\` is not of type \`object\` but rather \`${typeof value}\``;
-      }
-
-      if (!value.hasOwnProperty(key)) {
-        if (decoder[optionDecoder]) {
-          return [key, undefined];
-        }
-        throw `Cannot find key \`${key}\` in \`${objectToString(value)}\``;
-      }
-
-      if (isNativeJsonDecoder(decoder)) {
-        decoder = jsonDecoder(decoder);
-      }
-
-      try {
-        const jsonvalue = value[key];
-        return [key, decoder(jsonvalue)];
-      } catch (message) {
-        throw (
-          message +
-          `\nwhen trying to decode the key \`${key}\` in \`${objectToString(
-            value
-          )}\``
-        );
-      }
-    })
-    .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
-};
-
-function tuple<
-  jsonA extends NativeJsonDecoder,
-  jsonB extends NativeJsonDecoder
->(deocderA: jsonA, decoderB: jsonB): Decoder<[jsonA, jsonB]>;
-function tuple<A, jsonB extends NativeJsonDecoder>(
-  deocderA: Decoder<A>,
-  decoderB: jsonB
-): Decoder<[A, jsonB]>;
-function tuple<jsonA extends NativeJsonDecoder, B>(
-  deocderA: jsonA,
-  decoderB: Decoder<B>
-): Decoder<[jsonA, B]>;
-function tuple<A, B>(
-  deocderA: Decoder<A>,
-  decoderB: Decoder<B>
-): Decoder<[A, B]>;
-function tuple(
-  decoderA: Decoder<unknown> | NativeJsonDecoder,
-  decoderB: Decoder<unknown> | NativeJsonDecoder
-) {
-  if (isNativeJsonDecoder(decoderA) && isNativeJsonDecoder(decoderB)) {
-    return tuple(jsonDecoder(decoderA), jsonDecoder(decoderB));
-  }
-  if (isNativeJsonDecoder(decoderA) && !isNativeJsonDecoder(decoderB)) {
-    return tuple(jsonDecoder(decoderA), decoderB);
-  }
-  if (!isNativeJsonDecoder(decoderA) && isNativeJsonDecoder(decoderB)) {
-    return tuple(decoderA, jsonDecoder(decoderB));
-  }
-  if (!isNativeJsonDecoder(decoderA) && !isNativeJsonDecoder(decoderB))
-    return (value: Json) => {
-      if (!Array.isArray(value)) {
-        throw `The value \`${JSON.stringify(
-          value
-        )}\` is not a list and can therefore not be parsed as a tuple`;
-      }
-      if (value.length !== 2) {
-        throw `The array \`${JSON.stringify(
-          value
-        )}\` is not the proper length for a tuple`;
-      }
-      const [a, b] = value;
-      return [decoderA(a), decoderB(b)];
-    };
-}
-
-const literal = <p extends primitive>(literal: p): Decoder<p> => (
-  value: Json
-) => {
-  if (literal !== value) {
-    throw `The value \`${JSON.stringify(
-      value
-    )}\` is not the literal \`${JSON.stringify(literal)}\``;
-  }
-  return literal;
-};
-
 const date = (value: Json) => {
   const dateString = string(value);
   const timeStampSinceEpoch = Date.parse(dateString);
@@ -262,7 +121,7 @@ const date = (value: Json) => {
     throw `String \`${dateString}\` is not a valid date string`;
   }
   return new Date(timeStampSinceEpoch);
-}
+};
 
 const discriminatedUnion = union(
   { discriminant: literal('one') },
@@ -301,15 +160,15 @@ const x: IEmployee = employeeDecoder({
   message: ['something-else', { somestuff: 'a' }],
   discriminatedUnion: { discriminant: 'two', data: '2' },
   address: { city: 'asdf' },
-  secondAddrese: { city: "secondcity" },
-  uni: "test",
+  secondAddrese: { city: 'secondcity' },
+  uni: 'test',
   likes: [
     ['likt', 3],
     ['likt', 0],
   ],
   phoneNumbers: ['733', 'dsfadadsa', '', '4'],
   ageAndReputation: [12, 'good'],
-  dateOfBirth: "1995-12-14T00:00:00.0Z",
+  dateOfBirth: '1995-12-14T00:00:00.0Z',
   isEmployed: true,
 });
 console.log(x);
