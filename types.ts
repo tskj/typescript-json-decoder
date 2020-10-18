@@ -1,4 +1,3 @@
-import { $, _ } from './hkts';
 import { Json } from './json-types';
 import { literal, tuple, record } from './literal-decoders';
 
@@ -99,15 +98,3 @@ export const decode = <D extends Decoder<unknown>>(
   }
   return decoder as any;
 };
-
-/**
- * Garbage
- */
-
-type getT<A, X> = X extends $<A, [infer T]> ? T : never;
-type getTypeofDecoderList<
-  t extends (Decoder<unknown> | JsonLiteralDecoder)[]
-> = getTypeOfDecoder<getT<Array<_>, t>>;
-export type getTypeOfDecoder<
-  t extends Decoder<unknown> | JsonLiteralDecoder
-> = t extends Decoder<unknown> ? getT<Decoder<_>, t> : t;
