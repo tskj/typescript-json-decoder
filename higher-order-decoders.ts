@@ -1,26 +1,13 @@
-import { $, _ } from './hkts';
 import { undef } from './decoder';
 import { Pojo } from './pojo';
 import { eval, decode, Decoder, DecoderFunction } from './types';
 
-/**
- * This business only works when union is called
- * with parameters as a tuple, not a general list?
- */
-type getT<A, X> = X extends $<A, [infer T]> ? T : never;
-export type getTypeofDecoderList<
-  t extends Decoder<unknown>[]
-> = getTypeOfDecoder<getT<Array<_>, t>>;
-export type getTypeOfDecoder<
-  t extends Decoder<unknown>
-> = t extends DecoderFunction<unknown> ? eval<t> : t;
-/**
- * ^ Wish I understood this better
- */
+type evalOver<t> = t extends unknown ? eval<t> : never;
+type getSumOfArray<arr> = arr extends (infer elements)[] ? elements : never;
 
 export const union = <decoders extends Decoder<unknown>[]>(
   ...decoders: decoders
-) => (value: Pojo): getTypeofDecoderList<decoders> => {
+) => (value: Pojo): evalOver<getSumOfArray<decoders>> => {
   if (decoders.length === 0) {
     throw `Could not match any of the union cases`;
   }
@@ -60,7 +47,7 @@ export function array<D extends Decoder<unknown>>(
       return xs.map((x, i) => {
         index = i;
         return decode(decoder as any)(x);
-      });
+      }) as any;
     } catch (message) {
       throw (
         message +

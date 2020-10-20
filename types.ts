@@ -57,7 +57,7 @@ const decodeJsonLiteralForm = <json extends JsonLiteralForm>(
     return tuple(decoder[0] as any, decoder[1] as any) as any;
   }
   if (isRecordJsonLiteralForm(decoder)) {
-    return record(decoder as any);
+    return record(decoder as any) as any;
   }
   throw `shouldn't happen`;
 };
@@ -82,12 +82,12 @@ const isDecoder = <T>(decoder: unknown): decoder is Decoder<T> =>
 export type primitive = string | boolean | number | null | undefined;
 // prettier-ignore
 export type eval<decoder> =
-  ([decoder] extends [primitive] ?
-    [decoder] :
-  [decoder] extends [(input: Pojo) => infer T] ?
+  (decoder extends DecoderFunction<infer T> ?
     [eval<T>] :
+  decoder extends JsonLiteralForm ?
+    [evalJsonLiteralForm<decoder>]:
 
-    [evalJsonLiteralForm<decoder>]
+    [decoder] 
   // needs a bit of indirection to avoid
   // circular type reference compiler error
   )[0];

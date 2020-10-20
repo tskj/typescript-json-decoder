@@ -16,16 +16,16 @@ const message = union(
 export type IEmployee = eval<typeof employeeDecoder>;
 export const employeeDecoder = record({
   employeeId: number,
-  name: string,
-  phoneNumbers: array(string),
+  ageAndReputation: [number, string],
+  secondAddrese: option({ city: string, option: option(number) }),
   message,
   discriminatedUnion,
+  name: string,
+  phoneNumbers: array(string),
   address: {
     city: string,
   },
-  secondAddrese: option({ city: string, option: option(number) }),
   uni: union('uni', { lol: string }),
-  ageAndReputation: [number, string],
   likes: array([literal('likt'), number]),
   isEmployed: boolean,
   dateOfBirth: date,
@@ -60,9 +60,6 @@ console.log(x);
 // maybe question mark on optional key
 
 // use tagged templates to abstract out the stringifying
-// clean up eval
-// refactor type guards and stuff around eval and type definitions
-// rename json -> jsob
 
 // two map decoders, both from a json map
 // and from a list of tuples
