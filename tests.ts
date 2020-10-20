@@ -16,12 +16,12 @@ const message = union(
 export type IEmployee = eval<typeof employeeDecoder>;
 export const employeeDecoder = record({
   employeeId: number,
-  ageAndReputation: [number, string],
-  secondAddrese: option({ city: string, option: option(number) }),
   message,
-  discriminatedUnion,
-  name: string,
   phoneNumbers: array(string),
+  discriminatedUnion,
+  secondAddrese: option({ city: string, option: option(number) }),
+  name: string,
+  ageAndReputation: [number, string],
   address: {
     city: string,
   },
@@ -60,6 +60,7 @@ console.log(x);
 // maybe question mark on optional key
 
 // use tagged templates to abstract out the stringifying
+// move object test up in record decoder to give better error messages
 
 // two map decoders, both from a json map
 // and from a list of tuples
