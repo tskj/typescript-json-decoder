@@ -7,26 +7,28 @@ import { literal, tuple, record } from './literal-decoders';
  * of themselves
  */
 
-type JsonLiteralFormPrimitive = string;
-const isJsonLiteralFormPrimitive = (
+type PrimitiveJsonLiteralForm = string;
+const isPrimitiveJsonLiteralForm = (
   v: unknown
-): v is JsonLiteralFormPrimitive => typeof v === 'string';
+): v is PrimitiveJsonLiteralForm => typeof v === 'string';
+
+type TupleJsonLiteralForm = [Decoder<unknown>, Decoder<unknown>];
+const isTupleJsonLiteralForm = (v: unknown): v is TupleJsonLiteralForm =>
+  Array.isArray(v) && v.length === 2 && v.every(isDecoder);
+
+type RecordJsonLiteralForm = { [key: string]: Decoder<unknown> };
+const isRecordJsonLiteralForm = (v: unknown): v is RecordJsonLiteralForm =>
+  typeof v === 'object' && v !== null && Object.values(v).every(isDecoder);
 
 export type JsonLiteralForm =
-  | JsonLiteralFormPrimitive
+  | PrimitiveJsonLiteralForm
   | [Decoder<unknown>, Decoder<unknown>]
   | { [key: string]: Decoder<unknown> };
 const isJsonLiteralForm = (decoder: unknown): decoder is JsonLiteralForm => {
   return (
-    isJsonLiteralFormPrimitive(decoder) ||
-    (Array.isArray(decoder) &&
-      decoder.length === 2 &&
-      decoder.every((x) => isJsonLiteralForm(x) || isDecoderFunction(x))) ||
-    (typeof decoder === 'object' &&
-      decoder !== null &&
-      Object.values(decoder).every(
-        (x) => isJsonLiteralForm(x) || isDecoderFunction(x)
-      ))
+    isPrimitiveJsonLiteralForm(decoder) ||
+    isTupleJsonLiteralForm(decoder) ||
+    isRecordJsonLiteralForm(decoder)
   );
 };
 
@@ -37,7 +39,7 @@ const isJsonLiteralForm = (decoder: unknown): decoder is JsonLiteralForm => {
 
 // prettier-ignore
 type evalJsonLiteralForm<decoder> =
-  [decoder] extends [JsonLiteralFormPrimitive] ?
+  [decoder] extends [PrimitiveJsonLiteralForm] ?
     decoder :
   [decoder] extends [[infer decoderA, infer decoderB]] ?
     [ eval<decoderA>, eval<decoderB> ] :
@@ -48,13 +50,13 @@ type evalJsonLiteralForm<decoder> =
 const decodeJsonLiteralForm = <json extends JsonLiteralForm>(
   decoder: json
 ): DecoderFunction<evalJsonLiteralForm<json>> => {
-  if (isJsonLiteralFormPrimitive(decoder)) {
+  if (isPrimitiveJsonLiteralForm(decoder)) {
     return literal(decoder) as any;
   }
-  if (Array.isArray(decoder)) {
+  if (isTupleJsonLiteralForm(decoder)) {
     return tuple(decoder[0] as any, decoder[1] as any) as any;
   }
-  if (typeof decoder === 'object') {
+  if (isRecordJsonLiteralForm(decoder)) {
     return record(decoder as any);
   }
   throw `shouldn't happen`;
@@ -68,7 +70,9 @@ export type DecoderFunction<T> = (input: Pojo) => T;
 const isDecoderFunction = (f: unknown): f is DecoderFunction<unknown> =>
   typeof f === 'function';
 
-export type Decoder<T> = DecoderFunction<T> | JsonLiteralForm;
+export type Decoder<T> = JsonLiteralForm | DecoderFunction<T>;
+const isDecoder = <T>(decoder: unknown): decoder is Decoder<T> =>
+  isJsonLiteralForm(decoder) || isDecoderFunction(decoder);
 
 /**
  * Run evaluation of decoder at both type and
