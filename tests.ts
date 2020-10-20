@@ -18,6 +18,8 @@ export const employeeDecoder = record({
   employeeId: number,
   name: string,
   phoneNumbers: array(string),
+  message,
+  discriminatedUnion,
   address: {
     city: string,
   },
@@ -25,8 +27,6 @@ export const employeeDecoder = record({
   uni: union('uni', { lol: string }),
   ageAndReputation: [number, string],
   likes: array([literal('likt'), number]),
-  message,
-  discriminatedUnion,
   isEmployed: boolean,
   dateOfBirth: date,
   ssn: option(string),
@@ -62,7 +62,6 @@ console.log(x);
 // use tagged templates to abstract out the stringifying
 // clean up eval
 // refactor type guards and stuff around eval and type definitions
-// better union type, at least understand current implementation
 // rename json -> jsob
 
 // two map decoders, both from a json map

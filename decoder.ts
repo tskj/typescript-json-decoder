@@ -1,7 +1,7 @@
-import { Json } from './json-types';
+import { Pojo } from './pojo';
 import { DecoderFunction } from './types';
 
-export const string: DecoderFunction<string> = (s: Json) => {
+export const string: DecoderFunction<string> = (s: Pojo) => {
   if (typeof s !== 'string') {
     throw `The value \`${JSON.stringify(
       s
@@ -10,7 +10,7 @@ export const string: DecoderFunction<string> = (s: Json) => {
   return s;
 };
 
-export const number: DecoderFunction<number> = (n: Json) => {
+export const number: DecoderFunction<number> = (n: Pojo) => {
   if (typeof n !== 'number') {
     throw `The value \`${JSON.stringify(
       n
@@ -19,7 +19,7 @@ export const number: DecoderFunction<number> = (n: Json) => {
   return n;
 };
 
-export const boolean: DecoderFunction<boolean> = (b: Json) => {
+export const boolean: DecoderFunction<boolean> = (b: Pojo) => {
   if (typeof b !== 'boolean') {
     throw `The value \`${JSON.stringify(
       b
@@ -28,7 +28,7 @@ export const boolean: DecoderFunction<boolean> = (b: Json) => {
   return b;
 };
 
-export const undef: DecoderFunction<undefined> = ((u: Json) => {
+export const undef: DecoderFunction<undefined> = ((u: Pojo) => {
   if (typeof u !== 'undefined') {
     throw `The value \`${JSON.stringify(
       u
@@ -37,7 +37,7 @@ export const undef: DecoderFunction<undefined> = ((u: Json) => {
   return u;
 }) as any;
 
-export const nil: DecoderFunction<null> = ((u: Json) => {
+export const nil: DecoderFunction<null> = ((u: Pojo) => {
   if (u !== null) {
     throw `The value \`${JSON.stringify(
       u
@@ -46,7 +46,7 @@ export const nil: DecoderFunction<null> = ((u: Json) => {
   return u as null;
 }) as any;
 
-export const date = (value: Json) => {
+export const date = (value: Pojo) => {
   const dateString = string(value);
   const timeStampSinceEpoch = Date.parse(dateString);
   if (isNaN(timeStampSinceEpoch)) {

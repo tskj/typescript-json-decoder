@@ -1,6 +1,6 @@
 import { $, _ } from './hkts';
 import { undef } from './decoder';
-import { Json } from './json-types';
+import { Pojo } from './pojo';
 import { eval, decode, Decoder, DecoderFunction } from './types';
 
 /**
@@ -14,10 +14,13 @@ export type getTypeofDecoderList<
 export type getTypeOfDecoder<
   t extends Decoder<unknown>
 > = t extends DecoderFunction<unknown> ? eval<t> : t;
+/**
+ * ^ Wish I understood this better
+ */
 
 export const union = <decoders extends Decoder<unknown>[]>(
   ...decoders: decoders
-) => (value: Json): getTypeofDecoderList<decoders> => {
+) => (value: Pojo): getTypeofDecoderList<decoders> => {
   if (decoders.length === 0) {
     throw `Could not match any of the union cases`;
   }
@@ -45,7 +48,7 @@ export function option<T extends Decoder<unknown>>(
 export function array<D extends Decoder<unknown>>(
   decoder: D
 ): DecoderFunction<eval<D>[]> {
-  return (xs: Json): D[] => {
+  return (xs: Pojo): D[] => {
     const arrayToString = (arr: any) => `${JSON.stringify(arr)}`;
     if (!Array.isArray(xs)) {
       throw `The value \`${arrayToString(
