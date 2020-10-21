@@ -22,8 +22,8 @@ const isRecordJsonLiteralForm = (v: unknown): v is RecordJsonLiteralForm =>
 
 export type JsonLiteralForm =
   | PrimitiveJsonLiteralForm
-  | [Decoder<unknown>, Decoder<unknown>]
-  | { [key: string]: Decoder<unknown> };
+  | TupleJsonLiteralForm
+  | RecordJsonLiteralForm;
 const isJsonLiteralForm = (decoder: unknown): decoder is JsonLiteralForm => {
   return (
     isPrimitiveJsonLiteralForm(decoder) ||
@@ -92,11 +92,11 @@ export type eval<decoder> =
   // circular type reference compiler error
   )[0];
 
-export const decode = <D extends Decoder<unknown>>(
-  decoder: D
+export const decoder = <D extends Decoder<unknown>>(
+  _decoder: D
 ): DecoderFunction<eval<D>> => {
-  if (!isDecoderFunction(decoder)) {
-    return decodeJsonLiteralForm(decoder as any);
+  if (!isDecoderFunction(_decoder)) {
+    return decodeJsonLiteralForm(_decoder as any);
   }
-  return decoder as any;
+  return _decoder as any;
 };

@@ -2,7 +2,7 @@ import { optionDecoder } from './higher-order-decoders';
 import { Pojo } from './pojo';
 import {
   eval,
-  decode,
+  decoder,
   Decoder,
   DecoderFunction,
   JsonLiteralForm,
@@ -34,7 +34,7 @@ export const tuple = <A extends Decoder<unknown>, B extends Decoder<unknown>>(
     )}\` is not the proper length for a tuple`;
   }
   const [a, b] = value;
-  return [decode(decoderA as any)(a), decode(decoderB as any)(b)];
+  return [decoder(decoderA as any)(a), decoder(decoderB as any)(b)];
 };
 
 export const record = <schema extends { [key: string]: Decoder<unknown> }>(
@@ -43,7 +43,7 @@ export const record = <schema extends { [key: string]: Decoder<unknown> }>(
   const objectToString = (obj: any) =>
     Object.keys(obj).length === 0 ? `{}` : `${JSON.stringify(obj)}`;
   return Object.entries(s)
-    .map(([key, decoder]: [string, any]) => {
+    .map(([key, _decoder]: [string, any]) => {
       if (Array.isArray(value) || typeof value !== 'object' || value === null) {
         throw `Value \`${objectToString(
           value
@@ -51,7 +51,7 @@ export const record = <schema extends { [key: string]: Decoder<unknown> }>(
       }
 
       if (!value.hasOwnProperty(key)) {
-        if (decoder[optionDecoder]) {
+        if (_decoder[optionDecoder]) {
           return [key, undefined];
         }
         throw `Cannot find key \`${key}\` in \`${objectToString(value)}\``;
@@ -59,7 +59,7 @@ export const record = <schema extends { [key: string]: Decoder<unknown> }>(
 
       try {
         const jsonvalue = value[key];
-        return [key, decode(decoder)(jsonvalue)];
+        return [key, decoder(_decoder)(jsonvalue)];
       } catch (message) {
         throw (
           message +

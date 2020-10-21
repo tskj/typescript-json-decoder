@@ -1,7 +1,7 @@
 import { boolean, date, number, string } from './decoder';
 import { array, option, union } from './higher-order-decoders';
-import { literal, record, tuple } from './literal-decoders';
-import { eval } from './types';
+import { literal, tuple } from './literal-decoders';
+import { decoder, eval } from './types';
 
 const discriminatedUnion = union(
   { discriminant: literal('one') },
@@ -14,7 +14,7 @@ const message = union(
 );
 
 export type IEmployee = eval<typeof employeeDecoder>;
-export const employeeDecoder = record({
+export const employeeDecoder = decoder({
   employeeId: number,
   message,
   phoneNumbers: array(string),
@@ -31,8 +31,6 @@ export const employeeDecoder = record({
   dateOfBirth: date,
   ssn: option(string),
 });
-
-// test
 
 const x: IEmployee = employeeDecoder({
   employeeId: 2,

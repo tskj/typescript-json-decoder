@@ -1,6 +1,6 @@
 import { undef } from './decoder';
 import { Pojo } from './pojo';
-import { eval, decode, Decoder, DecoderFunction } from './types';
+import { eval, decoder, Decoder, DecoderFunction } from './types';
 
 type evalOver<t> = t extends unknown ? eval<t> : never;
 type getSumOfArray<arr> = arr extends (infer elements)[] ? elements : never;
@@ -11,9 +11,9 @@ export const union = <decoders extends Decoder<unknown>[]>(
   if (decoders.length === 0) {
     throw `Could not match any of the union cases`;
   }
-  const [decoder, ...rest] = decoders;
+  const [_decoder, ...rest] = decoders;
   try {
-    return decode(decoder as any)(value) as any;
+    return decoder(_decoder as any)(value) as any;
   } catch (messageFromThisDecoder) {
     try {
       return union(...(rest as any))(value) as any;
@@ -33,7 +33,7 @@ export function option<T extends Decoder<unknown>>(
 }
 
 export function array<D extends Decoder<unknown>>(
-  decoder: D
+  _decoder: D
 ): DecoderFunction<eval<D>[]> {
   return (xs: Pojo): D[] => {
     const arrayToString = (arr: any) => `${JSON.stringify(arr)}`;
@@ -46,7 +46,7 @@ export function array<D extends Decoder<unknown>>(
     try {
       return xs.map((x, i) => {
         index = i;
-        return decode(decoder as any)(x);
+        return decoder(_decoder as any)(x);
       }) as any;
     } catch (message) {
       throw (
