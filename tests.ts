@@ -57,9 +57,15 @@ console.log(x);
 // maybe variadic tuple decoder
 // maybe question mark on optional key
 
-// use tagged templates to abstract out the stringifying
-// move object test up in record decoder to give better error messages
+// Use tagged templates to abstract out the stringifying
+// Returning nestend objects instead of strings?
+// Move object test up in record decoder to give better error messages
+// Use my object-map implementation
+// also less any and more 'correct' implementations in general
 
-// two map decoders, both from a json map
+// Two map decoders, both from a json map
 // and from a list of tuples
-// maybe even one from a list of objects and key functions
+// Maybe even one from a list of objects and key functions
+
+// Set up tests
+// Readme with some examples
