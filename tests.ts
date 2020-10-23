@@ -1,5 +1,5 @@
 import { boolean, date, number, string } from './decoder';
-import { array, dict, map, option, union } from './higher-order-decoders';
+import { array, dict, map, option, set, union } from './higher-order-decoders';
 import { literal, tuple } from './literal-decoders';
 import { decoder, eval } from './types';
 
@@ -17,6 +17,7 @@ export type IEmployee = eval<typeof employeeDecoder>;
 export const employeeDecoder = decoder({
   employeeId: number,
   name: string,
+  set: set(union(string, number, { data: boolean })),
   employees: map(
     {
       employeeId: number,
@@ -44,6 +45,7 @@ export const employeeDecoder = decoder({
 const x: IEmployee = employeeDecoder({
   employeeId: 2,
   name: 'asdfasd',
+  set: ['7', 7, { data: true }],
   employees: [
     { employeeId: 1, name: 'lollern' },
     { employeeId: 3, name: 'other guy', ssn: '4' },
@@ -72,14 +74,10 @@ console.log(x);
 // maybe question mark on optional key
 
 // Use tagged templates to abstract out the stringifying
-// Returning nestend objects instead of strings?
+// Returning nestend objects instead of strings for error reporting?
 // Move object test up in record decoder to give better error messages
 // Use my object-map implementation
 // also less any and more 'correct' implementations in general
-
-// Two map decoders, both from a json map
-// and from a list of tuples
-// Maybe even one from a list of objects and key functions
 
 // Set up tests
 // Readme with some examples

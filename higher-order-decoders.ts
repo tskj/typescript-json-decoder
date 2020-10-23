@@ -59,21 +59,32 @@ export function array<D extends Decoder<unknown>>(
   };
 }
 
+export const set = <D extends Decoder<unknown>>(
+  _decoder: D
+): DecoderFunction<Set<eval<D>>> => (list: Pojo) => {
+  try {
+    return new Set(decoder(array(_decoder))(list));
+  } catch (message) {
+    throw message + `\nand can therefore not be parsed as a set`;
+  }
+};
+
 export const map = <K, D extends Decoder<unknown>>(
   _decoder: D,
   key: (x: eval<D>) => K
 ): DecoderFunction<Map<K, eval<D>>> => (listOfObjects: Pojo) => {
-  if (!isPojoArray(listOfObjects)) {
-    throw `Value \`${listOfObjects}\` is not a list and can therefore not be parsed as a map`;
+  try {
+    const parsedObjects = decoder(array(_decoder))(listOfObjects);
+    const map = new Map(parsedObjects.map((value) => [key(value), value]));
+    if (parsedObjects.length !== map.size) {
+      console.warn(
+        `Probable duplicate key in map: List \`${parsedObjects}\` isn't the same size as the parsed \`${map}\``
+      );
+    }
+    return map;
+  } catch (message) {
+    throw message + `\nand can therefore not be parsed as a map`;
   }
-  const parsedObjects = decoder(array(_decoder))(listOfObjects);
-  const map = new Map(parsedObjects.map((value) => [key(value), value]));
-  if (parsedObjects.length !== map.size) {
-    console.warn(
-      `Probable duplicate key in map: List \`${parsedObjects}\` isn't the same size as the parsed \`${map}\``
-    );
-  }
-  return map;
 };
 
 export const dict = <D extends Decoder<unknown>>(
