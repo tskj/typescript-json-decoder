@@ -1,5 +1,5 @@
 import { string, undef } from './decoder';
-import { Pojo } from './pojo';
+import { isPojoArray, isPojoObject, Pojo } from './pojo';
 import { eval, decoder, Decoder, DecoderFunction } from './types';
 
 type evalOver<t> = t extends unknown ? eval<t> : never;
@@ -59,10 +59,21 @@ export function array<D extends Decoder<unknown>>(
   };
 }
 
+export const map = <K, D extends Decoder<unknown>>(
+  _decoder: D,
+  key: (x: eval<D>) => K
+): DecoderFunction<Map<K, eval<D>>> => (listOfObjects: Pojo) => {
+  if (!isPojoArray(listOfObjects)) {
+    throw `Value \`${listOfObjects}\` is not a list and can therefore not be parsed as a map`;
+  }
+  const parsedObjects = decoder(array(_decoder))(listOfObjects);
+  return new Map(parsedObjects.map((value) => [key(value), value]));
+};
+
 export const dict = <D extends Decoder<unknown>>(
   _decoder: D
 ): DecoderFunction<Map<string, eval<D>>> => (map: Pojo) => {
-  if (!(typeof map === 'object' && map !== null)) {
+  if (!isPojoObject(map)) {
     throw `Value \`${map}\` is not an object and can therefore not be parsed as a map`;
   }
   const decodedPairs = Object.entries(map).map(([key, value]) => {

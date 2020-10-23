@@ -1,5 +1,5 @@
 import { boolean, date, number, string } from './decoder';
-import { array, dict, option, union } from './higher-order-decoders';
+import { array, dict, map, option, union } from './higher-order-decoders';
 import { literal, tuple } from './literal-decoders';
 import { decoder, eval } from './types';
 
@@ -17,6 +17,14 @@ export type IEmployee = eval<typeof employeeDecoder>;
 export const employeeDecoder = decoder({
   employeeId: number,
   name: string,
+  employees: map(
+    {
+      employeeId: number,
+      name: string,
+      ssn: option(string),
+    },
+    (x) => x.employeeId
+  ),
   dict: dict(union(string, number)),
   phoneNumbers: array(string),
   address: {
@@ -36,6 +44,11 @@ export const employeeDecoder = decoder({
 const x: IEmployee = employeeDecoder({
   employeeId: 2,
   name: 'asdfasd',
+  employees: [
+    { employeeId: 1, name: 'lollern' },
+    { employeeId: 1, name: 'duplicate' },
+    { employeeId: 3, name: 'other guy', ssn: '4' },
+  ],
   dict: { somestuff: 'lol', morestuff: 7 },
   message: ['something-else', { somestuff: 'a' }],
   discriminatedUnion: { discriminant: 'two', data: '2' },
