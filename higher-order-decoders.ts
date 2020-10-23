@@ -67,7 +67,13 @@ export const map = <K, D extends Decoder<unknown>>(
     throw `Value \`${listOfObjects}\` is not a list and can therefore not be parsed as a map`;
   }
   const parsedObjects = decoder(array(_decoder))(listOfObjects);
-  return new Map(parsedObjects.map((value) => [key(value), value]));
+  const map = new Map(parsedObjects.map((value) => [key(value), value]));
+  if (parsedObjects.length !== map.size) {
+    console.warn(
+      `Probable duplicate key in map: List \`${parsedObjects}\` isn't the same size as the parsed \`${map}\``
+    );
+  }
+  return map;
 };
 
 export const dict = <D extends Decoder<unknown>>(

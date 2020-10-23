@@ -46,7 +46,6 @@ const x: IEmployee = employeeDecoder({
   name: 'asdfasd',
   employees: [
     { employeeId: 1, name: 'lollern' },
-    { employeeId: 1, name: 'duplicate' },
     { employeeId: 3, name: 'other guy', ssn: '4' },
   ],
   dict: { somestuff: 'lol', morestuff: 7 },
