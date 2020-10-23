@@ -1,4 +1,4 @@
-import { undef } from './decoder';
+import { string, undef } from './decoder';
 import { Pojo } from './pojo';
 import { eval, decoder, Decoder, DecoderFunction } from './types';
 
@@ -58,3 +58,19 @@ export function array<D extends Decoder<unknown>>(
     }
   };
 }
+
+export const dict = <D extends Decoder<unknown>>(
+  _decoder: D
+): DecoderFunction<Map<string, eval<D>>> => (map: Pojo) => {
+  if (!(typeof map === 'object' && map !== null)) {
+    throw `Value \`${map}\` is not an object and can therefore not be parsed as a map`;
+  }
+  const decodedPairs = Object.entries(map).map(([key, value]) => {
+    try {
+      return [key, decoder(_decoder)(value)] as [string, eval<D>];
+    } catch (message) {
+      throw message + `\nwhen decoding the key \`${key}\` in map \`${map}\``;
+    }
+  });
+  return new Map(decodedPairs);
+};
