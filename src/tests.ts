@@ -1,7 +1,7 @@
 import { boolean, date, number, string } from './primitive-decoders';
 import { array, dict, map, option, set, union } from './higher-order-decoders';
 import { literal, tuple } from './literal-decoders';
-import { decoder, decode } from '.';
+import { decoder, decode } from './types';
 
 const discriminatedUnion = union(
   { discriminant: literal('one') },

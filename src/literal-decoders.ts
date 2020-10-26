@@ -1,6 +1,12 @@
 import { optionDecoder } from './higher-order-decoders';
 import { Pojo } from './pojo';
-import { decode, decoder, Decoder, DecoderFunction, JsonLiteralForm } from '.';
+import {
+  decode,
+  decoder,
+  Decoder,
+  DecoderFunction,
+  JsonLiteralForm,
+} from './types';
 
 export const literal = <p extends JsonLiteralForm>(
   literal: p

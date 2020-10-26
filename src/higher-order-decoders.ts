@@ -1,6 +1,6 @@
 import { undef } from './primitive-decoders';
 import { isPojoObject, Pojo } from './pojo';
-import { decode, decoder, Decoder, DecoderFunction } from '.';
+import { decode, decoder, Decoder, DecoderFunction } from './types';
 
 type evalOver<t> = t extends unknown ? decode<t> : never;
 type getSumOfArray<arr> = arr extends (infer elements)[] ? elements : never;
