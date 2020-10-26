@@ -42,10 +42,10 @@ type evalJsonLiteralForm<decoder> =
   [decoder] extends [PrimitiveJsonLiteralForm] ?
     decoder :
   [decoder] extends [[infer decoderA, infer decoderB]] ?
-    [ eval<decoderA>, eval<decoderB> ] :
+    [ decode<decoderA>, decode<decoderB> ] :
 
     {
-      [key in keyof decoder]: eval<decoder[key]>;
+      [key in keyof decoder]: decode<decoder[key]>;
     }
 const decodeJsonLiteralForm = <json extends JsonLiteralForm>(
   decoder: json
@@ -81,9 +81,9 @@ const isDecoder = <T>(decoder: unknown): decoder is Decoder<T> =>
 
 export type primitive = string | boolean | number | null | undefined;
 // prettier-ignore
-export type eval<decoder> =
+export type decode<decoder> =
   (decoder extends DecoderFunction<infer T> ?
-    [eval<T>] :
+    [decode<T>] :
   decoder extends JsonLiteralForm ?
     [evalJsonLiteralForm<decoder>]:
 
@@ -94,7 +94,7 @@ export type eval<decoder> =
 
 export const decoder = <D extends Decoder<unknown>>(
   _decoder: D
-): DecoderFunction<eval<D>> => {
+): DecoderFunction<decode<D>> => {
   if (!isDecoderFunction(_decoder)) {
     return decodeJsonLiteralForm(_decoder as any);
   }

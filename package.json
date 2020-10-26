@@ -1,0 +1,23 @@
+{
+  "name": "typescript-json-decoder",
+  "version": "0.0.1",
+  "description": "",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tskj/typescript-json-decoder.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/tskj/typescript-json-decoder/issues"
+  },
+  "homepage": "https://github.com/tskj/typescript-json-decoder#readme",
+  "prepublish": "tsc"
+}

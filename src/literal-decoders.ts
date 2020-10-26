@@ -1,12 +1,6 @@
 import { optionDecoder } from './higher-order-decoders';
 import { Pojo } from './pojo';
-import {
-  eval,
-  decoder,
-  Decoder,
-  DecoderFunction,
-  JsonLiteralForm,
-} from './types';
+import { decode, decoder, Decoder, DecoderFunction, JsonLiteralForm } from '.';
 
 export const literal = <p extends JsonLiteralForm>(
   literal: p
@@ -22,7 +16,7 @@ export const literal = <p extends JsonLiteralForm>(
 export const tuple = <A extends Decoder<unknown>, B extends Decoder<unknown>>(
   decoderA: A,
   decoderB: B
-): DecoderFunction<[eval<A>, eval<B>]> => (value: Pojo) => {
+): DecoderFunction<[decode<A>, decode<B>]> => (value: Pojo) => {
   if (!Array.isArray(value)) {
     throw `The value \`${JSON.stringify(
       value
@@ -39,7 +33,7 @@ export const tuple = <A extends Decoder<unknown>, B extends Decoder<unknown>>(
 
 export const record = <schema extends { [key: string]: Decoder<unknown> }>(
   s: schema
-): DecoderFunction<eval<schema>> => (value: Pojo) => {
+): DecoderFunction<decode<schema>> => (value: Pojo) => {
   const objectToString = (obj: any) =>
     Object.keys(obj).length === 0 ? `{}` : `${JSON.stringify(obj)}`;
   return Object.entries(s)
