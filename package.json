@@ -1,12 +1,12 @@
 {
   "name": "typescript-json-decoder",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc-bundle tsconfig.json"
+    "build": "tsc"
   },
   "repository": {
     "type": "git",
@@ -19,12 +19,9 @@
     "url": "https://github.com/tskj/typescript-json-decoder/issues"
   },
   "homepage": "https://github.com/tskj/typescript-json-decoder#readme",
-  "prepublish": "tsc-bundle tsconfig.json",
+  "prepublish": "tsc",
   "files": [
     "dist/index.js",
     "dist/index.d.ts"
-  ],
-  "devDependencies": {
-    "typescript-bundle": "^1.0.16"
-  }
+  ]
 }
