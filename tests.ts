@@ -79,5 +79,12 @@ console.log(x);
 // Use my object-map implementation
 // also less any and more 'correct' implementations in general
 
+// Constant decoder (always returns same regardless of input)
+// Default decoder for when stuff is null or undefined
+// Integer decoder, and other validation of data
+// Regex decoder which takes a regex and returns string
+// Fail for explicitly disallowing keys
+// Unknown for passing through anything and leaving type unknown
+
 // Set up tests
 // Readme with some examples
