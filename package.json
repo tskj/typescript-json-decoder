@@ -1,6 +1,6 @@
 {
   "name": "typescript-json-decoder",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -19,9 +19,5 @@
     "url": "https://github.com/tskj/typescript-json-decoder/issues"
   },
   "homepage": "https://github.com/tskj/typescript-json-decoder#readme",
-  "prepublish": "tsc",
-  "files": [
-    "dist/index.js",
-    "dist/index.d.ts"
-  ]
+  "prepublish": "tsc"
 }
