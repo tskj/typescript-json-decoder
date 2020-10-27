@@ -212,3 +212,21 @@ const blogpostDecoder = decoder({
 ```
 
 Look at that: actual, type safe, automatic parsing of a date encoded as a Json string.
+
+At his point I went a little crazy implementing fun datastructures. How about a dictionary? A dictionary is a map from strings to your type `T`, that is, the type `Map<string, T>`. The function `dict` then takes a decoder of `T` and creates a decoder which parses *JavaScript object literals* as maps. Take a look at the following example to understand how it works.
+
+```typescript
+import { dict } from 'typescript-json-decoder';
+
+const myDictionary = {
+    one: 1,
+    two: 2,
+    three: 3,
+};
+
+const numberDictionaryDecoder = dict(number);
+const myMap = numberDictionaryDecoder(myDictionary); // Map<string, number>
+console.log(myMap.get('two')); // 2
+```
+
+Although this makes a lot of sense, few APIs actually use Json literals to encode maps. Rather you often see lists of objects, for example lists of `User` objects, which in a sense *are* maps, and maybe you want to treat those as maps from their user id to the user object. Enter the `map` decoder.
