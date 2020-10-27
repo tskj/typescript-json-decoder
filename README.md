@@ -1,5 +1,9 @@
 
-TypeScript Json Decoder is a library for decoding untrusted data as it comes in to your system, inspired by elm-json-decode. Detecting at runtime that your type does not in fact match the value returned by your API sucks, and not being able to parse the data to a datastructure of your liking in a convenient way sucks majorly - and having a type definition separate from its parser is unacceptable.
+TypeScript Json Decoder is a library for decoding untrusted data as it comes in to your system, inspired by elm-json-decode.
+
+Detecting at runtime that your type does not in fact match the value returned by your API sucks, and not being able to parse the data to a datastructure of your liking in a convenient way sucks majorly - and having a type definition separate from its parser is unacceptable.
+
+Installation: [npmjs.com/package/typescript-json-decoder](https://www.npmjs.com/package/typescript-json-decoder)
 
 ## The idea
 
