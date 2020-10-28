@@ -124,7 +124,15 @@ const stringAndNumberDecoder = decoder([string, number])
 const myTuple = stringAndNumberDecoder(['user', 2]);
 ```
 
-Notice we now need a call to the standard `decoder` function to make it into an actually callable decoder.
+Notice we now need a call to the standard `decoder` function to make it into an actually callable decoder. The advantage to this approach is that you can use the literal tuple syntax directly in an object, such as the following.
+
+```typescript
+const myDecoder = decoder({
+    username: string,
+    result: [string, number],
+    results: array([string, number]),
+})
+```
 
 It turns out this idea of literal form decoders is actually a lot more general. In fact, you can consider the first example of the `User` type to be a literal decoder where the `User` decoder object is a decoder of a JavaScript object of the same form. For this reason we also consider strings as literal decoders of themselves, that is `decoder('hey')` literally decodes the string `'hey'`. That might seem dumb, but it allows some really cool stuff. Firstly it allows us to decode an object which looks exactly like the following.
 
