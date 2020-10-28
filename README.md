@@ -120,7 +120,7 @@ This doesn't really match the syntax of regular TypeScript as much as I would li
 import { decode, decoder, string, number } from 'typescript-json-decoder';
 
 type StringAndNumber = decode<typeof stringAndNumberDecoder>;
-const stringAndNumberDecoder = decoder([string, number])
+const stringAndNumberDecoder = decoder([string, number]);
 const myTuple = stringAndNumberDecoder(['user', 2]);
 ```
 
@@ -131,13 +131,13 @@ const myDecoder = decoder({
     username: string,
     result: [string, number],
     results: array([string, number]),
-})
+});
 ```
 
 It turns out this idea of literal form decoders is actually a lot more general. In fact, you can consider the first example of the `User` type to be a literal decoder where the `User` decoder object is a decoder of a JavaScript object of the same form. For this reason we also consider strings as literal decoders of themselves, that is `decoder('hey')` literally decodes the string `'hey'`. That might seem dumb, but it allows some really cool stuff. Firstly it allows us to decode an object which looks exactly like the following.
 
 ```typescript
-const x = { type: 'cool', somestuff: "" }
+const x = { type: 'cool', somestuff: "" };
 ```
 
 With this decoder.
@@ -152,7 +152,7 @@ const coolDecoder = decoder({ type: decoder('cool'), somestuff: string });
 Similarly we can define another decoder of this type.
 
 ```typescript
-const y = { type: 'dumb', otherstuff: "starbucks" }
+const y = { type: 'dumb', otherstuff: "starbucks" };
 ```
 
 With a decoder that looks like this.
