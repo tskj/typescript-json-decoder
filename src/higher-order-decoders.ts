@@ -1,4 +1,4 @@
-import { undef } from './primitive-decoders';
+import { string, undef } from './primitive-decoders';
 import { isPojoObject, Pojo } from './pojo';
 import { decode, decoder, Decoder, DecoderFunction } from './types';
 
@@ -24,13 +24,13 @@ export const union = <decoders extends Decoder<unknown>[]>(
 };
 
 export const optionDecoder: unique symbol = Symbol('optional-decoder');
-export function option<T extends Decoder<unknown>>(
+export const option = <T extends Decoder<unknown>>(
   decoder: T
-): DecoderFunction<decode<T> | undefined> {
+): DecoderFunction<decode<T> | undefined> => {
   let _optionDecoder = union(undef, decoder as any);
   (_optionDecoder as any)[optionDecoder] = true;
   return _optionDecoder;
-}
+};
 
 export function array<D extends Decoder<unknown>>(
   _decoder: D
