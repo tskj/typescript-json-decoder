@@ -1,7 +1,7 @@
 
 TypeScript Json Decoder is a library for decoding untrusted data as it comes in to your system, inspired by elm-json-decode.
 
-Detecting at runtime that your type does not in fact match the value returned by your API sucks, and not being able to parse the data to a datastructure of your liking in a convenient way sucks majorly - and having a type definition separate from its parser is unacceptable.
+Detecting at runtime that your type does not in fact match the value returned by your API sucks, and not being able to parse the data to a data structure of your liking in a convenient way sucks majorly - and having a type definition separate from its parser is unacceptable.
 
 Installation: [npmjs.com/package/typescript-json-decoder](https://www.npmjs.com/package/typescript-json-decoder)
 
@@ -104,7 +104,7 @@ const users: Promise<User[]> =
 
 Everything so far should cover most APIs you need to model. However, I really want to give you the tools to model any kind of API you come across or want to create. Therefore we will look at some more complicated and useful constructs.
 
-Although not as common in Json APIs (yet?), tuples are a very useful datastructure. In JavaScript we usually encode them as lists with exactly two elements and possibly of different types, and TypeScript understands this. A tuple with a string and a number (such as `['user', 2]`) can be expressed with the type `[string, number]`. In this library we can use the `tuple` function to the same effect.
+Although not as common in Json APIs (yet?), tuples are a very useful data structure. In JavaScript we usually encode them as lists with exactly two elements and possibly of different types, and TypeScript understands this. A tuple with a string and a number (such as `['user', 2]`) can be expressed with the type `[string, number]`. In this library we can use the `tuple` function to the same effect.
 
 ```typescript
 import { decode, tuple, string, number } from 'typescript-json-decoder';
@@ -169,7 +169,7 @@ The type `Stuff` represents the union of these two other types, and TypeScript n
 
 ## Custom decoders
 
-All the decoders we have defined so far are in a way custom decoders and can be combined freely, however I encourage people to create arbitrary parsing functions which transform and validate data. Simply create a function which tries to build the datastructure you want and throw an error message if you are unable to signify failure. Decoders can be reused and combined however you want, and composition of decoders is simply function composition.
+All the decoders we have defined so far are in a way custom decoders and can be combined freely, however I encourage people to create arbitrary parsing functions which transform and validate data. Simply create a function which tries to build the data structure you want and throw an error message if you are unable to signify failure. Decoders can be reused and combined however you want, and composition of decoders is simply function composition.
 
 Here are some decoders I wrote mostly for fun.
 
@@ -213,7 +213,7 @@ const blogpostDecoder = decoder({
 
 Look at that: actual, type safe, automatic parsing of a date encoded as a Json string.
 
-At his point I went a little crazy implementing fun datastructures. How about a dictionary? A dictionary is a map from strings to your type `T`, that is, the type `Map<string, T>`. The function `dict` then takes a decoder of `T` and creates a decoder which parses *JavaScript object literals* as maps. Take a look at the following example to understand how it works.
+At his point I went a little crazy implementing fun data structures. How about a dictionary? A dictionary is a map from strings to your type `T`, that is, the type `Map<string, T>`. The function `dict` then takes a decoder of `T` and creates a decoder which parses *JavaScript object literals* as maps. Take a look at the following example to understand how it works.
 
 ```typescript
 import { dict } from 'typescript-json-decoder';
@@ -230,3 +230,42 @@ console.log(myMap.get('two')); // 2
 ```
 
 Although this makes a lot of sense, few APIs actually use Json literals to encode maps. Rather you often see lists of objects, for example lists of `User` objects, which in a sense *are* maps, and maybe you want to treat those as maps from their user id to the user object. Enter the `map` decoder.
+
+The `map` decoder is a function which takes a decoder and a "key" function. The key function takes the decoded object and returns its key. Imagine you have Json of the following form.
+
+```json
+[
+    {
+        "id": 1,
+        "username": "Fred",
+        "isBanned": true,
+    },
+    {
+        "id": 2,
+        "username": "Olga",
+        "isBanned": false,
+    }
+]
+```
+
+A decoder which understands this is data structure can be specified as the following.
+
+```typescript
+import { map, Decoder } from 'typescript-json-decoder';
+
+const userListDecoder: Decoder<Map<number, User>> =
+    map(userDecoder, x => x.id);
+```
+
+Here too the type declaration is redundant and will be inferred if you wish. You can also inline the definition if it only appears one place and you don't need a name for it.
+
+```typescript
+import { number, string, boolean, map, Decoder } from 'typescript-json-decoder';
+
+const userListDecoder =
+    map({
+        id: number,
+        username: string,
+        isBanned: boolean,
+    }, x => x.id);
+```
