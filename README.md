@@ -1,3 +1,4 @@
+#
 
 TypeScript Json Decoder is a library for decoding untrusted data as it comes in to your system, inspired by elm-json-decode.
 
@@ -75,7 +76,6 @@ const userDecoder = decoder({
 Union takes an arbitrary number of parameters.
 
 Lastly we can add some more stuff, and if you wish to fetch a list of your users, do it like the following.
-
 
 ```typescript
 import { decode, decoder, number, string, boolean, array, option, union } from 'typescript-json-decoder';
@@ -165,7 +165,7 @@ type Stuff = decode<typeof stuffDecoder>;
 const stuffDecoder = union(coolDecoder, dumbDecoder);
 ```
 
-The type `Stuff` represents the union of these two other types, and TypeScript now requires us to check the `type` field before trying to access either `somestuff` or `otherstuff` since they do not appear in both types - but one of them are guaranteed to exist. 
+The type `Stuff` represents the union of these two other types, and TypeScript now requires us to check the `type` field before trying to access either `somestuff` or `otherstuff` since they do not appear in both types - but one of them are guaranteed to exist.
 
 ## Custom decoders
 
