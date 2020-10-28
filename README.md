@@ -138,7 +138,7 @@ With this decoder.
 import { decode, decoder, string } from 'typescript-json-decoder';
 
 type Cool = decode<typeof coolDecoder>;
-const coolDecoder = decoder({ type: 'cool', somestuff: string });
+const coolDecoder = decoder({ type: decoder('cool'), somestuff: string });
 ```
 
 Similarly we can define another decoder of this type.
@@ -153,7 +153,7 @@ With a decoder that looks like this.
 import { decode, decoder, string } from 'typescript-json-decoder';
 
 type Dumb = decode<typeof dumbDecoder>;
-const dumbDecoder = decoder({ type: 'dumb', otherstuff: string });
+const dumbDecoder = decoder({ type: decoder('dumb'), otherstuff: string });
 ```
 
 This ensures that the `type` key is exactly the string `cool` or `dumb` respectively. If we now combine these decoders using a union we get what is known as a "discriminated union".
