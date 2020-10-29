@@ -36,6 +36,24 @@ const user: Promise<User> =
 
 Although, the `Promise<User>` declaration is redundant; the correct type will be inferred for us. If the decoder fails, the promise is rejected.
 
+## Benefits
+
+- You have *one* definition of your type which is easy to change and mirrors regular TypeScript definitions. The decoder is a free bonus.
+
+- Immediate error messages anytime your assumption about your API is wrong, or if it were to change in the future. No more runtime errors that only occasionally occur.
+
+- If you use the decoder at the end of a fetch call, the promise will reject - meaning you can consider a decoding failure the same as any other network failure.
+
+- A decoder for an object will pick out all the keys it needs, and discard the rest. This means that if your API has superfluous keys you don't care about, you won't carry unnecessary data around in the objects in your app.
+
+- All the standard types have decoders provided which you can use directly and never have to write a custom decoder.
+
+- If you'd like you can write custom decoders, operating on whatever data you want and producing whatever you want. Decoders are just functions, and functions can be composed!
+
+- Decoders can do arbitrary transformations of your data, massaging it to have the exact shape and structure your want. There is no reason to be stuck with whatever data structure your API supplies.
+
+- Decoders can do validation! Simply pass the data through your decoder unchanged if it satisfies your rules, and throw an error if it doesn't.
+
 ## Usage
 
 This library supports all the regular TypeScript types you are used to and can be composed arbitrarily to describe your types - with a goal of being as close to the regular type syntax as possible.
