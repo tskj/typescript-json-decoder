@@ -50,9 +50,9 @@ Although, the `Promise<User>` declaration is redundant; the correct type will be
 
 - If you'd like you can write custom decoders, operating on whatever data you want and producing whatever you want. Decoders are just functions, and functions can be composed!
 
-- Decoders can do arbitrary transformations of your data, massaging it to have the exact shape and structure your want. There is no reason to be stuck with whatever data structure your API supplies.
+- Decoders can do arbitrary transformations of your data, massaging it to have the exact shape and structure you want. There is no reason to be stuck with whatever data structure your API supplies.
 
-- Decoders can do validation! Simply pass the data through your decoder unchanged if it satisfies your rules, and throw an error if it doesn't.
+- Decoders can do validation! If you want to write a decoder that does validation, simply pass the data through your decoder unchanged if it satisfies your rules, or throw an error if it doesn't.
 
 ## Usage
 
