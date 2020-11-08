@@ -1,5 +1,5 @@
 import { optionDecoder } from './higher-order-decoders';
-import { Pojo } from './pojo';
+import { isPojoObject, Pojo, PojoObject } from './pojo';
 import {
   decode,
   decoder,
@@ -37,37 +37,40 @@ export const tuple = <A extends Decoder<unknown>, B extends Decoder<unknown>>(
   return [decoder(decoderA as any)(a), decoder(decoderB as any)(b)];
 };
 
+export const fieldDecoder: unique symbol = Symbol('field-decoder');
+const field = (key: string) => (_decoder: Decoder<unknown>) => (
+  value: PojoObject
+) => {
+  const objectToString = (obj: any) =>
+    Object.keys(obj).length === 0 ? `{}` : `${JSON.stringify(obj)}`;
+  if (!value.hasOwnProperty(key)) {
+    if ((_decoder as any)[optionDecoder]) {
+      return [key, undefined];
+    }
+    throw `Cannot find key \`${key}\` in \`${objectToString(value)}\``;
+  }
+  try {
+    const jsonvalue = value[key];
+    return decoder(_decoder)(jsonvalue);
+  } catch (message) {
+    throw (
+      message +
+      `\nwhen trying to decode the key \`${key}\` in \`${objectToString(
+        value
+      )}\``
+    );
+  }
+};
+
 export const record = <schema extends { [key: string]: Decoder<unknown> }>(
   s: schema
 ): DecoderFunction<decode<schema>> => (value: Pojo) => {
-  const objectToString = (obj: any) =>
-    Object.keys(obj).length === 0 ? `{}` : `${JSON.stringify(obj)}`;
+  if (!isPojoObject(value)) {
+    throw `Value \`${value}\` is not of type \`object\` but rather \`${typeof value}\``;
+  }
   return Object.entries(s)
     .map(([key, _decoder]: [string, any]) => {
-      if (Array.isArray(value) || typeof value !== 'object' || value === null) {
-        throw `Value \`${objectToString(
-          value
-        )}\` is not of type \`object\` but rather \`${typeof value}\``;
-      }
-
-      if (!value.hasOwnProperty(key)) {
-        if (_decoder[optionDecoder]) {
-          return [key, undefined];
-        }
-        throw `Cannot find key \`${key}\` in \`${objectToString(value)}\``;
-      }
-
-      try {
-        const jsonvalue = value[key];
-        return [key, decoder(_decoder)(jsonvalue)];
-      } catch (message) {
-        throw (
-          message +
-          `\nwhen trying to decode the key \`${key}\` in \`${objectToString(
-            value
-          )}\``
-        );
-      }
+      return [key, field(key)(_decoder)(value)] as [string, any];
     })
     .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
 };
