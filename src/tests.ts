@@ -1,7 +1,13 @@
 import { boolean, date, number, string } from './primitive-decoders';
 import { array, dict, map, option, set, union } from './higher-order-decoders';
-import { field, fieldDecoder, literal, tuple } from './literal-decoders';
-import { decoder, decode } from './types';
+import {
+  combinefields,
+  field,
+  fieldDecoder,
+  literal,
+  tuple,
+} from './literal-decoders';
+import { decoder, decode, DecoderFunction } from './types';
 
 const discriminatedUnion = union(
   { discriminant: literal('one') },
@@ -16,6 +22,11 @@ const message = union(
 export type IEmployee = decode<typeof employeeDecoder>;
 export const employeeDecoder = decoder({
   month: field('dateOfBirth', (x) => date(x).getMonth()),
+  year: combinefields(
+    (name, id) => `${name}:${id}`,
+    field('name', string) as DecoderFunction<string>,
+    field('employeeId', number) as DecoderFunction<number>
+  ),
   employeeId: number,
   name: string,
   set: set(union(string, number, { data: boolean })),

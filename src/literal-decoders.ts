@@ -1,5 +1,6 @@
 import { optionDecoder } from './higher-order-decoders';
 import { isPojoObject, Pojo, PojoObject } from './pojo';
+import { date, number, string } from './primitive-decoders';
 import {
   decode,
   decoder,
@@ -65,6 +66,25 @@ export const field = <T>(
   };
   (dec as any)[fieldDecoder] = true;
   return dec as any;
+};
+
+type deocodeDecodersInTuple<Tuple extends DecoderFunction<unknown>[]> = {
+  [Index in keyof Tuple]: decode<Tuple[Index]>;
+} & { length: Tuple['length'] };
+export const combinefields = <T extends DecoderFunction<unknown>[], U>(
+  f: (...x: deocodeDecodersInTuple<T>) => U,
+  ...fieldDecoders: T
+) => {
+  const dec = (value: Pojo) => {
+    return f(
+      ...((fieldDecoders as Decoder<unknown>[]).map(((
+        g: DecoderFunction<unknown>
+      ) => g(value)) as any) as any)
+    );
+  };
+
+  (dec as any)[fieldDecoder] = true;
+  return dec;
 };
 
 export const record = <schema extends { [key: string]: Decoder<unknown> }>(

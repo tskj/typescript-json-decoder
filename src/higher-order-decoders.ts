@@ -1,4 +1,4 @@
-import { string, undef } from './primitive-decoders';
+import { undef } from './primitive-decoders';
 import { isPojoObject, Pojo } from './pojo';
 import { decode, decoder, Decoder, DecoderFunction } from './types';
 
