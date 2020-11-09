@@ -99,3 +99,6 @@ console.log(x);
 
 // Set up tests
 // Readme with some examples
+
+// could be useful to catch errors in record decoder in combination
+// with combinefields, for better error reporting

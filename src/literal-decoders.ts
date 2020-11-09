@@ -71,9 +71,9 @@ export const field = <T>(
 type deocodeDecodersInTuple<Tuple extends unknown[]> = {
   [Index in keyof Tuple]: Decoder<Tuple[Index]>;
 } & { length: Tuple['length'] };
-export const combinefields = <T extends unknown[], U>(
+export const combinefields = <T extends unknown[]>(
   ...fieldDecoders: deocodeDecodersInTuple<T>
-) => (f: (...x: T) => U) => {
+) => <U>(f: (...x: T) => U) => {
   const dec = (value: Pojo) => {
     return f(
       ...((fieldDecoders as Decoder<unknown>[]).map(((
@@ -81,7 +81,6 @@ export const combinefields = <T extends unknown[], U>(
       ) => g(value)) as any) as any)
     );
   };
-
   (dec as any)[fieldDecoder] = true;
   return dec;
 };
