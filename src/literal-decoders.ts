@@ -40,7 +40,7 @@ export const tuple = <A extends Decoder<unknown>, B extends Decoder<unknown>>(
 export const fieldDecoder: unique symbol = Symbol('field-decoder');
 export const field = <T>(
   key: string,
-  _decoder: DecoderFunction<T>
+  _decoder: Decoder<T>
 ): DecoderFunction<T> => {
   const dec = (value: PojoObject) => {
     const objectToString = (obj: any) =>
@@ -67,43 +67,13 @@ export const field = <T>(
   return dec as any;
 };
 
-type deocodeDecodersInTuple<Tuple extends unknown[]> = {
-  [Index in keyof Tuple]: Decoder<Tuple[Index]>;
-} & { length: Tuple['length'] };
-export const combinefields = <T extends unknown[]>(
-  ...fieldDecoders: deocodeDecodersInTuple<T>
-) => <U>(f: (...x: T) => U) => {
-  const dec = (value: Pojo) => {
-    return f(
-      ...((fieldDecoders as Decoder<unknown>[]).map(((
-        g: DecoderFunction<unknown>
-      ) => g(value)) as any) as any)
-    );
-  };
-  (dec as any)[fieldDecoder] = true;
-  return dec;
-};
-
-export function fields<T extends { [key: string]: Decoder<unknown> }>(
-  _decoder: T
-): [T] extends [{ [key: string]: infer U }] ? U : never;
 export function fields<T extends { [key: string]: Decoder<unknown> }, U>(
   _decoder: T,
   f: (x: decode<T>) => U
-): DecoderFunction<U>;
-export function fields<T extends { [key: string]: Decoder<unknown> }, U>(
-  _decoder: T,
-  f?: (x: decode<T>) => U
 ): DecoderFunction<U> {
   const dec = (value: Pojo) => {
-    const decoded = decoder(_decoder)(value) as any;
-    if (f) {
-      return f(decoded);
-    }
-    if (Object.keys(_decoder).length === 0) {
-      throw `Internal parser error. You need to provide a decoder with keys to fields`;
-    }
-    return decoded[Object.keys(_decoder)[0]];
+    const decoded = decoder(_decoder)(value);
+    return f(decoded);
   };
   (dec as any)[fieldDecoder] = true;
   return dec;
