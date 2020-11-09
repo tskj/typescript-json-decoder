@@ -48,7 +48,7 @@ export const field = <T>(
       Object.keys(obj).length === 0 ? `{}` : `${JSON.stringify(obj)}`;
     if (!value.hasOwnProperty(key)) {
       if ((_decoder as any)[optionDecoder]) {
-        return [key, undefined];
+        return undefined;
       }
       throw `Cannot find key \`${key}\` in \`${objectToString(value)}\``;
     }

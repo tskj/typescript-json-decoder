@@ -1,12 +1,6 @@
 import { boolean, date, number, string } from './primitive-decoders';
 import { array, dict, map, option, set, union } from './higher-order-decoders';
-import {
-  combinefields,
-  field,
-  fieldDecoder,
-  literal,
-  tuple,
-} from './literal-decoders';
+import { combinefields, field, literal, tuple } from './literal-decoders';
 import { decoder, decode, DecoderFunction } from './types';
 
 const discriminatedUnion = union(
@@ -98,7 +92,8 @@ console.log(x);
 // Unknown for passing through anything and leaving type unknown
 
 // Set up tests
-// Readme with some examples
 
-// could be useful to catch errors in record decoder in combination
+// Could be useful to catch errors in record decoder in combination
 // with combinefields, for better error reporting
+// or just with field in general.
+// Fix option combined with field decoder, doesn't quite work.
