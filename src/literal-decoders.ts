@@ -38,28 +38,33 @@ export const tuple = <A extends Decoder<unknown>, B extends Decoder<unknown>>(
 };
 
 export const fieldDecoder: unique symbol = Symbol('field-decoder');
-const field = (key: string) => (_decoder: Decoder<unknown>) => (
-  value: PojoObject
-) => {
-  const objectToString = (obj: any) =>
-    Object.keys(obj).length === 0 ? `{}` : `${JSON.stringify(obj)}`;
-  if (!value.hasOwnProperty(key)) {
-    if ((_decoder as any)[optionDecoder]) {
-      return [key, undefined];
+export const field = <T>(
+  key: string,
+  _decoder: DecoderFunction<T>
+): DecoderFunction<T> => {
+  const dec = (value: PojoObject) => {
+    const objectToString = (obj: any) =>
+      Object.keys(obj).length === 0 ? `{}` : `${JSON.stringify(obj)}`;
+    if (!value.hasOwnProperty(key)) {
+      if ((_decoder as any)[optionDecoder]) {
+        return [key, undefined];
+      }
+      throw `Cannot find key \`${key}\` in \`${objectToString(value)}\``;
     }
-    throw `Cannot find key \`${key}\` in \`${objectToString(value)}\``;
-  }
-  try {
-    const jsonvalue = value[key];
-    return decoder(_decoder)(jsonvalue);
-  } catch (message) {
-    throw (
-      message +
-      `\nwhen trying to decode the key \`${key}\` in \`${objectToString(
-        value
-      )}\``
-    );
-  }
+    try {
+      const jsonvalue = value[key];
+      return decoder(_decoder)(jsonvalue);
+    } catch (message) {
+      throw (
+        message +
+        `\nwhen trying to decode the key \`${key}\` in \`${objectToString(
+          value
+        )}\``
+      );
+    }
+  };
+  (dec as any)[fieldDecoder] = true;
+  return dec as any;
 };
 
 export const record = <schema extends { [key: string]: Decoder<unknown> }>(
@@ -70,7 +75,10 @@ export const record = <schema extends { [key: string]: Decoder<unknown> }>(
   }
   return Object.entries(s)
     .map(([key, _decoder]: [string, any]) => {
-      return [key, field(key)(_decoder)(value)] as [string, any];
+      const _fieldDecoder = _decoder[fieldDecoder]
+        ? _decoder
+        : field(key, _decoder);
+      return [key, _fieldDecoder(value)] as [string, any];
     })
     .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
 };
