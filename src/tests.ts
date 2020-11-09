@@ -22,11 +22,10 @@ const message = union(
 export type IEmployee = decode<typeof employeeDecoder>;
 export const employeeDecoder = decoder({
   month: field('dateOfBirth', (x) => date(x).getMonth()),
-  year: combinefields(
-    (name, id) => `${name}:${id}`,
-    field('name', string) as DecoderFunction<string>,
-    field('employeeId', number) as DecoderFunction<number>
-  ),
+  employeeIdentifier: combinefields(
+    field('name', string),
+    field('employeeId', number)
+  )((name, id) => `${name}:${id}`),
   employeeId: number,
   name: string,
   set: set(union(string, number, { data: boolean })),
