@@ -1,6 +1,5 @@
 import { optionDecoder } from './higher-order-decoders';
 import { isPojoObject, Pojo, PojoObject } from './pojo';
-import { date, number, string } from './primitive-decoders';
 import {
   decode,
   decoder,

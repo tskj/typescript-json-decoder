@@ -1,7 +1,7 @@
 import { boolean, date, number, string } from './primitive-decoders';
 import { array, dict, map, option, set, union } from './higher-order-decoders';
 import { combinefields, field, literal, tuple } from './literal-decoders';
-import { decoder, decode, DecoderFunction } from './types';
+import { decoder, decode } from './types';
 
 const discriminatedUnion = union(
   { discriminant: literal('one') },
@@ -83,6 +83,8 @@ console.log(x);
 // Move object test up in record decoder to give better error messages
 // Use my object-map implementation
 // also less any and more 'correct' implementations in general
+// What about decorators for marking as fieldDecoder?
+// Allow arbitrarily many transformation / decoder functions in field (composed together)
 
 // Constant decoder (always returns same regardless of input)
 // Default decoder for when stuff is null or undefined
