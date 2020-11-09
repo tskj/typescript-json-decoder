@@ -1,6 +1,12 @@
 import { boolean, date, number, string } from './primitive-decoders';
 import { array, dict, map, option, set, union } from './higher-order-decoders';
-import { combinefields, field, literal, tuple } from './literal-decoders';
+import {
+  combinefields,
+  field,
+  fields,
+  literal,
+  tuple,
+} from './literal-decoders';
 import { decoder, decode } from './types';
 
 const discriminatedUnion = union(
@@ -15,6 +21,14 @@ const message = union(
 
 export type IEmployee = decode<typeof employeeDecoder>;
 export const employeeDecoder = decoder({
+  renamedfield: fields({ phoneNumbers: array(string) }),
+  month2: fields({ dateOfBirth: date }, ({ dateOfBirth }) =>
+    dateOfBirth.getMonth()
+  ),
+  employeeIdentifier2: fields(
+    { name: string, employeeId: number },
+    ({ name, employeeId }) => `${name}:${employeeId}`
+  ),
   month: field('dateOfBirth', (x) => date(x).getMonth()),
   employeeIdentifier: combinefields(
     field('name', string),
@@ -85,6 +99,7 @@ console.log(x);
 // also less any and more 'correct' implementations in general
 // What about decorators for marking as fieldDecoder?
 // Allow arbitrarily many transformation / decoder functions in field (composed together)
+// OR decide on going for only `fields`
 
 // Constant decoder (always returns same regardless of input)
 // Default decoder for when stuff is null or undefined

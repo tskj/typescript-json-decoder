@@ -84,6 +84,31 @@ export const combinefields = <T extends unknown[]>(
   return dec;
 };
 
+export function fields<T extends { [key: string]: Decoder<unknown> }>(
+  _decoder: T
+): [T] extends [{ [key: string]: infer U }] ? U : never;
+export function fields<T extends { [key: string]: Decoder<unknown> }, U>(
+  _decoder: T,
+  f: (x: decode<T>) => U
+): DecoderFunction<U>;
+export function fields<T extends { [key: string]: Decoder<unknown> }, U>(
+  _decoder: T,
+  f?: (x: decode<T>) => U
+): DecoderFunction<U> {
+  const dec = (value: Pojo) => {
+    const decoded = decoder(_decoder)(value) as any;
+    if (f) {
+      return f(decoded);
+    }
+    if (Object.keys(_decoder).length === 0) {
+      throw `Internal parser error. You need to provide a decoder with keys to fields`;
+    }
+    return decoded[Object.keys(_decoder)[0]];
+  };
+  (dec as any)[fieldDecoder] = true;
+  return dec;
+}
+
 export const record = <schema extends { [key: string]: Decoder<unknown> }>(
   s: schema
 ): DecoderFunction<decode<schema>> => (value: Pojo) => {
