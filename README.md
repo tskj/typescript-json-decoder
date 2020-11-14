@@ -170,7 +170,7 @@ const coolDecoder = decoder({ type: decoder('cool'), somestuff: string });
 Similarly we can define another decoder of this type.
 
 ```typescript
-const y = { type: 'dumb', otherstuff: "starbucks" };
+const y = { type: 'dumb', otherstuff: 'starbucks' };
 ```
 
 With a decoder that looks like this.
@@ -229,11 +229,11 @@ I provide this decoder with the library, and we can use it as follows.
 ```typescript
 import { decode, decoder, date } from 'typescript-json-decoder';
 
-type BlogPost = decode<typeof blogpostDecoder>;
-const blogpostDecoder = decoder({
+type blogpost = decode<typeof blogpostdecoder>;
+const blogpostdecoder = decoder({
     title: string,
     content: string,
-    createdDate: date,
+    createddate: date,
 });
 ```
 
@@ -295,3 +295,37 @@ const userListDecoder =
         isBanned: boolean,
     }, x => x.id);
 ```
+
+## Low level access
+
+Sometimes you need direct access to the fields of the object you're decoding. Maybe you want to use the same fields to calculate two different things, or maybe you want to combine two or more different fields.
+
+The `field` decoder accepts a string, the name of they key, and a decoder which decodes the value found at this key.
+
+Say you have some date in an iso-date-string format in the field `"dateOfBirth"` but are only interested in the year and month, you could use the `field` decoder to access it in the following way.
+
+```typescript
+import { decode, decoder, field } from 'typescript-json-decoder';
+
+type User = decode<typeof userDecoder>;
+const userDecoder = decoder({
+    month: field('dateOfBirth', x => date(x).getMonth() + 1),
+    year: field('dateOfBirth', x => date(x).getFullYear()),
+});
+```
+
+Alternatively if you need both username and id you can use the `fields` decoder. This has a slightly different api. The `fields` decoder accepts an object decoder in the same way `decoder` does, and a second argument, a function, which accepts the result of this decoder and produces the resulting value of the `fields` decoder. An example is maybe more explanatory.
+
+```typescript
+import { decode, decoder, fields } from 'typescript-json-decoder';
+
+type User = decode<typeof userDecoder>;
+const userDecoder = decoder({
+    identifier: fields({ username: string, userId: number },
+                            ({ username, userId }) => `user:${username}:${userid}`),
+});
+```
+
+This is read as "the `userDecoder` decodes an object which might look like `{ username: "hunter2", userId: 3 }` and decodes to an object which looks like `{ identifier: "user:hunter2:3" }`".
+
+Both the `field` and the `fields` decoder are meant to be used "inside" an object decoder in the way shown here, although you may pass an object directly.
