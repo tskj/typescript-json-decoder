@@ -5,7 +5,7 @@ TypeScript is great because it lets you write statically verified code. You'll n
 Have you ever written code like this?
 
 ```typescript
-const users = fetch('/users') as Promsie<User[]>;
+const users = fetch('/users') as Promise<User[]>;
 ```
 
 This sucks, because we are just hoping and praying the response from the `/users` endpoint matches our definition of the `User` type, which might look something like the following.
@@ -20,15 +20,13 @@ type User = {
 
 Usually it does, but there is never a guarantee - and especially not a guarantee that the data from the endpoint never changes. It's even more insidiuous if the data mostly matches, but sometimes it returns something slightly different, because you'll probably not catch it when developing and maybe not even when testing. And that's how you ship a bug to production that should (and could!) have been caught at compile time.
 
-@TODO: Legg inn link:
-Alright but how do you catch that at compile time? Without [LINKLINKNLIN](https://example.com) some kind of integration of your backend and frontend types, how do you statically verify the shape of your (possibly external) API's data? Well you can't really do that easily, but you can *verify* that the data actually does match the type you say it has as it comes in. So that's the idea, verify early and fail hard. Instead of mindlessly casting (using TypeScripts `as` operator) where you introduce the possibility of error, we would like to actually test and make sure the data actually conforms to our type and rather reject the Promise if it doesn't. Which I think makes sense, there is no practical difference to your app whether the external endpoint is down or it returns to you data you don't understand.
+Alright but how do you catch that at compile time? Without [some kind of integration of your backend and frontend types,](https://functional.christmas/2020/6) how do you statically verify the shape of your (possibly external) API's data? Well you can't really do that easily, but you can *verify* that the data actually does match the type you say it has as it comes in. So that's the idea, verify early and fail hard. Instead of mindlessly casting (using TypeScripts `as` operator) where you introduce the possibility of error, we would like to actually test and make sure the data actually conforms to our type and rather reject the Promise if it doesn't. Which I think makes sense, there is no practical difference to your app whether the external endpoint is down or it returns to you data you don't understand.
 
-But this seems annoying, should we write parsers or validators for every type that comes in from an external source? That takes a lot of time, and is doubly annoying to maintain as our app and our APIs grow and change. That's why I wrote `typescript-json-decoder`. It is a library that automatically creates what is often known as "decoders", functions that make sure your data looks the way you say it does, based on your types. It has no external dependencies, is lightweight, and one of its core values is that it resembles and can be swapped in, in place of your existing TypeScript type definitions without any modifications or limitations. I want this to be idiomatic, regular TypeScript with as little friction as possible. The API surface of the library is designed to intuitive and as small as possible, so that it's not a caworksse of "yet another library" for people to learn and manage in their code. This is merely how I wish TypeScript already worked.
+But this seems annoying, should we write parsers or validators for every type that comes in from an external source? That takes a lot of time, and is doubly annoying to maintain as our app and our APIs grow and change. That's why I wrote TypeScript Json Decoder. It is a library that automatically creates what is often known as "decoders", functions that make sure your data looks the way you say it does, based on your types. It has no external dependencies, is lightweight, and one of its core values is that it resembles and can be swapped in, in place of your existing TypeScript type definitions without any modifications or limitations. I want this to be idiomatic, regular TypeScript with as little friction as possible. The API surface of the library is designed to intuitive and as small as possible, so that it's not a caworksse of "yet another library" for people to learn and manage in their code. This is merely how I wish TypeScript already worked.
 
-@TODO: Sjekk at linken gir meining
-Check out [the github page](https://github.com/tskj/typescript-json-decoder) to see lots of examples and explanations of the more advanced features needed to express everything a TypeScript type can.
+Check out [the GitHub page](https://github.com/tskj/typescript-json-decoder) to see lots of examples and explanations of the more advanced features needed to express everything a TypeScript type can.
 
-Let me give you a basic introduction to underlying idea. If we were to wish to replace our `User` type with a decoder for that type, we would instead write the following.
+Let me give you a basic introduction to the underlying idea. If we wanted to replace our `User` type with a decoder for that type, we would instead write the following.
 
 ```typescript
 import { decode, decoder, number, string, array } from 'typescript-json-decoder`;
@@ -53,7 +51,9 @@ At the cost of one line of boilerplate this gives you complete type safety when 
 
 ## How it works
 
-The way this works under the hood is pretty interesting. If you pay close attention you see that what we have defined is not a type at all, it's actually a JavaScript object that kind of looks like a type definition. This is because it's actually impossible in TypeScript (without hooking into the compiler) to do the kind of metaprogramming where you inspect the type itself. So instead we do the opposite, we create a regular value which represents the type we wish to generate, and from that we generate both the type itself (and assign it to `User`) and the decoder. The idea is that the library supplies all the primitive decoders such as `number`, `string`, and even `array` (which takes another decoder as a parameter), and then we combine these to build bigger decoders (with accompanying types). The way these decoders are defined is really simple, take a look at the following definition of the `string` decoder.
+The way this works under the hood is pretty interesting. If you pay close attention you see that what we have defined is not a type at all, it's actually a JavaScript object that kind of looks like a type definition. This is because it's actually impossible in TypeScript (without hooking into the compiler) to do the kind of metaprogramming where you inspect the type itself. So instead we do the opposite, we create a regular value which represents the type we wish to generate, and from that we generate both the type itself (and assign it to `User`) and the decoder. The special TypeScript operator `typeof` (named after a similar, but different, JavaScript operator with the same name) is used to extract the type of the decoder from the JavaScript object that defines it, in our case `userDecoder`. This type is then transformed to the corresponding type which the decoder decodes to.
+
+The idea is that the library supplies all the primitive decoders such as `number`, `string`, and even `array` (which takes another decoder as a parameter), and then we combine these to build bigger decoders (which represent the equivalent type we are trying to express). The way these decoders are defined is really simple, take a look at the following definition of the `string` decoder.
 
 ```typescript
 const string: DecoderFunction<string> = (s: Pojo) => {
@@ -66,7 +66,7 @@ const string: DecoderFunction<string> = (s: Pojo) => {
 
 The library refers to regular JavaScript objects as `Pojo`s. This decoder doesn't actually *do* anything! It just returns the string it's passed, if it is a string, or if not, throws. So this is actually the identity function for strings.
 
-The complexity in the library is elsewhere; the core idea is that an object (or what you might call a record) containing these decoders, *is a decoder of an object with the same fields*. In a sense, it is a decoder of itself. It decodes a thing that looks like itself. And this is defined recursively, which allows us to nest objects, or have arrays of objects, or arrays containing objects of objects containing arrays, and so on and so on. In this way you can define your own "custom" decoders and compose them arbitrarily.
+The complexity in the library is elsewhere; the core idea is that JavaScript values are considered to be decoders of themselves. I call these literal decoders. For example, the string `"hello"` is a decoder of the literal value `"hello"`, and only that value. That might not seem so useful, but once you extend it to records, it becomes quite powerful. A record containing decoders, *is a decoder of a record with the same fields*. In a sense, it is a decoder of itself. It decodes a thing that looks like itself. And this is defined recursively, which allows us to nest objects, or have arrays of objects, or arrays containing objects of objects containing arrays, and so on and so on. In this way you can define your own "custom" decoders and compose them arbitrarily.
 
 The way the decoders are evaluated, then, is a pretty straightforward recursive traversal of the tree structure of decoders where it applies the decoders it finds. What is much more interesting, and honestly where all the complexity of this library resides, is in the innocent looking `decode` type level function, which is responsible for taking a decoder and producing the type of the thing it decodes.
 
@@ -78,12 +78,10 @@ However, let's ignore that and first think about how to extract the type that a 
 
 ```typescript
 type decode<decoder> = decoder extends (x: Pojo) => (infer T) ? T : never;
-@TODO: sjekk at dette kompilerer
 ```
 
 Now this is the kind of metaprogramming that gets me going. What in the world is going on. Well, first of all we have a ternary - essentially an if test on types. The thing we are testing on is the `decoder extends (x: Pojo) => (infer T)` part, which is a *subtype test*. The extend keyword, I think, is a horribly chosen name in TypeScript, mostly carried over from other contexts. What it means is "is a subtype of". It is a question asked of the type parameter `decoder`, are you a subtype of the type `(x: Pojo) => (infer T)`, which begs the question, what is `infer T`? Well, it is whatever it needs to be to satisfy the subtype test. If `decoder` is the function type defined above, `(x: Pojo) => User`, then `T` would need to be `User` for the one to be the subtype of the other - at least if you consider being the same type as being a subtype. The keyword `infer` is used to introduce a new type variable. In the first branch of the ternary we return the type `T` if we have a match (that is, the decoder is a function type), and in the second branch we return TypeScript's bottom type `never`, indicating this should never happen. If this does happen, and we try to use the resulting type for anything, we get a compiler error. `never` is the empty set, if you are inclined to think about types as sets, and there is no value of this type.
 
-@TODO: Sjekker at dette stemmer:
 This is actually the definition of the type level function for extracting the return type of a function (that's a mouthful), and is in fact available in the standard library under the name `ReturnType`! So that was a lot of type theory for very little. We need to go further. I mentioned that the essence of this library is to understand literal values as decoders of themselves, and to define this recursively in the case of records. So let's add records!
 
 @TODO: Sjekk at dette er riktig:
@@ -173,9 +171,4 @@ type User = {
 }>;
 ```
 
-@TODO: figure out spelling of github
-@TODO: sjekk om den faktisk kompilerer?
-And that's basically it! The above definition of `decode` doesn't actually compile, because direct recursive references aren't always allowed in TypeScript. If you're curious how that is solved I suggest to check out the source code on GitHub. It's a bit more involved, but I have tried to keep it pretty clean. I would very much welcome PR's and suggestions for improvements. Thanks for reading!
-
-@TODO: Legg inn forklaring / eksempel om at literale json-verdier som strings og numbers dekoder til seg sjølv.
-@TODO: nevn typeof og korleis den funker med å dra ting opp fra value space til type space, når det motsatte er umulig.
+And that's basically it! If you're curious to see the actual implementation I suggest checking out the source code on GitHub. It's a bit more involved, but I have tried to keep it pretty clean. I would very much welcome PR's and suggestions for improvements. Thanks for reading!
