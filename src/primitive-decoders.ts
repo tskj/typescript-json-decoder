@@ -4,7 +4,7 @@ import { DecoderFunction } from './types';
 export const string: DecoderFunction<string> = (s: Pojo) => {
   if (typeof s !== 'string') {
     throw `The value \`${JSON.stringify(
-      s
+      s,
     )}\` is not of type \`string\`, but is of type \`${typeof s}\``;
   }
   return s;
@@ -13,7 +13,7 @@ export const string: DecoderFunction<string> = (s: Pojo) => {
 export const number: DecoderFunction<number> = (n: Pojo) => {
   if (typeof n !== 'number') {
     throw `The value \`${JSON.stringify(
-      n
+      n,
     )}\` is not of type \`number\`, but is of type \`${typeof n}\``;
   }
   return n;
@@ -22,7 +22,7 @@ export const number: DecoderFunction<number> = (n: Pojo) => {
 export const boolean: DecoderFunction<boolean> = (b: Pojo) => {
   if (typeof b !== 'boolean') {
     throw `The value \`${JSON.stringify(
-      b
+      b,
     )}\` is not of type \`boolean\`, but is of type \`${typeof b}\``;
   }
   return b;
@@ -31,7 +31,7 @@ export const boolean: DecoderFunction<boolean> = (b: Pojo) => {
 export const undef: DecoderFunction<undefined> = ((u: Pojo) => {
   if (typeof u !== 'undefined') {
     throw `The value \`${JSON.stringify(
-      u
+      u,
     )}\` is not of type \`undefined\`, but is of type \`${typeof u}\``;
   }
   return u;
@@ -40,7 +40,7 @@ export const undef: DecoderFunction<undefined> = ((u: Pojo) => {
 export const nil: DecoderFunction<null> = ((u: Pojo) => {
   if (u !== null) {
     throw `The value \`${JSON.stringify(
-      u
+      u,
     )}\` is not of type \`null\`, but is of type \`${typeof u}\``;
   }
   return u as null;

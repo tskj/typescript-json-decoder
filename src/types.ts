@@ -9,7 +9,7 @@ import { literal, tuple, record } from './literal-decoders';
 
 type PrimitiveJsonLiteralForm = string;
 const isPrimitiveJsonLiteralForm = (
-  v: unknown
+  v: unknown,
 ): v is PrimitiveJsonLiteralForm => typeof v === 'string';
 
 type TupleJsonLiteralForm = [Decoder<unknown>, Decoder<unknown>];
@@ -48,7 +48,7 @@ type evalJsonLiteralForm<decoder> =
       [key in keyof decoder]: decode<decoder[key]>;
     }
 const decodeJsonLiteralForm = <json extends JsonLiteralForm>(
-  decoder: json
+  decoder: json,
 ): DecoderFunction<evalJsonLiteralForm<json>> => {
   if (isPrimitiveJsonLiteralForm(decoder)) {
     return literal(decoder) as any;
@@ -93,7 +93,7 @@ export type decode<decoder> =
   )[0];
 
 export const decoder = <D extends Decoder<unknown>>(
-  _decoder: D
+  _decoder: D,
 ): DecoderFunction<decode<D>> => {
   if (!isDecoderFunction(_decoder)) {
     return decodeJsonLiteralForm(_decoder as any);

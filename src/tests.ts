@@ -5,23 +5,23 @@ import { decoder, decode } from './types';
 
 const discriminatedUnion = union(
   { discriminant: literal('one') },
-  { discriminant: literal('two'), data: string }
+  { discriminant: literal('two'), data: string },
 );
 
 const message = union(
   tuple('message', string),
-  tuple('something-else', { somestuff: string })
+  tuple('something-else', { somestuff: string }),
 );
 
 export type IEmployee = decode<typeof employeeDecoder>;
 export const employeeDecoder = decoder({
   renamedfield: field('phoneNumbers', array(string)),
   month2: fields({ dateOfBirth: date }, ({ dateOfBirth }) =>
-    dateOfBirth.getMonth()
+    dateOfBirth.getMonth(),
   ),
   employeeIdentifier2: fields(
     { name: string, employeeId: number },
-    ({ name, employeeId }) => `${name}:${employeeId}`
+    ({ name, employeeId }) => `${name}:${employeeId}`,
   ),
   month: field('dateOfBirth', (x) => date(x).getMonth()),
   employeeIdentifier: fields(
@@ -29,7 +29,7 @@ export const employeeDecoder = decoder({
       name: string,
       employeeId: number,
     },
-    ({ name, employeeId }) => `${name}:${employeeId}`
+    ({ name, employeeId }) => `${name}:${employeeId}`,
   ),
   employeeId: number,
   name: string,
@@ -40,7 +40,7 @@ export const employeeDecoder = decoder({
       name: string,
       ssn: option(string),
     },
-    (x) => x.employeeId
+    (x) => x.employeeId,
   ),
   dict: dict(union(string, number)),
   phoneNumbers: array(string),

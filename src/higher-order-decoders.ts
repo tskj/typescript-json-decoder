@@ -25,7 +25,7 @@ export const union = <decoders extends Decoder<unknown>[]>(
 
 export const optionDecoder: unique symbol = Symbol('optional-decoder');
 export const option = <T extends Decoder<unknown>>(
-  decoder: T
+  decoder: T,
 ): DecoderFunction<decode<T> | undefined> => {
   let _optionDecoder = union(undef, decoder as any);
   (_optionDecoder as any)[optionDecoder] = true;
@@ -33,13 +33,13 @@ export const option = <T extends Decoder<unknown>>(
 };
 
 export function array<D extends Decoder<unknown>>(
-  _decoder: D
+  _decoder: D,
 ): DecoderFunction<decode<D>[]> {
   return (xs: Pojo): D[] => {
     const arrayToString = (arr: any) => `${JSON.stringify(arr)}`;
     if (!Array.isArray(xs)) {
       throw `The value \`${arrayToString(
-        xs
+        xs,
       )}\` is not of type \`array\`, but is of type \`${typeof xs}\``;
     }
     let index = 0;
@@ -52,7 +52,7 @@ export function array<D extends Decoder<unknown>>(
       throw (
         message +
         `\nwhen trying to decode the array (at index ${index}) \`${arrayToString(
-          xs
+          xs,
         )}\``
       );
     }
@@ -60,7 +60,7 @@ export function array<D extends Decoder<unknown>>(
 }
 
 export const set = <D extends Decoder<unknown>>(
-  _decoder: D
+  _decoder: D,
 ): DecoderFunction<Set<decode<D>>> => (list: Pojo) => {
   try {
     return new Set(decoder(array(_decoder))(list));
@@ -71,14 +71,14 @@ export const set = <D extends Decoder<unknown>>(
 
 export const map = <K, D extends Decoder<unknown>>(
   _decoder: D,
-  key: (x: decode<D>) => K
+  key: (x: decode<D>) => K,
 ): DecoderFunction<Map<K, decode<D>>> => (listOfObjects: Pojo) => {
   try {
     const parsedObjects = decoder(array(_decoder))(listOfObjects);
     const map = new Map(parsedObjects.map((value) => [key(value), value]));
     if (parsedObjects.length !== map.size) {
       console.warn(
-        `Probable duplicate key in map: List \`${parsedObjects}\` isn't the same size as the parsed \`${map}\``
+        `Probable duplicate key in map: List \`${parsedObjects}\` isn't the same size as the parsed \`${map}\``,
       );
     }
     return map;
@@ -88,7 +88,7 @@ export const map = <K, D extends Decoder<unknown>>(
 };
 
 export const dict = <D extends Decoder<unknown>>(
-  _decoder: D
+  _decoder: D,
 ): DecoderFunction<Map<string, decode<D>>> => (map: Pojo) => {
   if (!isPojoObject(map)) {
     throw `Value \`${map}\` is not an object and can therefore not be parsed as a map`;

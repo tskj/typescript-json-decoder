@@ -9,11 +9,11 @@ import {
 } from './types';
 
 export const literal = <p extends JsonLiteralForm>(
-  literal: p
+  literal: p,
 ): DecoderFunction<p> => (value: Pojo) => {
   if (literal !== value) {
     throw `The value \`${JSON.stringify(
-      value
+      value,
     )}\` is not the literal \`${JSON.stringify(literal)}\``;
   }
   return literal;
@@ -21,16 +21,16 @@ export const literal = <p extends JsonLiteralForm>(
 
 export const tuple = <A extends Decoder<unknown>, B extends Decoder<unknown>>(
   decoderA: A,
-  decoderB: B
+  decoderB: B,
 ): DecoderFunction<[decode<A>, decode<B>]> => (value: Pojo) => {
   if (!Array.isArray(value)) {
     throw `The value \`${JSON.stringify(
-      value
+      value,
     )}\` is not a list and can therefore not be parsed as a tuple`;
   }
   if (value.length !== 2) {
     throw `The array \`${JSON.stringify(
-      value
+      value,
     )}\` is not the proper length for a tuple`;
   }
   const [a, b] = value;
@@ -40,7 +40,7 @@ export const tuple = <A extends Decoder<unknown>, B extends Decoder<unknown>>(
 export const fieldDecoder: unique symbol = Symbol('field-decoder');
 export const field = <T>(
   key: string,
-  _decoder: Decoder<T>
+  _decoder: Decoder<T>,
 ): DecoderFunction<T> => {
   const dec = (value: PojoObject) => {
     const objectToString = (obj: any) =>
@@ -58,7 +58,7 @@ export const field = <T>(
       throw (
         message +
         `\nwhen trying to decode the key \`${key}\` in \`${objectToString(
-          value
+          value,
         )}\``
       );
     }
@@ -69,7 +69,7 @@ export const field = <T>(
 
 export function fields<T extends { [key: string]: Decoder<unknown> }, U>(
   _decoder: T,
-  f: (x: decode<T>) => U
+  f: (x: decode<T>) => U,
 ): DecoderFunction<U> {
   const dec = (value: Pojo) => {
     const decoded = decoder(_decoder)(value);
@@ -80,7 +80,7 @@ export function fields<T extends { [key: string]: Decoder<unknown> }, U>(
 }
 
 export const record = <schema extends { [key: string]: Decoder<unknown> }>(
-  s: schema
+  s: schema,
 ): DecoderFunction<decode<schema>> => (value: Pojo) => {
   if (!isPojoObject(value)) {
     throw `Value \`${value}\` is not of type \`object\` but rather \`${typeof value}\``;
