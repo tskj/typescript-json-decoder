@@ -42,42 +42,20 @@ export const field = <T>(
   key: string,
   _decoder: Decoder<T>,
 ): DecoderFunction<T> => {
-  const dec = (value: PojoObject) => {
-    const objectToString = (obj: any) =>
-      Object.keys(obj).length === 0 ? `{}` : `${JSON.stringify(obj)}`;
-    if (!value.hasOwnProperty(key)) {
-      if ((_decoder as any)[optionDecoder]) {
-        return undefined;
-      }
-      throw `Cannot find key \`${key}\` in \`${objectToString(value)}\``;
-    }
-    try {
-      const jsonvalue = value[key];
-      return decoder(_decoder)(jsonvalue);
-    } catch (message) {
-      throw (
-        message +
-        `\nwhen trying to decode the key \`${key}\` in \`${objectToString(
-          value,
-        )}\``
-      );
-    }
-  };
-  (dec as any)[fieldDecoder] = true;
-  return dec as any;
+  return fields({ [key]: _decoder }, (x: any) => x[key]);
 };
 
-export function fields<T extends { [key: string]: Decoder<unknown> }, U>(
+export const fields = <T extends { [key: string]: Decoder<unknown> }, U>(
   _decoder: T,
-  f: (x: decode<T>) => U,
-): DecoderFunction<U> {
+  continuation: (x: decode<T>) => U,
+): DecoderFunction<U> => {
   const dec = (value: Pojo) => {
     const decoded = decoder(_decoder)(value);
-    return f(decoded);
+    return continuation(decoded);
   };
   (dec as any)[fieldDecoder] = true;
   return dec;
-}
+};
 
 export const record = <schema extends { [key: string]: Decoder<unknown> }>(
   s: schema,
@@ -87,10 +65,26 @@ export const record = <schema extends { [key: string]: Decoder<unknown> }>(
   }
   return Object.entries(s)
     .map(([key, _decoder]: [string, any]) => {
-      const _fieldDecoder = _decoder[fieldDecoder]
-        ? _decoder
-        : field(key, _decoder);
-      return [key, _fieldDecoder(value)] as [string, any];
+      if (_decoder[fieldDecoder] === true) {
+        return [key, decoder(_decoder)(value)];
+      }
+      if (!value.hasOwnProperty(key)) {
+        if ((_decoder as any)[optionDecoder]) {
+          return [key, undefined];
+        }
+        throw `Cannot find key \`${key}\` in \`${JSON.stringify(value)}\``;
+      }
+      try {
+        const jsonvalue = value[key];
+        return [key, decoder(_decoder)(jsonvalue)];
+      } catch (message) {
+        throw (
+          message +
+          `\nwhen trying to decode the key \`${key}\` in \`${JSON.stringify(
+            value,
+          )}\``
+        );
+      }
     })
     .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
 };

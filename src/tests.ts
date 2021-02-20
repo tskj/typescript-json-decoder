@@ -14,11 +14,13 @@ const message = union(
 );
 
 export type IEmployee = decode<typeof employeeDecoder>;
+
 export const employeeDecoder = decoder({
   renamedfield: field('phoneNumbers', array(string)),
   month2: fields({ dateOfBirth: date }, ({ dateOfBirth }) =>
     dateOfBirth.getMonth(),
   ),
+  maybessn: fields({ ssn: option(string) }, ({ ssn }) => ssn),
   employeeIdentifier2: fields(
     { name: string, employeeId: number },
     ({ name, employeeId }) => `${name}:${employeeId}`,
@@ -53,6 +55,7 @@ export const employeeDecoder = decoder({
   message,
   uni: union('uni', { lol: string }),
   likes: array([literal('likt'), number]),
+  likes2: array(tuple('likt', number)),
   isEmployed: boolean,
   dateOfBirth: date,
   ssn: option(string),
@@ -75,6 +78,10 @@ const x: IEmployee = employeeDecoder({
   likes: [
     ['likt', 3],
     ['likt', 0],
+  ],
+  likes2: [
+    ['likt', 1],
+    ['likt', 2],
   ],
   phoneNumbers: ['733', 'dsfadadsa', '', '4'],
   ageAndReputation: [12, 'good'],
