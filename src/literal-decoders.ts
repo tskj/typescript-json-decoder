@@ -7,6 +7,7 @@ import {
   DecoderFunction,
   JsonLiteralForm,
 } from './types';
+import { tag } from './utils';
 
 export const literal = <p extends JsonLiteralForm>(
   literal: p,
@@ -38,13 +39,6 @@ export const tuple = <A extends Decoder<unknown>, B extends Decoder<unknown>>(
 };
 
 export const fieldDecoder: unique symbol = Symbol('field-decoder');
-export const field = <T>(
-  key: string,
-  _decoder: Decoder<T>,
-): DecoderFunction<T> => {
-  return fields({ [key]: _decoder }, (x: any) => x[key]);
-};
-
 export const fields = <T extends { [key: string]: Decoder<unknown> }, U>(
   _decoder: T,
   continuation: (x: decode<T>) => U,
@@ -53,8 +47,15 @@ export const fields = <T extends { [key: string]: Decoder<unknown> }, U>(
     const decoded = decoder(_decoder)(value);
     return continuation(decoded);
   };
-  (dec as any)[fieldDecoder] = true;
+  tag(dec, fieldDecoder);
   return dec;
+};
+
+export const field = <T>(
+  key: string,
+  _decoder: Decoder<T>,
+): DecoderFunction<T> => {
+  return fields({ [key]: _decoder }, (x: any) => x[key]);
 };
 
 export const record = <schema extends { [key: string]: Decoder<unknown> }>(

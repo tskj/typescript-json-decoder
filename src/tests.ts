@@ -92,19 +92,20 @@ console.log(x);
 
 // TODO
 
-// Goals
+// Goals:
 // maybe variadic tuple decoder
 // maybe question mark on optional key
 
+// Improvements:
 // Use tagged templates to abstract out the stringifying
 // Returning nestend objects instead of strings for error reporting?
 // Move object test up in record decoder to give better error messages
 // Use my object-map implementation
-// also less any and more 'correct' implementations in general
+// also less any and more 'correct' implementations in general?
 // What about decorators for marking as fieldDecoder?
-// Allow arbitrarily many transformation / decoder functions in field (composed together)
-// OR decide on going for only `fields`
+// Maybe also type-safe tag function after TypeScript 4.2
 
+// Additions:
 // Constant decoder (always returns same regardless of input)
 // Default decoder for when stuff is null or undefined
 // Integer decoder, and other validation of data
@@ -113,8 +114,5 @@ console.log(x);
 // Unknown for passing through anything and leaving type unknown
 
 // Set up tests
-
-// Could be useful to catch errors in record decoder in combination
-// with combinefields, for better error reporting
-// or just with field in general.
-// Fix option combined with field decoder, doesn't quite work.
+// Docs
+// Release 1.0
