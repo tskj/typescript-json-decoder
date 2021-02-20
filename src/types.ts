@@ -42,10 +42,10 @@ type evalJsonLiteralForm<decoder> =
   [decoder] extends [PrimitiveJsonLiteralForm] ?
     decoder :
   [decoder] extends [[infer decoderA, infer decoderB]] ?
-    [ decode<decoderA>, decode<decoderB> ] :
+    [ decodeType<decoderA>, decodeType<decoderB> ] :
 
     {
-      [key in keyof decoder]: decode<decoder[key]>;
+      [key in keyof decoder]: decodeType<decoder[key]>;
     }
 const decodeJsonLiteralForm = <json extends JsonLiteralForm>(
   decoder: json,
@@ -81,9 +81,9 @@ const isDecoder = <T>(decoder: unknown): decoder is Decoder<T> =>
 
 export type primitive = string | boolean | number | null | undefined;
 // prettier-ignore
-export type decode<decoder> =
+export type decodeType<decoder> =
   (decoder extends DecoderFunction<infer T> ?
-    [decode<T>] :
+    [decodeType<T>] :
   decoder extends JsonLiteralForm ?
     [evalJsonLiteralForm<decoder>]:
 
@@ -92,11 +92,11 @@ export type decode<decoder> =
   // circular type reference compiler error
   )[0];
 
-export const decoder = <D extends Decoder<unknown>>(
-  _decoder: D,
-): DecoderFunction<decode<D>> => {
-  if (!isDecoderFunction(_decoder)) {
-    return decodeJsonLiteralForm(_decoder as any);
+export const decode = <D extends Decoder<unknown>>(
+  decoder: D,
+): DecoderFunction<decodeType<D>> => {
+  if (!isDecoderFunction(decoder)) {
+    return decodeJsonLiteralForm(decoder as any);
   }
-  return _decoder as any;
+  return decoder as any;
 };

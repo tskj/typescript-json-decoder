@@ -1,8 +1,8 @@
-import { optionDecoder } from './higher-order-decoders';
+import { optionalDecoder } from './higher-order-decoders';
 import { isPojoObject, Pojo, PojoObject } from './pojo';
 import {
+  decodeType,
   decode,
-  decoder,
   Decoder,
   DecoderFunction,
   JsonLiteralForm,
@@ -23,7 +23,7 @@ export const literal = <p extends JsonLiteralForm>(
 export const tuple = <A extends Decoder<unknown>, B extends Decoder<unknown>>(
   decoderA: A,
   decoderB: B,
-): DecoderFunction<[decode<A>, decode<B>]> => (value: Pojo) => {
+): DecoderFunction<[decodeType<A>, decodeType<B>]> => (value: Pojo) => {
   if (!Array.isArray(value)) {
     throw `The value \`${JSON.stringify(
       value,
@@ -35,16 +35,16 @@ export const tuple = <A extends Decoder<unknown>, B extends Decoder<unknown>>(
     )}\` is not the proper length for a tuple`;
   }
   const [a, b] = value;
-  return [decoder(decoderA as any)(a), decoder(decoderB as any)(b)];
+  return [decode(decoderA as any)(a), decode(decoderB as any)(b)];
 };
 
 export const fieldDecoder: unique symbol = Symbol('field-decoder');
 export const fields = <T extends { [key: string]: Decoder<unknown> }, U>(
-  _decoder: T,
-  continuation: (x: decode<T>) => U,
+  decoder: T,
+  continuation: (x: decodeType<T>) => U,
 ): DecoderFunction<U> => {
   const dec = (value: Pojo) => {
-    const decoded = decoder(_decoder)(value);
+    const decoded = decode(decoder)(value);
     return continuation(decoded);
   };
   tag(dec, fieldDecoder);
@@ -53,31 +53,31 @@ export const fields = <T extends { [key: string]: Decoder<unknown> }, U>(
 
 export const field = <T>(
   key: string,
-  _decoder: Decoder<T>,
+  decoder: Decoder<T>,
 ): DecoderFunction<T> => {
-  return fields({ [key]: _decoder }, (x: any) => x[key]);
+  return fields({ [key]: decoder }, (x: any) => x[key]);
 };
 
 export const record = <schema extends { [key: string]: Decoder<unknown> }>(
   s: schema,
-): DecoderFunction<decode<schema>> => (value: Pojo) => {
+): DecoderFunction<decodeType<schema>> => (value: Pojo) => {
   if (!isPojoObject(value)) {
     throw `Value \`${value}\` is not of type \`object\` but rather \`${typeof value}\``;
   }
   return Object.entries(s)
-    .map(([key, _decoder]: [string, any]) => {
-      if (_decoder[fieldDecoder] === true) {
-        return [key, decoder(_decoder)(value)];
+    .map(([key, decoder]: [string, any]) => {
+      if (decoder[fieldDecoder] === true) {
+        return [key, decode(decoder)(value)];
       }
       if (!value.hasOwnProperty(key)) {
-        if ((_decoder as any)[optionDecoder]) {
+        if ((decoder as any)[optionalDecoder]) {
           return [key, undefined];
         }
         throw `Cannot find key \`${key}\` in \`${JSON.stringify(value)}\``;
       }
       try {
         const jsonvalue = value[key];
-        return [key, decoder(_decoder)(jsonvalue)];
+        return [key, decode(decoder)(jsonvalue)];
       } catch (message) {
         throw (
           message +

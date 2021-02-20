@@ -1,7 +1,14 @@
 import { boolean, date, number, string } from './primitive-decoders';
-import { array, dict, map, option, set, union } from './higher-order-decoders';
-import { field, fields, literal, tuple } from './literal-decoders';
-import { decoder, decode } from './types';
+import {
+  array,
+  dict,
+  map,
+  optional,
+  set,
+  union,
+} from './higher-order-decoders';
+import { field, fields, literal, record, tuple } from './literal-decoders';
+import { decodeType } from './types';
 
 const discriminatedUnion = union(
   { discriminant: literal('one') },
@@ -13,17 +20,17 @@ const message = union(
   tuple('something-else', { somestuff: string }),
 );
 
-export type IEmployee = decode<typeof employeeDecoder>;
+export type IEmployee = decodeType<typeof employeeDecoder>;
 
-export const employeeDecoder = decoder({
+export const employeeDecoder = record({
   renamedfield: field('phoneNumbers', array(string)),
   month2: fields({ dateOfBirth: date }, ({ dateOfBirth }) =>
     dateOfBirth.getMonth(),
   ),
-  maybessn: fields({ ssn: option(string) }, ({ ssn }) => ssn),
+  maybessn: fields({ ssn: optional(string) }, ({ ssn }) => ssn),
   employeeIdentifier2: fields(
-    { name: string, employeeId: number },
-    ({ name, employeeId }) => `${name}:${employeeId}`,
+    { name: string, employeeId: optional(number) },
+    ({ name, employeeId }) => `${name}:${employeeId || 0}`,
   ),
   month: field('dateOfBirth', (x) => date(x).getMonth()),
   employeeIdentifier: fields(
@@ -40,7 +47,7 @@ export const employeeDecoder = decoder({
     {
       employeeId: number,
       name: string,
-      ssn: option(string),
+      ssn: optional(string),
     },
     (x) => x.employeeId,
   ),
@@ -49,7 +56,7 @@ export const employeeDecoder = decoder({
   address: {
     city: string,
   },
-  secondAddrese: option({ city: string, option: option(number) }),
+  secondAddrese: optional({ city: string, option: optional(number) }),
   ageAndReputation: [number, string],
   discriminatedUnion,
   message,
@@ -58,7 +65,7 @@ export const employeeDecoder = decoder({
   likes2: array(tuple('likt', number)),
   isEmployed: boolean,
   dateOfBirth: date,
-  ssn: option(string),
+  ssn: optional(string),
 });
 
 const x: IEmployee = employeeDecoder({
