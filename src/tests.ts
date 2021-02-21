@@ -106,9 +106,6 @@ console.log(x);
 // Improvements:
 // Use tagged templates to abstract out the stringifying
 // Returning nestend objects instead of strings for error reporting?
-// Move object test up in record decoder to give better error messages
-// Use my object-map implementation
-// also less any and more 'correct' implementations in general?
 // What about decorators for marking as fieldDecoder?
 // Maybe also type-safe tag function after TypeScript 4.2
 
