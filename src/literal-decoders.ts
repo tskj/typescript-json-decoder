@@ -1,5 +1,5 @@
 import { optionalDecoder } from './higher-order-decoders';
-import { isPojoObject, Pojo, PojoObject } from './pojo';
+import { isPojoObject, Pojo } from './pojo';
 import {
   decodeType,
   decode,
