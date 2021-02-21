@@ -7,6 +7,8 @@ Detecting at runtime that your type does not in fact match the value returned by
 
 Installation: [npmjs.com/package/typescript-json-decoder](https://www.npmjs.com/package/typescript-json-decoder)
 
+I've also written a piece about how it works internally and the underlying idea [here.](article.md)
+
 ## The idea
 
 The following is an example of a simple decoder which defines a decoder of type `User`.
