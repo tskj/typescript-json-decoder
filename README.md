@@ -11,10 +11,10 @@ Installation: [npmjs.com/package/typescript-json-decoder](https://www.npmjs.com/
 The following is an example of a simple decoder which defines a decoder of type `User`.
 
 ```typescript
-import { decode, decoder, number, string, boolean } from 'typescript-json-decoder';
+import { decodeType, record, number, string, boolean } from 'typescript-json-decoder';
 
-type User = decode<typeof userDecoder>;
-const userDecoder = decoder({
+type User = decodeType<typeof userDecoder>;
+const userDecoder = record({
     id: number,
     username: string,
     isBanned: boolean,
@@ -61,15 +61,15 @@ This library supports all the regular TypeScript types you are used to and can b
 Expanding on the `User` example, we could for instance have an optional ssn and a list of phone numbers.
 
 ```typescript
-import { decode, decoder, number, string, boolean, array, option } from 'typescript-json-decoder';
+import { decodeType, record, number, string, boolean, array, optional } from 'typescript-json-decoder';
 
-type User = decode<typeof userDecoder>;
-const userDecoder = decoder({
+type User = decodeType<typeof userDecoder>;
+const userDecoder = record({
     id: number,
     username: string,
     isBanned: boolean,
     phoneNumbers: array(string),
-    ssn: option(string),
+    ssn: optional(string),
 });
 ```
 
@@ -78,15 +78,15 @@ I call these higher order decoders, as they are functions accepting any decoder 
 Another useful kind of "type combinator" in TypeScript is the concept of a union of two types, for instance written `string | number` for the union of strings and numbers. We can imagine a user has a credit card number which is either a string or a number. Don't refer to me for domain modeling advice.
 
 ```typescript
-import { decode, decoder, number, string, boolean, array, option, union } from 'typescript-json-decoder';
+import { decodeType, record, number, string, boolean, array, optional, union } from 'typescript-json-decoder';
 
-type User = decode<typeof userDecoder>;
-const userDecoder = decoder({
+type User = decodeType<typeof userDecoder>;
+const userDecoder = record({
     id: number,
     username: string,
     isBanned: boolean,
     phoneNumbers: array(string),
-    ssn: option(string),
+    ssn: optional(string),
     creditCardNumber: union(string, number),
 });
 ```
@@ -96,19 +96,19 @@ Union takes an arbitrary number of parameters.
 Lastly we can add some more stuff, and if you wish to fetch a list of your users, do it like the following.
 
 ```typescript
-import { decode, decoder, number, string, boolean, array, option, union } from 'typescript-json-decoder';
+import { decodeType, record, number, string, boolean, array, optional, union } from 'typescript-json-decoder';
 
-type User = decode<typeof userDecoder>;
-const userDecoder = decoder({
+type User = decodeType<typeof userDecoder>;
+const userDecoder = record({
     id: number,
     username: string,
     isBanned: boolean,
     phoneNumbers: array(string),
-    ssn: option(string),
+    ssn: optional(string),
     creditCardNumber: union(string, number),
     address: {
         city: string,
-        timezones: array({ info: string, optionalInfo: option(array(number)) })
+        timezones: array({ info: string, optionalInfo: optional(array(number)) })
     }
 });
 
@@ -125,9 +125,9 @@ Everything so far should cover most APIs you need to model. However, I really wa
 Although not as common in Json APIs (yet?), tuples are a very useful data structure. In JavaScript we usually encode them as lists with exactly two elements and possibly of different types, and TypeScript understands this. A tuple with a string and a number (such as `['user', 2]`) can be expressed with the type `[string, number]`. In this library we can use the `tuple` function to the same effect.
 
 ```typescript
-import { decode, tuple, string, number } from 'typescript-json-decoder';
+import { decodeType, tuple, string, number } from 'typescript-json-decoder';
 
-type StringAndNumber = decode<typeof stringAndNumberDecoder>;
+type StringAndNumber = decodeType<typeof stringAndNumberDecoder>;
 const stringAndNumberDecoder = tuple(string, number);
 const myTuple = stringAndNumberDecoder(['user', 2]);
 ```
@@ -135,17 +135,17 @@ const myTuple = stringAndNumberDecoder(['user', 2]);
 This doesn't really match the syntax of regular TypeScript as much as I would like, so as a convenience feature we also allow a *literal syntax* for tuples. The idea is that a two element list of decoders can be cansidered itself a decoder of the corresponding tuple. The same example as above written in the literal form would be as follows.
 
 ```typescript
-import { decode, decoder, string, number } from 'typescript-json-decoder';
+import { decodeType, decode, string, number } from 'typescript-json-decoder';
 
-type StringAndNumber = decode<typeof stringAndNumberDecoder>;
-const stringAndNumberDecoder = decoder([string, number]);
+type StringAndNumber = decodeType<typeof stringAndNumberDecoder>;
+const stringAndNumberDecoder = decode([string, number]);
 const myTuple = stringAndNumberDecoder(['user', 2]);
 ```
 
-Notice we now need a call to the standard `decoder` function to make it into an actually callable decoder. The advantage to this approach is that you can use the literal tuple syntax directly in an object, such as the following.
+Notice we now need a call to a `decode` function to make it into an actually callable decoder. `decode` is the low level implementation which all the other decoders are implemented in terms of; that is `record`, `tuple`, and all the other built in decoders eventually call `decode` to do the dirty work. But that's a tangent, the advantage to this approach is that you can use the literal tuple syntax directly in an object, such as the following.
 
 ```typescript
-const myDecoder = decoder({
+const myDecoder = record({
     username: string,
     result: [string, number],
     results: array([string, number]),
@@ -161,10 +161,10 @@ const x = { type: 'cool', somestuff: "" };
 With this decoder.
 
 ```typescript
-import { decode, decoder, string } from 'typescript-json-decoder';
+import { decodeType, record, string } from 'typescript-json-decoder';
 
-type Cool = decode<typeof coolDecoder>;
-const coolDecoder = decoder({ type: decoder('cool'), somestuff: string });
+type Cool = decodeType<typeof coolDecoder>;
+const coolDecoder = record({ type: decoder('cool'), somestuff: string });
 ```
 
 Similarly we can define another decoder of this type.
@@ -176,18 +176,18 @@ const y = { type: 'dumb', otherstuff: 'starbucks' };
 With a decoder that looks like this.
 
 ```typescript
-import { decode, decoder, string } from 'typescript-json-decoder';
+import { decodeType, decode, record, string } from 'typescript-json-decoder';
 
-type Dumb = decode<typeof dumbDecoder>;
-const dumbDecoder = decoder({ type: decoder('dumb'), otherstuff: string });
+type Dumb = decodeType<typeof dumbDecoder>;
+const dumbDecoder = record({ type: decode('dumb'), otherstuff: string });
 ```
 
 This ensures that the `type` key is exactly the string `cool` or `dumb` respectively. If we now combine these decoders using a union we get what is known as a "discriminated union".
 
 ```typescript
-import { decode, union } from 'typescript-json-decoder';
+import { decodeType, union } from 'typescript-json-decoder';
 
-type Stuff = decode<typeof stuffDecoder>;
+type Stuff = decodeTyype<typeof stuffDecoder>;
 const stuffDecoder = union(coolDecoder, dumbDecoder);
 ```
 
@@ -227,10 +227,10 @@ const date = (value: Pojo) => {
 I provide this decoder with the library, and we can use it as follows.
 
 ```typescript
-import { decode, decoder, date } from 'typescript-json-decoder';
+import { decodeType, record, date } from 'typescript-json-decoder';
 
-type blogpost = decode<typeof blogpostdecoder>;
-const blogpostdecoder = decoder({
+type blogpost = decodeType<typeof blogpostdecoder>;
+const blogpostdecoder = record({
     title: string,
     content: string,
     createddate: date,
@@ -305,16 +305,16 @@ The `field` decoder accepts a string, the name of they key, and a decoder which 
 Say you have some date in an iso-date-string format in the field `"dateOfBirth"` but are only interested in the year and month, you could use the `field` decoder to access it in the following way.
 
 ```typescript
-import { decode, decoder, field } from 'typescript-json-decoder';
+import { decodeType, record, field } from 'typescript-json-decoder';
 
-type User = decode<typeof userDecoder>;
-const userDecoder = decoder({
+type User = decodeType<typeof userDecoder>;
+const userDecoder = record({
     month: field('dateOfBirth', x => date(x).getMonth() + 1),
     year: field('dateOfBirth', x => date(x).getFullYear()),
 });
 ```
 
-Alternatively if you need both username and id you can use the `fields` decoder. This has a slightly different api. The `fields` decoder accepts an object decoder in the same way `decoder` does, and a second argument, a function, which accepts the result of this decoder and produces the resulting value of the `fields` decoder. An example is maybe more explanatory.
+Alternatively if you need both username and id you can use the `fields` decoder. This has a slightly different api. The `fields` decoder accepts an object decoder in the same way `decoder` does, and a second argument, a continuation, which accepts the result of this decoder and produces the resulting value of the `fields` decoder. An example is maybe more explanatory.
 
 ```typescript
 import { decode, decoder, fields } from 'typescript-json-decoder';
@@ -328,4 +328,4 @@ const userDecoder = decoder({
 
 This is read as "the `userDecoder` decodes an object which might look like `{ username: "hunter2", userId: 3 }` and decodes to an object which looks like `{ identifier: "user:hunter2:3" }`".
 
-Both the `field` and the `fields` decoder are meant to be used "inside" an object decoder in the way shown here, although you may pass an object directly.
+Both the `field` and the `fields` decoder are meant to be used "inside" a record decoder in the way shown here.
