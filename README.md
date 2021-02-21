@@ -1,3 +1,4 @@
+![logo](logo.png)
 #
 
 TypeScript Json Decoder is a library for decoding untrusted data as it comes in to your system, inspired by elm-json-decode.
