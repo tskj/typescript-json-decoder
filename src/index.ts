@@ -1,5 +1,5 @@
 export { decode, decodeType, Decoder, DecoderFunction } from './types';
-export { tuple, literal } from './literal-decoders';
+export { tuple, literal, record, field, fields } from './literal-decoders';
 export {
   union,
   optional,

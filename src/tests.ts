@@ -1,14 +1,21 @@
-import { boolean, date, number, string } from './primitive-decoders';
 import {
+  boolean,
+  date,
+  number,
+  string,
   array,
   dict,
   map,
   optional,
   set,
   union,
-} from './higher-order-decoders';
-import { field, fields, literal, record, tuple } from './literal-decoders';
-import { decodeType } from './types';
+  field,
+  fields,
+  literal,
+  record,
+  tuple,
+  decodeType,
+} from './index';
 
 const discriminatedUnion = union(
   { discriminant: literal('one') },
