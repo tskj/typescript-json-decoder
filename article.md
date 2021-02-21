@@ -29,10 +29,10 @@ Check out [the GitHub page](https://github.com/tskj/typescript-json-decoder) to 
 Let me give you a basic introduction to the underlying idea. If we wanted to replace our `User` type with a decoder for that type, we would instead write the following.
 
 ```typescript
-import { decode, decoder, number, string, array } from 'typescript-json-decoder`;
+import { decodeType, record, number, string, array } from 'typescript-json-decoder`;
 
-type User = decode<typeof userDecoder>;
-const userDecoder = decoder({
+type User = decodeType<typeof userDecoder>;
+const userDecoder = record({
     id: number,
     username: string,
     friends: array(number),
@@ -77,7 +77,7 @@ If you think about it, a decoder by necessity does not have the same type as the
 However, let's ignore that and first think about how to extract the type that a (function) decoder will decode.
 
 ```typescript
-type decode<decoder> = decoder extends (x: Pojo) => (infer T) ? T : never;
+type decoeType<decoder> = decoder extends (x: Pojo) => (infer T) ? T : never;
 ```
 
 Now this is the kind of metaprogramming that gets me going. What in the world is going on. Well, first of all we have a ternary - essentially an if test on types. The thing we are testing on is the `decoder extends (x: Pojo) => (infer T)` part, which is a *subtype test*. The extend keyword, I think, is a horribly chosen name in TypeScript, mostly carried over from other contexts. What it means is "is a subtype of". It is a question asked of the type parameter `decoder`, are you a subtype of the type `(x: Pojo) => (infer T)`? Which begs the question, what is `infer T`? Well, it is whatever it needs to be to satisfy the subtype test. If `decoder` is the function type defined above, `(x: Pojo) => User`, then `T` would need to be `User` for the one to be the subtype of the other - at least if you consider being the same type as being a subtype. The keyword `infer` is used to introduce a new type variable. In the first branch of the ternary we return the type `T` if we have a match (that is, the decoder is a function type), and in the second branch we return TypeScript's bottom type `never`, indicating this should never happen. If this does happen, and we try to use the resulting `never` type for anything, we get a compiler error. `never` is the empty set, if you are inclined to think about types as sets. There is no value of this type.
@@ -85,16 +85,16 @@ Now this is the kind of metaprogramming that gets me going. What in the world is
 This is actually the definition of the type level function for extracting the return type of a function (that's a mouthful), and is in fact available in the standard library under the name `ReturnType`! So that was a lot of type theory for very little. We need to go further. I mentioned that the essence of this library is to understand literal values as decoders of themselves, and to define this recursively in the case of records. So let's add records!
 
 ```typescript
-type decode<decoder> =
+type decodeType<decoder> =
     decoder extends (x: Pojo) => (infer T)
         ? T
-        : { [key in keyof decoder]: decode<decoder[key]> }
+        : { [key in keyof decoder]: decodeType<decoder[key]> }
 ```
 
-Here I've formatted the ternary to make it resemble a classical if block a bit more. It's kind of elegant in a way. It's the classic recursive pattern, a base case where we break the recursion when there is no more work to do, and a body where we recursively call ourselves with a smaller set of the problem. Here we use TypeScript's well understood mapped types to iterate, or map I guess, over the keys and values of the record. For every key we evaluate `decode` on its value. So the following type, which would be the type of the decoder of our `User` type,
+Here I've formatted the ternary to make it resemble a classical if block a bit more. It's kind of elegant in a way. It's the classic recursive pattern, a base case where we break the recursion when there is no more work to do, and a body where we recursively call ourselves with a smaller set of the problem. Here we use TypeScript's well understood mapped types to iterate, or map I guess, over the keys and values of the record. For every key we evaluate `decodeType` on its value. So the following type, which would be the type of the decoder of our `User` type,
 
 ```typescript
-type User = decode<{
+type User = decodeType<{
     id: (x: Pojo) => number;
     username: (x: Pojo) => string;
     friends: (x: Pojo) => number[];
@@ -114,8 +114,8 @@ type User = {
 Now hopefully it makes sense to think about the series of steps it would take to evaluate a nested type defintion. So if we were to add an `address` to our `User`:
 
 ```typescript
-type User = decode<typeof userDecoder>;
-const userDecoder = decoder({
+type User = decodeType<typeof userDecoder>;
+const userDecoder = record({
     id: number,
     username: string,
     friends: array(number),
@@ -129,7 +129,7 @@ const userDecoder = decoder({
 we would get the following evaluation steps.
 
 ```typescript
-type User = decode<{
+type User = decodeType<{
     id: (x: Pojo) => number;
     username: (x: Pojo) => string;
     friends: (x: Pojo) => number[];
@@ -140,10 +140,10 @@ type User = decode<{
 }>;
 
 type User = {
-    id: decode<(x: Pojo) => number>;
-    username: decode<(x: Pojo) => string>;
-    friends: decode<(x: Pojo) => number[]>;
-    address: decode<{
+    id: decodeType<(x: Pojo) => number>;
+    username: decodeType<(x: Pojo) => string>;
+    friends: decodeType<(x: Pojo) => number[]>;
+    address: decodeType<{
         city: (x: Pojo) => string;
         zip: (x: Pojo) => number;
     }>,
@@ -154,8 +154,8 @@ type User = {
     username: string;
     friends: number[];
     address: {
-        city: decode<(x: Pojo) => string>;
-        zip: decode<(x: Pojo) => number>;
+        city: decodeType<(x: Pojo) => string>;
+        zip: decodeType<(x: Pojo) => number>;
     },
 }>;
 
