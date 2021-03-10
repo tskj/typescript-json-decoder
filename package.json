@@ -22,7 +22,8 @@
   "homepage": "https://github.com/tskj/typescript-json-decoder#readme",
   "prepublish": "tsc",
   "devDependencies": {
-    "tsc-watch": "^4.2.9"
+    "tsc-watch": "^4.2.9",
+    "typescript": "^4.2.3"
   },
   "prettier": {
     "trailingComma": "all",
