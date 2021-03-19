@@ -103,27 +103,3 @@ const x: IEmployee = employeeDecoder({
   isEmployed: true,
 });
 console.log(x);
-
-// TODO
-
-// Goals:
-// maybe variadic tuple decoder
-// maybe question mark on optional key
-
-// Improvements:
-// Use tagged templates to abstract out the stringifying
-// Returning nestend objects instead of strings for error reporting?
-// What about decorators for marking as fieldDecoder?
-// Maybe also type-safe tag function after TypeScript 4.2
-
-// Additions:
-// Constant decoder (always returns same regardless of input)
-// Default decoder for when stuff is null or undefined
-// Integer decoder, and other validation of data
-// Regex decoder which takes a regex and returns string
-// Fail for explicitly disallowing keys
-// Unknown for passing through anything and leaving type unknown
-
-// Set up tests
-// Docs
-// Release 1.0
