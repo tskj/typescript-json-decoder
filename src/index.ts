@@ -16,3 +16,4 @@ export {
   nil,
   date,
 } from './primitive-decoders';
+export { Pojo } from './pojo';

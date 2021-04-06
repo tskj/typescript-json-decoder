@@ -1,6 +1,6 @@
 {
   "name": "typescript-json-decoder",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -8,7 +8,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",
     "start": "tsc-watch --onSuccess 'node dist/tests.js'",
-    "prepublishOnly": "npm run build && git add . && git commit && git push --tags"
+    "prepublishOnly": "npm run build && git push && git push --tags"
   },
   "repository": {
     "type": "git",
