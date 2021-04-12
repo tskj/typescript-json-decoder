@@ -1,11 +1,6 @@
 ![logo](logo.png)
 #
 
-![AppVeyor](https://img.shields.io/appveyor/build/tskj/typescript-calendar-date?style=for-the-badge&logo=appveyor)
-![License](https://img.shields.io/github/license/tskj/typescript-calendar-date?style=for-the-badge)
-![npm bundle size](https://img.shields.io/bundlephobia/minzip/typescript-calendar-date?style=for-the-badge&logo=shields.io)
-![npm](https://img.shields.io/npm/v/typescript-calendar-date?style=for-the-badge&logo=npm&color=yellow)
-
 TypeScript Json Decoder is a library for decoding untrusted data as it comes in to your system, inspired by elm-json-decode.
 
 Detecting at runtime that your type does not in fact match the value returned by your API sucks, and not being able to parse the data to a data structure of your liking in a convenient way sucks majorly - and having a type definition separate from its parser is unacceptable.
