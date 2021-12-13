@@ -102,4 +102,12 @@ const x: IEmployee = employeeDecoder({
   dateOfBirth: '1995-12-14T00:00:00.0Z',
   isEmployed: true,
 });
-console.log(x);
+const fooDecoder = record({
+  bar: optional(string),
+  baz: string,
+});
+type Foo = decodeType<typeof fooDecoder>;
+const myFoo: Foo = fooDecoder({
+  baz: 'foobar',
+});
+console.log(x, myFoo);
