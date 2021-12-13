@@ -1,3 +1,4 @@
+import { nullable } from './higher-order-decoders';
 import {
   boolean,
   date,
@@ -73,6 +74,7 @@ export const employeeDecoder = record({
   isEmployed: boolean,
   dateOfBirth: date,
   ssn: optional(string),
+  girlfriend: nullable(string),
 });
 
 const x: IEmployee = employeeDecoder({
@@ -101,6 +103,7 @@ const x: IEmployee = employeeDecoder({
   ageAndReputation: [12, 'good'],
   dateOfBirth: '1995-12-14T00:00:00.0Z',
   isEmployed: true,
+  girlfriend: null,
 });
 const fooDecoder = record({
   bar: optional(string),
