@@ -1,4 +1,4 @@
-import { undef } from './primitive-decoders';
+import { nil, undef } from './primitive-decoders';
 import { isPojoObject, Pojo } from './pojo';
 import { decodeType, decode, Decoder, DecoderFunction } from './types';
 import { tag } from './utils';
@@ -22,6 +22,12 @@ export const union = <decoders extends Decoder<unknown>[]>(
       throw `${messageFromThisDecoder}\n${message}`;
     }
   }
+};
+
+export const nullable = <T extends Decoder<unknown>>(
+  decoder: T,
+): DecoderFunction<decodeType<T> | null> => {
+  return union(nil, decoder as any);
 };
 
 export const optionalDecoder: unique symbol = Symbol('optional-decoder');
