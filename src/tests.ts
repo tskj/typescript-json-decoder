@@ -16,6 +16,8 @@ import {
   record,
   tuple,
   decodeType,
+  Pojo,
+  Decoder,
 } from './index';
 
 const discriminatedUnion = union(
@@ -27,6 +29,9 @@ const message = union(
   tuple('message', string),
   tuple('something-else', { somestuff: string }),
 );
+
+// test impl
+const always = <T>(x: T): Decoder<T> => (json: Pojo) => x
 
 export type IEmployee = decodeType<typeof employeeDecoder>;
 
@@ -75,6 +80,8 @@ export const employeeDecoder = record({
   dateOfBirth: date,
   ssn: optional(string),
   girlfriend: nullable(string),
+  test: fields({girlfriend: nullable(string), dateOfBirth: date }, ({girlfriend, dateOfBirth}) => girlfriend ?? dateOfBirth),
+  just: array(union(boolean, always(false))),
 });
 
 const x: IEmployee = employeeDecoder({
@@ -104,6 +111,7 @@ const x: IEmployee = employeeDecoder({
   dateOfBirth: '1995-12-14T00:00:00.0Z',
   isEmployed: true,
   girlfriend: null,
+  just: ["blah", true, false],
 });
 const fooDecoder = record({
   bar: optional(string),
