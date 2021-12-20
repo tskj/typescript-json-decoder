@@ -31,7 +31,10 @@ const message = union(
 );
 
 // test impl
-const always = <T>(x: T): Decoder<T> => (json: Pojo) => x
+const always =
+  <T>(x: T): Decoder<T> =>
+  (json: Pojo) =>
+    x;
 
 export type IEmployee = decodeType<typeof employeeDecoder>;
 
@@ -80,7 +83,10 @@ export const employeeDecoder = record({
   dateOfBirth: date,
   ssn: optional(string),
   girlfriend: nullable(string),
-  test: fields({girlfriend: nullable(string), dateOfBirth: date }, ({girlfriend, dateOfBirth}) => girlfriend ?? dateOfBirth),
+  test: fields(
+    { girlfriend: nullable(string), dateOfBirth: date },
+    ({ girlfriend, dateOfBirth }) => girlfriend ?? dateOfBirth,
+  ),
   just: array(union(boolean, always(false))),
 });
 
@@ -111,7 +117,7 @@ const x: IEmployee = employeeDecoder({
   dateOfBirth: '1995-12-14T00:00:00.0Z',
   isEmployed: true,
   girlfriend: null,
-  just: ["blah", true, false],
+  just: ['blah', true, false],
 });
 const fooDecoder = record({
   bar: optional(string),
