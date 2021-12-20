@@ -1,4 +1,3 @@
-import { optionalDecoder } from './higher-order-decoders';
 import { isPojoObject, Pojo } from './pojo';
 import {
   decodeType,
@@ -72,12 +71,6 @@ export const record =
       .map(([key, decoder]: [string, any]) => {
         if (decoder[fieldDecoder] === true) {
           return [key, decode(decoder)(value)];
-        }
-        if (!value.hasOwnProperty(key)) {
-          if ((decoder as any)[optionalDecoder]) {
-            return [key, undefined];
-          }
-          throw `Cannot find key \`${key}\` in \`${JSON.stringify(value)}\``;
         }
         try {
           const jsonvalue = value[key];

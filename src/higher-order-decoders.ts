@@ -30,14 +30,9 @@ export const nullable = <T extends Decoder<unknown>>(
   return union(nil, decoder as any);
 };
 
-export const optionalDecoder: unique symbol = Symbol('optional-decoder');
 export const optional = <T extends Decoder<unknown>>(
   decoder: T,
-): DecoderFunction<decodeType<T> | undefined> => {
-  const _optionDecoder = union(undef, decoder as any);
-  tag(_optionDecoder, optionalDecoder);
-  return _optionDecoder;
-};
+): DecoderFunction<decodeType<T> | undefined> => union(undef, decoder as any);
 
 export function array<D extends Decoder<unknown>>(
   decoder: D,
