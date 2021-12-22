@@ -7,7 +7,6 @@
   "scripts": {
     "test": "jest",
     "build": "tsc",
-    "start": "tsc-watch --onSuccess 'node dist/tests.js'",
     "prepublishOnly": "npm run build && npm run test && git push && git push --tags"
   },
   "repository": {
