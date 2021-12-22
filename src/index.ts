@@ -7,6 +7,7 @@ export {
   set,
   map,
   dict,
+  nullable,
 } from './higher-order-decoders';
 export {
   string,
