@@ -268,6 +268,39 @@ test('union with default case pattern', () => {
   expect<union>(union_decoder(false)).toEqual('');
 });
 
+test('discriminated union with records', () => {
+  const one = { discriminant: 'one' };
+  const two = { discriminant: 'two', data: 'stuff' };
+
+  type adt = decodeType<typeof adt_decoder>;
+  const adt_decoder = union(
+    { discriminant: literal('one') },
+    { discriminant: literal('two'), data: string },
+  );
+
+  expect<adt>(adt_decoder(one)).toEqual(one);
+  expect<adt>(adt_decoder(two)).toEqual(two);
+  expect(() => adt_decoder({ ...two, data: undefined })).toThrow();
+});
+
+test('discriminated union with tuples', () => {
+  const one = ['one', 1];
+  const two = ['two', 'stuff'];
+  const three = ['three', { data: 'stuff' }];
+
+  type adt = decodeType<typeof adt_decoder>;
+  const adt_decoder = union(
+    tuple('one', number),
+    tuple('two', string),
+    tuple('three', { data: string }),
+  );
+
+  expect<adt>(adt_decoder(one)).toEqual(one);
+  expect<adt>(adt_decoder(two)).toEqual(two);
+  expect<adt>(adt_decoder(three)).toEqual(three);
+  expect(() => adt_decoder(['three', { data: undefined }])).toThrow();
+});
+
 test('optional string decoder', () => {
   const l1 = 'test data';
 

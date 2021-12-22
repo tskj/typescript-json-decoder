@@ -10,6 +10,8 @@ import {
   undef,
   union,
   array,
+  literal,
+  tuple,
 } from '../src';
 
 let n = 0;
@@ -46,3 +48,40 @@ expectType<string | number | {}>(union_decoder('test'));
 
 let optional_decoder = optional(union(string, number));
 expectType<string | number | undefined>(optional_decoder(''));
+
+let discriminated_rec_decoder = union(
+  { discriminant: literal('one') },
+  { discriminant: literal('two'), data: string },
+);
+expectType<{ discriminant: 'one' } | { discriminant: 'two'; data: string }>(
+  discriminated_rec_decoder({ discriminant: 'one' }),
+);
+
+let discriminated_tuple_decoder = union(
+  tuple('one', number),
+  tuple('two', string),
+  tuple('three', { data: string }),
+);
+let discriminated_tuple_decoder_2 = union(
+  ['one' as const, number],
+  ['two' as const, string],
+  ['three' as const, { data: string }],
+);
+let discriminated_tuple_decoder_3 = union(
+  [literal('one'), number],
+  [literal('two'), string],
+  [literal('three'), { data: string }],
+);
+type expected_discriminated_tuple_t =
+  | ['one', number]
+  | ['two', string]
+  | ['three', { data: string }];
+expectType<expected_discriminated_tuple_t>(
+  discriminated_tuple_decoder(['one', 1]),
+);
+expectType<expected_discriminated_tuple_t>(
+  discriminated_tuple_decoder_2(['one', 1]),
+);
+expectType<expected_discriminated_tuple_t>(
+  discriminated_tuple_decoder_3(['one', 1]),
+);
