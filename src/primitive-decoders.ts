@@ -46,7 +46,7 @@ export const nil: DecoderFunction<null> = ((u: Pojo) => {
   return u as null;
 }) as any;
 
-export const date = (value: Pojo) => {
+export const date: DecoderFunction<Date> = (value: Pojo) => {
   const dateString = string(value);
   const timeStampSinceEpoch = Date.parse(dateString);
   if (isNaN(timeStampSinceEpoch)) {
