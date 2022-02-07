@@ -18,6 +18,7 @@ import {
   decodeType,
   Pojo,
   Decoder,
+  decode,
 } from '../src';
 
 test('everything', () => {
@@ -34,8 +35,8 @@ test('everything', () => {
   // test impl
   const always =
     <T>(x: T): Decoder<T> =>
-    (json: Pojo) =>
-      x;
+      (json: Pojo) =>
+        x;
   always(false);
   type IEmployee = decodeType<typeof employeeDecoder>;
 
@@ -164,3 +165,97 @@ test('everything', () => {
     just: [false, true, false],
   });
 });
+
+const nameDecoder = record({ first: string, last: string })
+
+const guestDecoder = record({
+  type: decode('Guest'),
+  email: string,
+  employer: optional({
+    id: string,
+    corporateId: string,
+    companyName: string
+  }),
+  reference: union(
+    {
+      ref: decode('SsoMicrosoft'),
+      tid: string,
+      oid: string
+    },
+    {
+      ref: decode('SsoMicrosoftPersonal'),
+      oid: string
+    }
+  )
+});
+
+const rolesDecoder = array(
+  union(
+    {
+      type: decode('Accountant'),
+      employer: {
+        id: string,
+        corporateId: string,
+        companyName: string
+      }
+    },
+    {
+      type: decode('Employer'),
+      employer: {
+        id: string,
+        corporateId: string,
+        companyName: string
+      }
+    },
+    {
+      type: decode('Company'),
+      corporateId: string,
+      companyName: string
+    }
+  )
+);
+
+const userDecoder = record({
+  type: decode('User'),
+  account: {
+    id: string,
+    name: nameDecoder,
+    email: string
+  },
+  roles: rolesDecoder,
+  intent: optional(union('Accountant', 'Company'))
+});
+
+const personDecoder = union(userDecoder, guestDecoder);
+
+const tokenDecoder = record({
+  token: string,
+  user: personDecoder
+})
+
+const token = {
+  "token": "<SECRET>",
+  "user": {
+    "type": "User",
+    "account": {
+      "id": "ac000002-0000-0000-0000-000000000001",
+      "name": {
+        "first": "Andreas",
+        "last": "Johansson"
+      },
+      "email": "andreas@gmail.se"
+    },
+    "roles": [
+      {
+        "type": "Accountant",
+        "employer": {
+          "id": "e1000000-0000-0000-0000-000000000001",
+          "corporateId": "551191-3113",
+          "companyName": "FRA"
+        }
+      }
+    ]
+  }
+}
+
+const myToken = tokenDecoder(token)
