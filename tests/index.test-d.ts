@@ -86,5 +86,11 @@ expectType<expected_discriminated_tuple_t>(
   discriminated_tuple_decoder_3(['one', 1]),
 );
 
-const a_or_b_decoder = union('a', 'b');
+const a_or_b_literal_decoder = union('a', 'b');
+expectType<'a' | 'b'>(a_or_b_literal_decoder('a'))
+
+const a_or_b_decoder = union(literal('a'), literal('b'));
 expectType<'a' | 'b'>(a_or_b_decoder('a'))
+
+const a_b_or_r_decoder = union('a', 'b', { test: string });
+expectType<'a' | 'b' | { test: string }>(a_b_or_r_decoder({ test: '' }))
