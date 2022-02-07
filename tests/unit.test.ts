@@ -95,6 +95,24 @@ test('literal string', () => {
 //   expect<literal>(literal_decoder(l1)).toEqual(l1);
 // });
 
+test('literal string union', () => {
+  type decoderType = decodeType<typeof decoder>;
+  const decoder = union('a', 'b');
+
+  expect<decoderType>(decoder('a')).toEqual('a');
+  expect<decoderType>(decoder('b')).toEqual('b');
+  expect(() => decoder('c')).toThrow();
+});
+
+test('literal literal string union', () => {
+  type decoderType = decodeType<typeof decoder>;
+  const decoder = union(literal('a'), literal('b'));
+
+  expect<decoderType>(decoder('a')).toEqual('a');
+  expect<decoderType>(decoder('b')).toEqual('b');
+  expect(() => decoder('c')).toThrow();
+});
+
 test('decode string', () => {
   const l1: 'a' = 'a' as const;
 

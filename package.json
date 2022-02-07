@@ -22,7 +22,7 @@
   "homepage": "https://github.com/tskj/typescript-json-decoder#readme",
   "prepublish": "tsc",
   "devDependencies": {
-    "@types/jest": "^27.0.3",
+    "@types/jest": "^27.4.0",
     "fast-check": "^2.20.0",
     "jest": "^27.4.5",
     "npx": "^10.2.2",
