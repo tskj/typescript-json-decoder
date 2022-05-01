@@ -303,7 +303,7 @@ const userListDecoder =
 
 Sometimes you need direct access to the fields of the object you're decoding. Maybe you want to use the same fields to calculate two different things, or maybe you want to combine two or more different fields.
 
-The `field` decoder accepts a string, the name of they key, and a decoder which decodes the value found at this key.
+The `field` decoder accepts a string, the name of the key, and a decoder which decodes the value found at this key.
 
 Say you have some date in an iso-date-string format in the field `"dateOfBirth"` but are only interested in the year and month, you could use the `field` decoder to access it in the following way.
 
@@ -320,10 +320,10 @@ const userDecoder = record({
 Alternatively if you need both username and id you can use the `fields` decoder. This has a slightly different api. The `fields` decoder accepts an object decoder in the same way `decoder` does, and a second argument, a continuation, which accepts the result of this decoder and produces the resulting value of the `fields` decoder. An example is maybe more explanatory.
 
 ```typescript
-import { decode, decoder, fields } from 'typescript-json-decoder';
+import { decodeType, record, fields } from 'typescript-json-decoder';
 
-type User = decode<typeof userDecoder>;
-const userDecoder = decoder({
+type User = decodeType<typeof userDecoder>;
+const userDecoder = record({
     identifier: fields({ username: string, userId: number },
                             ({ username, userId }) => `user:${username}:${userid}`),
 });
