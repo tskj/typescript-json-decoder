@@ -9,9 +9,11 @@ import {
   string,
   undef,
   union,
+  intersection,
   array,
   literal,
   tuple,
+  decode,
 } from '../src';
 
 let n = 0;
@@ -24,6 +26,8 @@ type rec_t = {
   f: string;
   option: string | undefined;
   list_of_stuff: (string | boolean)[];
+  intersect:
+    ({a: number} | {a: string, b: number}) & {c: boolean, a: number | 'foo'}
 };
 const rec_decoder = record({
   data: string,
@@ -32,6 +36,10 @@ const rec_decoder = record({
   f: fields({ data: string, value: number }, ({ data, value }) => data + value),
   option: optional(string),
   list_of_stuff: array(union(string, boolean)),
+  intersect: intersection(
+    union({a: number}, {a: string, b: number}),
+    {c: boolean, a: union(number, decode('foo'))},
+  ),
 });
 expectAssignable<Decoder<rec_t>>(rec_decoder);
 expectType<rec_t>(
@@ -40,11 +48,15 @@ expectType<rec_t>(
     value: 0,
     rec: { more: true },
     option: 'yes',
+    intersect: {a: 'foo'},
   }),
 );
 
 let union_decoder = union(string, number, record({}));
 expectType<string | number | {}>(union_decoder('test'));
+
+let intersection_decoder = intersection({a: string}, {a: decode('foo'), b: number})
+expectType<{a: 'foo'}>(intersection_decoder({a: 'foo'}))
 
 let optional_decoder = optional(union(string, number));
 expectType<string | number | undefined>(optional_decoder(''));

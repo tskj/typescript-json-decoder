@@ -96,6 +96,8 @@ const userDecoder = record({
 
 Union takes an arbitrary number of parameters.
 
+Similarly, you can use something like `intersection({email: string}, userDecoder)` to get a decoder for `{email: string} & user`, the subtype of users that also have an e-mail address.
+
 Lastly we can add some more stuff, and if you wish to fetch a list of your users, do it like the following.
 
 ```typescript

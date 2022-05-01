@@ -19,6 +19,7 @@ import {
   map,
   dict,
   nullable,
+  intersection,
 } from '../src';
 
 test('homogeneous tuple', () => {
@@ -112,6 +113,39 @@ test('literal literal string union', () => {
   expect<decoderType>(decoder('b')).toEqual('b');
   expect(() => decoder('c')).toThrow();
 });
+
+test('record intersection', () => {
+  type decoderType = decodeType<typeof decoder>;
+  const decoder = intersection(
+    record({a: union('foo', 'bar'), b: nullable(string)}),
+    record({a: union('bar', 'baz'), b: string, c: optional(number)})
+  );
+
+  expect<decoderType>(decoder({a: 'bar', b: 'str'})).toEqual({a: 'bar', b: 'str'});
+  expect(() => decoder({a: 'bar', b: null})).toThrow();
+})
+
+test('union intersection', () => {
+  type decoderType = decodeType<typeof decoder>;
+  const decoder = intersection(
+    union('foo', 'bar', 'baz'),
+    union('bar', 'baz', number),
+    union('baz', boolean, 'foo')
+  )
+
+  expect<decoderType>(decoder('baz')).toEqual('baz');
+  expect(() => decoder('foo')).toThrow();
+})
+
+test('same props intersection', () => {
+  type decoderType = decodeType<typeof decoder>;
+  const decoder = intersection(
+    record({a: string}),
+    record({a: field('a', a => string(a).toUpperCase())}),
+  )
+
+  expect<decoderType>(decoder({a: 'Foo'})).toEqual({a: 'FOO'});
+})
 
 test('decode string', () => {
   const l1: 'a' = 'a' as const;
