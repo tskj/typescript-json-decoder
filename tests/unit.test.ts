@@ -549,3 +549,25 @@ test('date decoder', () => {
   expect(() => decoder([])).toThrow();
   expect(() => decoder({})).toThrow();
 });
+
+test('intersection fails to override properties', () => {
+  const test_value = { a: 'test' };
+
+  type intersection = decodeType<typeof intersect_decoder>;
+  const intersect_decoder = intersection({ a: number }, { a: string });
+
+  // expect<intersection>(intersect_decoder(test_value)).toEqual(test_value);
+  expect(() => intersect_decoder({ a: '0' })).toThrow();
+  expect(() => intersect_decoder({ a: 1 })).toThrow();
+});
+
+test('intersection of objects is additative', () => {
+  const test_value = { a: 'test', b: 1 };
+
+  type intersection = decodeType<typeof intersect_decoder>;
+  const intersect_decoder = intersection({ a: string }, { a: string, b: number });
+
+  expect<intersection>(intersect_decoder(test_value)).toEqual(test_value);
+  expect(() => intersect_decoder({ a: '' })).toThrow()
+  expect(() => intersect_decoder({ b: 0 })).toThrow()
+});
