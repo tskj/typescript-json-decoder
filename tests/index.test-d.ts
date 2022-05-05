@@ -48,7 +48,7 @@ expectType<rec_t>(
     value: 0,
     rec: { more: true },
     option: 'yes',
-    intersect: {a: 'foo'},
+    intersect: { a: 'foo' },
   }),
 );
 
@@ -58,6 +58,8 @@ expectType<string | number | {}>(union_decoder('test'));
 let intersection_decoder = intersection({a: string}, {a: literal('foo'), b: number})
 expectAssignable<{ a: 'foo'; b: number }>(intersection_decoder({a: 'foo'}))
 expectAssignable<{ a: 'foo' }>(intersection_decoder({a: 'foo'}))
+
+expectAssignable<{ a: string, b: number }>(intersection({ a: string }, { b: number })({}))
 
 let optional_decoder = optional(union(string, number));
 expectType<string | number | undefined>(optional_decoder(''));
