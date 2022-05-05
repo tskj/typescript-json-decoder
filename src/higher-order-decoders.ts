@@ -52,12 +52,47 @@ export const intersection =
         }
       }
       if (errors.length === 0) {
-        // When not all cases are objects, the static type checking of the
-        // intersection should ensure that we can safely return just the
-        // result of the last case
-        return results.some(res => typeof res !== 'object')
-          ? results[results.length - 1]
-          : results.reduce((acc, val) => ({...acc, ...val}), {});
+        if (results.length === 0) {
+          return {} as any;
+        }
+        const jsType = typeof results[0];
+        results.forEach(result => {
+          const resType = typeof result;
+          if (jsType !== resType) {
+            throw `Cannot form intersection of ${jsType} and ${resType}`;
+          }
+        })
+
+        // For intersections with primitive types, we compare the results to
+        // make sure they are equal. With objects, we overwrite properties
+        // if they occur multiple times.
+        if (jsType === 'object') {
+          // The prototypes are combined to make sure the methods of each
+          // branch are callable
+          const prototype = results.reduce((acc, val) => {
+            const valProto = Object.getPrototypeOf(val) ?? {};
+            const props = [
+              ...Object.getOwnPropertyNames(valProto),
+              ...Object.getOwnPropertySymbols(valProto),
+            ];
+            return {
+              ...acc,
+              ...props
+                .reduce((acc, prop) => ({ ...acc, [prop]: val[prop]}), {})
+            };
+          }, {});
+
+          const base = results.some(Array.isArray) ? [] : {};
+          const result = Object.assign(base, results.reduce((acc, val) => ({...acc, ...val}), {}));
+          return Object.setPrototypeOf(result, prototype);
+        } else {
+          const result = results[0];
+          if (results.some(r => r !== result)) {
+            throw `Intersections with primitive type must produce the same value in all branches, but got ${results}`
+          }
+          return result;
+        }
+
       } else {
         errors.push(`Could not match all of the intersection cases`);
         throw errors.join('\n');
