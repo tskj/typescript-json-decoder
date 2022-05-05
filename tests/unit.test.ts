@@ -579,6 +579,8 @@ test('intersection of objects is mixins/multi-inheritance', () => {
   const intersect_decoder = intersection({ a: string }, { b: number });
 
   expect<intersection>(intersect_decoder(test_value)).toEqual(test_value);
+  expect(intersect_decoder(test_value).a).toEqual(test_value.a);
+  expect(intersect_decoder(test_value).b).toEqual(test_value.b);
   expect(() => intersect_decoder({ a: '' })).toThrow()
   expect(() => intersect_decoder({ b: 0 })).toThrow()
 });
@@ -590,9 +592,11 @@ test('intersection of empty object', () => {
   const intersect_decoder = intersection({}, { a: string });
 
   expect<intersection>(intersect_decoder(test_value)).toEqual(test_value);
+  expect(intersect_decoder(test_value).a).toEqual(test_value.a);
   expect(intersect_decoder({ a: '' })).toEqual({ a: '' })
   expect(() => intersect_decoder({ a: 0 })).toThrow()
   expect(() => intersect_decoder({ b: '' })).toThrow()
+
 });
 
 test('intersection of arrays', () => {
@@ -619,6 +623,25 @@ test('intersection of tuple and array', () => {
   expect(() => intersect_decoder({ a: '' })).toThrow()
   expect(() => intersect_decoder({ b: 0 })).toThrow()
 });
+
+/*
+test('intersection of compatible tuples', () => {
+  
+  const test_value: [ {a: string; b: number}, number] = [ { a: '1', b: 2 }, 3 ]
+
+  type intersection = decodeType<typeof intersect_decoder>;
+  const intersect_decoder = intersection([ { a: string }, number ], [ { b: number }, number ]);
+
+  expect<intersection>(intersect_decoder(test_value)).toEqual(test_value)
+  expect(intersect_decoder(test_value)['0'].a).toEqual(test_value['0']['a'])
+  expect(intersect_decoder(test_value)['0'].b).toEqual(test_value['0']['b'])
+  expect(() => intersect_decoder([])).toThrow()
+  expect(() => intersect_decoder([ 1, 2 ])).toThrow()
+  expect(() => intersect_decoder([ '1', 2 ])).toThrow()
+  expect(() => intersect_decoder('')).toThrow()
+  expect(() => intersect_decoder(0)).toThrow()
+});
+*/
 
 test('intersection of incompatible tuples', () => {
 
