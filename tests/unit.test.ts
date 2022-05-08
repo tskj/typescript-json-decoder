@@ -160,33 +160,6 @@ test('deep intersection', () => {
   expect(() => decoder({a: 'foo', b: {c: 42, d: false, f: null}, e: {}, h: 'discard'})).toThrow();
 })
 
-test('class intersection', () => {
-  class A {
-    one() {
-      return 1
-    }
-    // This would fail, since it's not part of the prototype, but rather an
-    // object property, and thus not the same reference on different objects:
-    // two = () => 2;
-  }
-  class B extends A {
-    four = 4;
-  }
-  class C extends A {
-    three() {
-      return 3;
-    }
-  }
-
-  const decoder = intersection(
-    _ => new B(),
-    _ => new C(),
-  )
-
-  const decoded = decoder('discard');
-  expect<number>(decoded.one() + decoded.three() + decoded.four).toEqual(8);
-})
-
 test('decode string', () => {
   const l1: 'a' = 'a' as const;
 

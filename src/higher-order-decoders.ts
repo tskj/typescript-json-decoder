@@ -55,7 +55,13 @@ const combineObjectProperties = <A extends Object, B extends Object>(a: A, b: B)
           [key]:
             key in a ?
               key in b ?
-                combineResults(aProp, bProp) :
+                (() => {
+                  try {
+                    return combineResults(aProp, bProp)
+                  } catch (message) {
+                    throw `${message}\nWhile trying to combine results for field '${String(key)}'`
+                  }
+                })() :
                 aProp :
               bProp,
         },
@@ -63,22 +69,13 @@ const combineObjectProperties = <A extends Object, B extends Object>(a: A, b: B)
     }, {}) as A & B;
 }
 
-const combinePrototypesOf = (a: unknown, b: unknown): object | null => {
-  const protoA = Object.getPrototypeOf(a);
-  const protoB = Object.getPrototypeOf(b);
-  if (protoA === protoB) {
-    return protoA;
+// Custom classes aren't allowed do to complications when extracting private
+// fields and such
+const validatePrototype = (a: unknown): void => {
+  const proto = Object.getPrototypeOf(a);
+  if (proto !== Object.prototype && proto !== Array.prototype) {
+    throw `Only Object, and Array, and the primitive types are allowed in intersections, but got ${proto.constructor.name}`
   }
-  const protoSuper = combinePrototypesOf(protoA, protoB);
-  // Typescript knows that constructors are Functions, but not about their
-  // argument and result types, thus this is still type-safe
-  const emtpyCtr = {constructor: () => {}};
-  return Object.create(
-    protoSuper,
-    Object.getOwnPropertyDescriptors(combineResults(
-      {...protoA, ...emtpyCtr},
-      {...protoB, ...emtpyCtr}
-    )))
 }
 
 // For intersections with primitive types, we compare the results to
@@ -87,26 +84,19 @@ const combineResults = <A, B>(a: A, b: B): A & B => {
   const jsType = typeof a;
   if (jsType !== typeof b) {
     throw `Cannot form intersection of ${typeof a} and ${typeof b}, but got ${a} and ${b}`;
+  } else if (jsType === 'function') {
+    throw `Combining functions in intersections is not supported`
   } else if (jsType === 'object') {
-    // The prototypes are combined to make sure the methods of each
-    // branch are callable
-    const prototype = combinePrototypesOf(a, b);
+    validatePrototype(a);
+    validatePrototype(b);
 
     const result = combineObjectProperties(a, b);
-    const isArray = Array.isArray(a) || Array.isArray(b);
-    // `setOwnProperty` is slow, so `create` is used instead when possible
-    return isArray ?
-      prototype === Object.getPrototypeOf([]) ?
-        Object.assign([], result) :
-        Object.setPrototypeOf(Object.assign([], result), prototype) :
-      Object.create(prototype, Object.getOwnPropertyDescriptors(result));
+    const base = Array.isArray(a) || Array.isArray(b) ? [] : {};
+    return Object.assign(base, result);
 
   } else {
     if (a as any !== b as any) {
-      throw `Intersections with primitive type must produce the same value in all branches, but ` +
-        (jsType === 'function' ?
-          `cannot verify that ${a} and ${b} are the same function` :
-          `got ${a} and ${b}`);
+      throw `Intersections must produce matching values in all branches, but got ${a} and ${b}`;
     }
     return a as A & B;
   }
