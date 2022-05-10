@@ -87,6 +87,14 @@ const combineResults = <A, B>(a: A, b: B): A & B => {
   } else if (jsType === 'function') {
     throw `Combining functions in intersections is not supported`
   } else if (jsType === 'object') {
+    if ([a, b].some(x => x === null)) {
+      const nonNull = [a, b].find(x => x !== null);
+      if (nonNull !== undefined) {
+        throw `Cannot intersect null with non-null value ${nonNull}`;
+      } else {
+        return null as any;
+      }
+    }
     validatePrototype(a);
     validatePrototype(b);
 

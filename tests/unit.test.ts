@@ -20,6 +20,7 @@ import {
   dict,
   nullable,
   intersection,
+  Decoder,
 } from '../src';
 
 test('homogeneous tuple', () => {
@@ -679,6 +680,23 @@ test('intersection of incompatible tuples', () => {
   expect(() => intersect_decoder(0)).toThrow()
 });
 
+test('intersection with incompatible tuple lengths', () => {
+
+  const tupleA: Decoder<[number, number]> = (x => {
+    const arr = array(number)(x);
+    return [arr[0], arr[1], ];
+  });
+  const tupleB: Decoder<[number, number, number]> = (x => {
+    const arr = array(number)(x);
+    return [arr[0], arr[1], arr[2], ];
+  });
+  const intersect_decoder = intersection(tupleA, tupleB);
+
+  expect(() => intersect_decoder([])).toThrow()
+  expect(() => intersect_decoder([ 1, 2 ])).toThrow()
+  expect(() => intersect_decoder([ 1, 2, 3 ])).toThrow()
+});
+
 test('intersection of primitives and object fail', () => {
 
   const intersect_decoder = intersection(number, { a: string });
@@ -688,3 +706,46 @@ test('intersection of primitives and object fail', () => {
   expect(() => intersect_decoder({ a: '' })).toThrow()
   expect(() => intersect_decoder(1)).toThrow()
 });
+
+test('intersection of arrays produces array', () => {
+  const test_value = [ 1, 2, 3, ];
+  type intersection = decodeType<typeof intersect_decoder>;
+  const intersect_decoder = intersection(array(number), array(number));
+  expect<string>(intersect_decoder(test_value).toString()).toEqual(test_value.toString());
+})
+
+
+test('intersection with null', () => {
+  type intersection = decodeType<typeof intersect>;
+  const intersect = intersection(nullable(number), nullable(number));
+
+  expect<intersection>(intersect(null)).toEqual(null);
+  expect<intersection>(intersect(5)).toEqual(5);
+  expect(() => intersect(undefined)).toThrow;
+})
+
+test('intersection with undefined', () => {
+  type intersection = decodeType<typeof intersect>;
+  const intersect = intersection(optional(number), optional(number));
+
+  expect<intersection>(intersect(undefined)).toEqual(undefined);
+  expect<intersection>(intersect(5)).toEqual(5);
+  expect(() => intersect(null)).toThrow;
+})
+
+test('no intersection for map, set, custom classes', () => {
+  const test_value1 = [1, 2, 3, ];
+  const test_value2 = 'test';
+
+  type intersection = decodeType<typeof intersect>;
+  const intersect = (result: any) => intersection(_ => result);
+
+  class A extends Map {}
+  class B {}
+
+  expect<intersection>(intersect(test_value1)(null)).toEqual(test_value1);
+  expect<intersection>(intersect(test_value2)(null)).toEqual(test_value2);
+  expect(() => intersect(new A())(null)).toThrow;
+  expect(() => intersect(new B())(null)).toThrow;
+  expect(() => intersect(new Set())(null)).toThrow;
+})
