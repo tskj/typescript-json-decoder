@@ -625,19 +625,17 @@ test('intersection of arrays', () => {
   expect(() => intersect_decoder({ b: 0 })).toThrow()
 });
 
-/*
-test('intersection of arrays of objects', () => {
-  const test_value = [ { a: '0', b: 1 }, { a: '2', b: 3 } ];
+test('intersection of objects of objects', () => {
+  const test_value = { x: { a: 'a', b: 2 }, y: 'false', z: true }
 
   type intersection = decodeType<typeof intersect_decoder>;
-  const intersect_decoder = intersection(array({ a: string }), array({ b: number }));
+  const intersect_decoder = 
+    intersection({ x: { a: string }, y: string }
+               , { x: { b: number }, y: string, z: boolean });
 
-  expect<intersection>(intersect_decoder([])).toEqual([]);
   expect<intersection>(intersect_decoder(test_value)).toEqual(test_value);
-  expect(intersect_decoder(test_value).map(x => x.a)).toEqual([ '0', '2' ]);
-  expect(intersect_decoder(test_value).map(x => x.b)).toEqual([ 1, 3 ]);
+  expect(() => intersect_decoder({})).toThrow();
 });
-*/
 
 test('intersection of tuple and array', () => {
   const test_value = [ 1, 2 ]

@@ -14,6 +14,7 @@ import {
   literal,
   tuple,
   decode,
+  nullable,
 } from '../src';
 
 let n = 0;
@@ -60,6 +61,8 @@ expectAssignable<{ a: 'foo'; b: number }>(intersection_decoder({a: 'foo'}))
 expectAssignable<{ a: 'foo' }>(intersection_decoder({a: 'foo'}))
 
 expectAssignable<{ a: string, b: number }>(intersection({ a: string }, { b: number })({}))
+expectAssignable<number | undefined>(intersection(optional(number), optional(number))(null))
+expectAssignable<number | null>(intersection(nullable(number), nullable(number))(null))
 
 let optional_decoder = optional(union(string, number));
 expectType<string | number | undefined>(optional_decoder(''));
