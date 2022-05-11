@@ -736,14 +736,14 @@ test('no intersection for map, set, custom classes', () => {
   const test_value2 = 'test';
 
   type intersection = decodeType<typeof intersect>;
-  const intersect = (result: any) => intersection(_ => result);
+  const intersect = (result: any) => intersection(_ => result, _ => result);
 
   class A extends Map {}
   class B {}
 
   expect<intersection>(intersect(test_value1)(null)).toEqual(test_value1);
   expect<intersection>(intersect(test_value2)(null)).toEqual(test_value2);
-  expect(() => intersect(new A())(null)).toThrow;
-  expect(() => intersect(new B())(null)).toThrow;
-  expect(() => intersect(new Set())(null)).toThrow;
+  expect(() => intersect(new A())(null)).toThrow();
+  expect(() => intersect(new B())(null)).toThrow();
+  expect(() => intersect(new Set())(null)).toThrow();
 })
