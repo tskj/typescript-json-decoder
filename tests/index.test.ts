@@ -19,6 +19,7 @@ import {
   Pojo,
   Decoder,
   decode,
+  intersection,
 } from '../src';
 
 test('everything', () => {
@@ -77,6 +78,7 @@ test('everything', () => {
     secondAddrese: optional({ city: string, option: optional(number) }),
     ageAndReputation: [number, string],
     discriminatedUnion,
+    intersection: intersection(discriminatedUnion, {extraData: string}),
     message,
     uni: union('uni', { lol: string }),
     likes: array([literal('likt'), number]),
@@ -103,6 +105,7 @@ test('everything', () => {
     dict: { somestuff: 'lol', morestuff: 7 },
     message: ['something-else', { somestuff: 'a' }],
     discriminatedUnion: { discriminant: 'two', data: '2' },
+    intersection: {discriminant: 'one', extraData: 'hiya'},
     address: { city: 'asdf' },
     secondAddrese: { city: 'secondcity' },
     uni: 'uni',
@@ -138,6 +141,7 @@ test('everything', () => {
     ]),
     message: ['something-else', { somestuff: 'a' }],
     discriminatedUnion: { discriminant: 'two', data: '2' },
+    intersection: { discriminant: 'one', extraData: 'hiya' },
     address: { city: 'asdf' },
     secondAddrese: { city: 'secondcity', option: undefined },
     employeeIdentifier2: 'asdfasd:2',

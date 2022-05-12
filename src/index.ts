@@ -2,6 +2,7 @@ export { decode, decodeType, Decoder, DecoderFunction } from './types';
 export { tuple, literal, record, field, fields } from './literal-decoders';
 export {
   union,
+  intersection,
   optional,
   array,
   set,

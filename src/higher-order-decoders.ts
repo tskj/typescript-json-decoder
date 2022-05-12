@@ -23,6 +23,118 @@ export const union =
     }
   };
 
+// intersectUnion<a | b> = a & b
+type intersectUnion<U> = (U extends unknown ? ((_: U) => void) : never) extends ((_: infer I) => void) ? I : never;
+
+// asObject<[a, b]> = { 0: {_: a}, 1: {_: b} }
+type asObject<T extends unknown[]> = {[K in Exclude<keyof T, keyof []>]: {_: decodeType<T[K]>}};
+
+// values<{0: a, 1: b}> = a | b
+type values<T> = T[keyof T];
+
+// fromObject {_: a} = a
+type fromObject<T> = T extends {_: infer V} ? V : never;
+
+// combine helpers to get an intersection of all the item types
+type getProductOfDecoderArray<arr extends Decoder<unknown>[]> = fromObject<intersectUnion<values<asObject<arr>>>>;
+
+const combineObjectProperties = <A extends Object, B extends Object>(a: A, b: B): A & B => {
+  const keys = [
+    ...Object.getOwnPropertyNames(a),
+    ...Object.getOwnPropertySymbols(a),
+    ...Object.getOwnPropertyNames(b),
+    ...Object.getOwnPropertySymbols(b),
+  ];
+  return keys
+    .reduce((acc, key) => {
+      const aProp = (a as any)[key];
+      const bProp = (b as any)[key];
+      return {
+        ...acc,
+        ...{
+          [key]:
+            key in a ?
+              key in b ?
+                (() => {
+                  try {
+                    return combineResults(aProp, bProp)
+                  } catch (message) {
+                    throw `${message}\nWhile trying to combine results for field '${String(key)}'`
+                  }
+                })() :
+                aProp :
+              bProp,
+        },
+      }
+    }, {}) as A & B;
+}
+
+// Custom classes aren't allowed do to complications when extracting private
+// fields and such
+const validatePrototype = (a: unknown): void => {
+  const proto = Object.getPrototypeOf(a);
+  if (proto !== Object.prototype && proto !== Array.prototype) {
+    throw `Only Object, and Array, and the primitive types are allowed in intersections, but got ${proto.constructor.name}`
+  }
+}
+
+// For intersections with primitive types, we compare the results to
+// make sure they are equal. With objects, recursively combine any properties
+const combineResults = <A, B>(a: A, b: B): A & B => {
+  const jsType = typeof a;
+  if (jsType !== typeof b) {
+    throw `Cannot form intersection of ${typeof a} and ${typeof b}, but got ${a} and ${b}`;
+  } else if (jsType === 'function') {
+    throw `Combining functions in intersections is not supported`
+  } else if (jsType === 'object') {
+    if ([a, b].some(x => x === null)) {
+      const nonNull = [a, b].find(x => x !== null);
+      if (nonNull !== undefined) {
+        throw `Cannot intersect null with non-null value ${nonNull}`;
+      } else {
+        return null as any;
+      }
+    }
+    validatePrototype(a);
+    validatePrototype(b);
+
+    const result = combineObjectProperties(a, b);
+    const base = Array.isArray(a) || Array.isArray(b) ? [] : {};
+    return Object.assign(base, result);
+
+  } else {
+    if (a as any !== b as any) {
+      throw `Intersections must produce matching values in all branches, but got ${a} and ${b}`;
+    }
+    return a as A & B;
+  }
+}
+
+// NB: if multiple cases create properties with identical keys, only the last one is kept
+export const intersection =
+  <decoders extends Decoder<unknown>[]>(...decoders: decoders) =>
+    (value: Pojo): getProductOfDecoderArray<decoders> => {
+      const errors: any[] = [];
+      const results: any[] = [];
+      for (const decoder of decoders) {
+        try {
+          results.push(decode(decoder)(value));
+        } catch (message) {
+          errors.push(message);
+        }
+      }
+      if (errors.length === 0) {
+        return results.length === 0 ?
+          {} as any :
+          results.reduce((acc, result) => combineResults(acc, result));
+
+      } else {
+        errors.push(`Could not match all of the intersection cases`);
+        throw errors.join('\n');
+      }
+    };
+
+
 export const nullable = <T extends Decoder<unknown>>(
   decoder: T,
 ): DecoderFunction<decodeType<T> | null> => {
