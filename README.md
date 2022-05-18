@@ -168,12 +168,8 @@ With this decoder.
 ```typescript
 import { decodeType, decode, record, string } from 'typescript-json-decoder';
 
-const coolDecoder = record({ 
-  type: decode('cool'), 
-  somestuff: string 
-});
-
 type Cool = decodeType<typeof coolDecoder>;
+const coolDecoder = record({ type: decode('cool'), somestuff: string });
 ```
 
 Similarly we can define another decoder of this type.
@@ -187,12 +183,8 @@ With a decoder that looks like this.
 ```typescript
 import { decodeType, decode, record, string } from 'typescript-json-decoder';
 
-const dumbDecoder = record({ 
-  type: decode('dumb'), 
-  otherstuff: string 
-});
-
 type Dumb = decodeType<typeof dumbDecoder>;
+const dumbDecoder = record({ type: decode('dumb'), otherstuff: string });
 ```
 
 This ensures that the `type` key is exactly the string `cool` or `dumb` respectively. If we now combine these decoders using a union we get what is known as a "discriminated union".
@@ -200,9 +192,8 @@ This ensures that the `type` key is exactly the string `cool` or `dumb` respecti
 ```typescript
 import { decodeType, union } from 'typescript-json-decoder';
 
-const stuffDecoder = union(coolDecoder, dumbDecoder);
-
 type Stuff = decodeType<typeof stuffDecoder>;
+const stuffDecoder = union(coolDecoder, dumbDecoder);
 ```
 
 The type `Stuff` represents the union of these two other types, and TypeScript now requires us to check the `type` field before trying to access either `somestuff` or `otherstuff` since they do not appear in both types - but one of them are guaranteed to exist.
