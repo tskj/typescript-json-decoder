@@ -166,10 +166,10 @@ const x = { type: 'cool', somestuff: "" };
 With this decoder.
 
 ```typescript
-import { decodeType, record, string } from 'typescript-json-decoder';
+import { decodeType, decode, record, string } from 'typescript-json-decoder';
 
 type Cool = decodeType<typeof coolDecoder>;
-const coolDecoder = record({ type: decoder('cool'), somestuff: string });
+const coolDecoder = record({ type: decode('cool'), somestuff: string });
 ```
 
 Similarly we can define another decoder of this type.
@@ -192,7 +192,7 @@ This ensures that the `type` key is exactly the string `cool` or `dumb` respecti
 ```typescript
 import { decodeType, union } from 'typescript-json-decoder';
 
-type Stuff = decodeTyype<typeof stuffDecoder>;
+type Stuff = decodeType<typeof stuffDecoder>;
 const stuffDecoder = union(coolDecoder, dumbDecoder);
 ```
 
