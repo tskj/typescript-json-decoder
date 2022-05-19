@@ -7,6 +7,8 @@ Detecting at runtime that your type does not in fact match the value returned by
 
 Installation: [npmjs.com/package/typescript-json-decoder](https://www.npmjs.com/package/typescript-json-decoder)
 
+Try it here: [sandbox](https://codesandbox.io/s/typescript-json-decoder-playground-5751w5)
+
 I've also written a piece about how it works internally and the underlying idea [here.](article.md)
 
 ## The idea
