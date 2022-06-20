@@ -36,8 +36,8 @@ test('everything', () => {
   // test impl
   const always =
     <T>(x: T): Decoder<T> =>
-      (json: Pojo) =>
-        x;
+    (json: Pojo) =>
+      x;
   always(false);
   type IEmployee = decodeType<typeof employeeDecoder>;
 
@@ -78,7 +78,7 @@ test('everything', () => {
     secondAddrese: optional({ city: string, option: optional(number) }),
     ageAndReputation: [number, string],
     discriminatedUnion,
-    intersection: intersection(discriminatedUnion, {extraData: string}),
+    intersection: intersection(discriminatedUnion, { extraData: string }),
     message,
     uni: union('uni', { lol: string }),
     likes: array([literal('likt'), number]),
@@ -105,7 +105,7 @@ test('everything', () => {
     dict: { somestuff: 'lol', morestuff: 7 },
     message: ['something-else', { somestuff: 'a' }],
     discriminatedUnion: { discriminant: 'two', data: '2' },
-    intersection: {discriminant: 'one', extraData: 'hiya'},
+    intersection: { discriminant: 'one', extraData: 'hiya' },
     address: { city: 'asdf' },
     secondAddrese: { city: 'secondcity' },
     uni: 'uni',
@@ -165,12 +165,11 @@ test('everything', () => {
     test: new Date('1995-12-14T00:00:00.0Z'),
     girlfriend: null,
     ssn: undefined,
-    maybessn: undefined,
     just: [false, true, false],
   });
 });
 
-const nameDecoder = record({ first: string, last: string })
+const nameDecoder = record({ first: string, last: string });
 
 const guestDecoder = record({
   type: decode('Guest'),
@@ -178,19 +177,19 @@ const guestDecoder = record({
   employer: optional({
     id: string,
     corporateId: string,
-    companyName: string
+    companyName: string,
   }),
   reference: union(
     {
       ref: decode('SsoMicrosoft'),
       tid: string,
-      oid: string
+      oid: string,
     },
     {
       ref: decode('SsoMicrosoftPersonal'),
-      oid: string
-    }
-  )
+      oid: string,
+    },
+  ),
 });
 
 const rolesDecoder = array(
@@ -200,23 +199,23 @@ const rolesDecoder = array(
       employer: {
         id: string,
         corporateId: string,
-        companyName: string
-      }
+        companyName: string,
+      },
     },
     {
       type: decode('Employer'),
       employer: {
         id: string,
         corporateId: string,
-        companyName: string
-      }
+        companyName: string,
+      },
     },
     {
       type: decode('Company'),
       corporateId: string,
-      companyName: string
-    }
-  )
+      companyName: string,
+    },
+  ),
 );
 
 const userDecoder = record({
@@ -224,42 +223,55 @@ const userDecoder = record({
   account: {
     id: string,
     name: nameDecoder,
-    email: string
+    email: string,
   },
   roles: rolesDecoder,
-  intent: optional(union('Accountant', 'Company'))
+  intent: optional(union('Accountant', 'Company')),
 });
 
 const personDecoder = union(userDecoder, guestDecoder);
 
 const tokenDecoder = record({
   token: string,
-  user: personDecoder
-})
+  user: personDecoder,
+});
 
 const token = {
-  "token": "<SECRET>",
-  "user": {
-    "type": "User",
-    "account": {
-      "id": "ac000002-0000-0000-0000-000000000001",
-      "name": {
-        "first": "Andreas",
-        "last": "Johansson"
+  token: '<SECRET>',
+  user: {
+    type: 'User',
+    account: {
+      id: 'ac000002-0000-0000-0000-000000000001',
+      name: {
+        first: 'Andreas',
+        last: 'Johansson',
       },
-      "email": "andreas@gmail.se"
+      email: 'andreas@gmail.se',
     },
-    "roles": [
+    roles: [
       {
-        "type": "Accountant",
-        "employer": {
-          "id": "e1000000-0000-0000-0000-000000000001",
-          "corporateId": "551191-3113",
-          "companyName": "FRA"
-        }
-      }
-    ]
-  }
-}
+        type: 'Accountant',
+        employer: {
+          id: 'e1000000-0000-0000-0000-000000000001',
+          corporateId: '551191-3113',
+          companyName: 'FRA',
+        },
+      },
+    ],
+  },
+};
 
-const myToken = tokenDecoder(token)
+const myToken = tokenDecoder(token);
+
+type Address = decodeType<typeof addressDecoder>;
+const addressDecoder = record({
+  street: optional(string),
+});
+
+const address: Address = {};
+const address2: Address = {
+  street: undefined,
+};
+const address3: Address = {
+  street: '',
+};
