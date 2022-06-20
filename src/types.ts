@@ -33,6 +33,23 @@ const isJsonLiteralForm = (decoder: unknown): decoder is JsonLiteralForm => {
 };
 
 /**
+ * Partialify record fields which can be `undefined`
+ * helper functions
+ */
+
+type undefinedKeys<T> = {
+  [P in keyof T]: undefined extends T[P] ? P : never;
+}[keyof T];
+type addQuestionmarksToRecordFields<R extends { [s: string]: unknown }> = {
+  [P in Exclude<keyof R, undefinedKeys<R>>]: R[P];
+} & {
+  [P in undefinedKeys<R>]?: R[P];
+} extends infer P
+  ? // this last part is just to flatten the intersection (&)
+    { [K in keyof P]: P[K] }
+  : never;
+
+/**
  * Run json literal decoder evaluation both at
  * type level and runtime level
  */
@@ -44,9 +61,11 @@ type evalJsonLiteralForm<decoder> =
   [decoder] extends [[infer decoderA, infer decoderB]] ?
     [ decodeType<decoderA>, decodeType<decoderB> ] :
 
+    addQuestionmarksToRecordFields<
     {
       [key in keyof decoder]: decodeType<decoder[key]>;
     }
+    >
 const decodeJsonLiteralForm = <json extends JsonLiteralForm>(
   decoder: json,
 ): DecoderFunction<evalJsonLiteralForm<json>> => {
