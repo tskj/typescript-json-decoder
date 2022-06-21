@@ -45,7 +45,10 @@ type fromObject<T> = T extends { _: infer V } ? V : never;
 // combine helpers to get an intersection of all the item types
 type getProductOfDecoderArray<arr extends Decoder<unknown>[]> = fromObject<
   intersectUnion<values<asObject<arr>>>
->;
+> extends infer P
+  ? // trick to normalize intersection type
+    { [K in keyof P]: P[K] }
+  : never;
 
 const combineObjectProperties = <A extends Object, B extends Object>(
   a: A,

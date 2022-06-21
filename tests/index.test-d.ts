@@ -27,10 +27,7 @@ type rec_t = {
   f: string;
   option?: string | undefined;
   list_of_stuff: (string | boolean)[];
-  intersect: ({ a: number } | { a: string; b: number }) & {
-    c: boolean;
-    a: number | 'foo';
-  };
+  intersect: { a: number; c: boolean } | { a: 'foo'; b: number; c: boolean };
 };
 const rec_decoder = record({
   data: string,
