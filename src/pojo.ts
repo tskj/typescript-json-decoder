@@ -23,3 +23,9 @@ export const isPojoArray = (value: unknown): value is PojoArray =>
 export type Pojo = PojoPrimitive | PojoObject | PojoArray;
 export const isPojo = (value: unknown): value is Pojo =>
   isPojoPrimitve(value) || isPojoObject(value) || isPojoArray(value);
+
+export function assert_is_pojo(value: unknown): asserts value is Pojo {
+  if (!isPojo(value)) {
+    throw `Value \`${value}\` is not a type that can be parsed by this library. Only primitive JS values and regular JS objects or arrays can be parsed, not classes (think anything that is valid JSON).`;
+  }
+}

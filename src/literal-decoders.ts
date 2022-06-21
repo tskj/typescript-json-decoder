@@ -1,4 +1,4 @@
-import { isPojoObject, Pojo } from './pojo';
+import { assert_is_pojo, isPojoObject } from './pojo';
 import {
   decodeType,
   decode,
@@ -10,7 +10,8 @@ import { tag } from './utils';
 
 export const literal =
   <p extends JsonLiteralForm>(literal: p): DecoderFunction<p> =>
-  (value: Pojo) => {
+  (value: unknown) => {
+    assert_is_pojo(value);
     if (literal !== value) {
       throw `The value \`${JSON.stringify(
         value,
@@ -24,7 +25,8 @@ export const tuple =
     decoderA: A,
     decoderB: B,
   ): DecoderFunction<[decodeType<A>, decodeType<B>]> =>
-  (value: Pojo) => {
+  (value: unknown) => {
+    assert_is_pojo(value);
     if (!Array.isArray(value)) {
       throw `The value \`${JSON.stringify(
         value,
@@ -44,7 +46,8 @@ export const fields = <T extends { [key: string]: Decoder<unknown> }, U>(
   decoder: T,
   continuation: (x: decodeType<T>) => U,
 ): DecoderFunction<U> => {
-  const dec = (value: Pojo) => {
+  const dec = (value: unknown) => {
+    assert_is_pojo(value);
     const decoded = decode(decoder)(value);
     return continuation(decoded);
   };
@@ -63,7 +66,8 @@ export const record =
   <schema extends { [key: string]: Decoder<unknown> }>(
     s: schema,
   ): DecoderFunction<decodeType<schema>> =>
-  (value: Pojo) => {
+  (value: unknown) => {
+    assert_is_pojo(value);
     if (!isPojoObject(value)) {
       throw `Value \`${value}\` is not of type \`object\` but rather \`${typeof value}\``;
     }

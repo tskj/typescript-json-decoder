@@ -1,4 +1,3 @@
-import { Pojo } from './pojo';
 import { literal, tuple, record } from './literal-decoders';
 
 /**
@@ -85,7 +84,7 @@ const decodeJsonLiteralForm = <json extends JsonLiteralForm>(
  * General decoder definition
  */
 
-export type DecoderFunction<T> = (input: Pojo) => T;
+export type DecoderFunction<T> = (input: unknown) => T;
 const isDecoderFunction = (f: unknown): f is DecoderFunction<unknown> =>
   typeof f === 'function';
 

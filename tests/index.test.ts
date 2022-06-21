@@ -36,7 +36,7 @@ test('everything', () => {
   // test impl
   const always =
     <T>(x: T): Decoder<T> =>
-    (json: Pojo) =>
+    (json: unknown) =>
       x;
   always(false);
   type IEmployee = decodeType<typeof employeeDecoder>;
