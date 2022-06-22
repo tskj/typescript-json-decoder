@@ -36,21 +36,22 @@ const isJsonLiteralForm = (decoder: unknown): decoder is JsonLiteralForm => {
  * helper functions
  */
 
+const a: unique symbol = Symbol()
+type rem<t> = t extends typeof a ? never : t;
+
 type undefinedKeys<T> = {
   [P in keyof T]: [undefined] extends [T[P]] ? P : never;
 }[keyof T];
 type addQuestionmarksToRecordFields<R extends { [s: string]: unknown }> = {
   [P in Exclude<keyof R, undefinedKeys<R>>]: R[P];
 } & {
-  [P in undefinedKeys<R>]?: R[P] | symbol
+  [P in undefinedKeys<R>]?: R[P] | typeof a
 } extends infer P
   ? // this last part is just to flatten the intersection (&)
     // { [K in keyof P]: [string | symbol] extends [P[K]] ? string | undefined | symbol : Exclude<P[K], symbol> }
     { [K in keyof P]: rem<P[K]> }
   : never
   ;
-
-type rem<t> = t extends symbol ? never : t;
 
 /**
  * Run json literal decoder evaluation both at
