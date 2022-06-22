@@ -66,7 +66,7 @@ export const record =
   <schema extends { [key: string]: Decoder<unknown> }>(
     s: schema,
   ): DecoderFunction<decodeType<schema>> =>
-  (value: unknown) => {
+  (value: unknown): any => {
     assert_is_pojo(value);
     if (!isPojoObject(value)) {
       throw `Value \`${value}\` is not of type \`object\` but rather \`${typeof value}\``;

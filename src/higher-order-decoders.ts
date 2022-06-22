@@ -162,7 +162,7 @@ export const optional = <T extends Decoder<unknown>>(
 export function array<D extends Decoder<unknown>>(
   decoder: D,
 ): DecoderFunction<decodeType<D>[]> {
-  return (xs: unknown): D[] => {
+  return (xs: unknown): any => {
     assert_is_pojo(xs);
     const arrayToString = (arr: any) => `${JSON.stringify(arr)}`;
     if (!Array.isArray(xs)) {

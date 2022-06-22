@@ -37,16 +37,20 @@ const isJsonLiteralForm = (decoder: unknown): decoder is JsonLiteralForm => {
  */
 
 type undefinedKeys<T> = {
-  [P in keyof T]: undefined extends T[P] ? P : never;
+  [P in keyof T]: [undefined] extends [T[P]] ? P : never;
 }[keyof T];
 type addQuestionmarksToRecordFields<R extends { [s: string]: unknown }> = {
   [P in Exclude<keyof R, undefinedKeys<R>>]: R[P];
 } & {
-  [P in undefinedKeys<R>]?: R[P];
+  [P in undefinedKeys<R>]?: R[P] | symbol
 } extends infer P
   ? // this last part is just to flatten the intersection (&)
-    { [K in keyof P]: P[K] }
-  : never;
+    // { [K in keyof P]: [string | symbol] extends [P[K]] ? string | undefined | symbol : Exclude<P[K], symbol> }
+    { [K in keyof P]: rem<P[K]> }
+  : never
+  ;
+
+type rem<t> = t extends symbol ? never : t;
 
 /**
  * Run json literal decoder evaluation both at
@@ -58,11 +62,11 @@ type evalJsonLiteralForm<decoder> =
   [decoder] extends [PrimitiveJsonLiteralForm] ?
     decoder :
   [decoder] extends [[infer decoderA, infer decoderB]] ?
-    [ decodeType<decoderA>, decodeType<decoderB> ] :
+    [ decodeTypeRecur<decoderA>, decodeTypeRecur<decoderB> ] :
 
     addQuestionmarksToRecordFields<
     {
-      [key in keyof decoder]: decodeType<decoder[key]>;
+      [key in keyof decoder]: decodeTypeRecur<decoder[key]>;
     }
     >
 const decodeJsonLiteralForm = <json extends JsonLiteralForm>(
@@ -99,9 +103,9 @@ const isDecoder = <T>(decoder: unknown): decoder is Decoder<T> =>
 
 export type primitive = string | boolean | number | null | undefined;
 // prettier-ignore
-export type decodeType<decoder> =
+type decodeTypeRecur<decoder> =
   (decoder extends DecoderFunction<infer T> ?
-    [decodeType<T>] :
+    [decodeTypeRecur<T>] :
   decoder extends JsonLiteralForm ?
     [evalJsonLiteralForm<decoder>]:
 
@@ -109,6 +113,13 @@ export type decodeType<decoder> =
   // needs a bit of indirection to avoid
   // circular type reference compiler error
   )[0];
+// export type decodeType<decoder> =
+    // decodeTypeRecur<decoder>;
+
+export type decodeType<T> = 
+    // removeA<
+  decodeTypeRecur<T>
+  // >
 
 export const decode = <D extends Decoder<unknown>>(
   decoder: D,

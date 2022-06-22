@@ -265,13 +265,63 @@ const myToken = tokenDecoder(token);
 
 type Address = decodeType<typeof addressDecoder>;
 const addressDecoder = record({
+  houseNumber: number,
   street: optional(string),
+  test: optional(number),
 });
 
-const address: Address = {};
+const address: Address = {houseNumber: 0};
 const address2: Address = {
+  houseNumber: 1,
   street: undefined,
 };
 const address3: Address = {
+  houseNumber: 2,
   street: '',
 };
+
+type ThingWithAddress = decodeType<typeof thingDecoder>;
+const thingDecoder = record({
+  thing: optional(string),
+  address: addressDecoder,
+});
+
+const thing: ThingWithAddress = {
+  thing: "",
+  address: {
+    houseNumber: 1,
+    street: ""
+  }
+};
+
+test('partial thing', () => {
+
+  type Address2 = decodeType<typeof addressDecoder2>;
+  const addressDecoder2 = record({
+    houseNumber: optional(string),
+    test: optional(number),
+    street: string,
+    number: number,
+  });
+
+  type ThingWithAddress2 = decodeType<typeof thingDecoder2>;
+  const thingDecoder2 = record({
+    id: optional(string),
+    address: addressDecoder2,
+    test: optional(number),
+  });
+
+  const thing2: ThingWithAddress2 = {
+    id: "",
+    address: {
+      number: 1,
+      houseNumber: "1",
+      street: "",
+    },
+    test: 2,
+  }
+
+  const houseNumber: string | undefined = thing2.address.houseNumber;
+
+  expect(houseNumber).toEqual("1")
+});
