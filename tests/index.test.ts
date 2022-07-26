@@ -270,7 +270,7 @@ const addressDecoder = record({
   test: optional(number),
 });
 
-const address: Address = {houseNumber: 0};
+const address: Address = { houseNumber: 0 };
 const address2: Address = {
   houseNumber: 1,
   street: undefined,
@@ -287,18 +287,19 @@ const thingDecoder = record({
 });
 
 const thing: ThingWithAddress = {
-  thing: "",
+  thing: '',
   address: {
     houseNumber: 1,
-    street: ""
-  }
+    street: '',
+  },
 };
 
 test('partial thing', () => {
-
   type Address2 = decodeType<typeof addressDecoder2>;
   const addressDecoder2 = record({
     houseNumber: optional(string),
+
+    // if you remove these three, everything breaks
     test: optional(number),
     street: string,
     number: number,
@@ -308,20 +309,24 @@ test('partial thing', () => {
   const thingDecoder2 = record({
     id: optional(string),
     address: addressDecoder2,
+    optionalAddress: optional(addressDecoder2),
     test: optional(number),
   });
 
   const thing2: ThingWithAddress2 = {
-    id: "",
+    id: '',
     address: {
       number: 1,
-      houseNumber: "1",
-      street: "",
+      houseNumber: '1',
+      street: '',
     },
     test: 2,
-  }
+  };
 
   const houseNumber: string | undefined = thing2.address.houseNumber;
 
-  expect(houseNumber).toEqual("1")
+  const optionalHouseNumber: Address2 | undefined = thing2.optionalAddress;
+
+  expect(houseNumber).toEqual('1');
+  expect(optionalHouseNumber).toEqual(undefined);
 });
