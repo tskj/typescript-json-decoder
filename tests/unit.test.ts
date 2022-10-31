@@ -21,6 +21,7 @@ import {
   nullable,
   intersection,
   Decoder,
+  dictWithTypedKey,
 } from '../src';
 
 test('homogeneous tuple', () => {
@@ -457,6 +458,27 @@ test('dict decoder', () => {
       ['two', 2],
     ]),
   );
+});
+
+test('dict decoder with typed key', () => {
+  const l1 = { small: true, medium: false };
+  const l2 = { xlarge: true, small: false };
+
+  const SizeValues = ['small', 'medium', 'large'] as const;
+
+  type dict_with_typed_keys = decodeType<typeof dict_with_typed_keys_decoder>;
+  const dict_with_typed_keys_decoder = dictWithTypedKey(boolean, SizeValues);
+
+  expect<dict_with_typed_keys>(dict_with_typed_keys_decoder({})).toEqual(
+    new Map(),
+  );
+  expect<dict_with_typed_keys>(dict_with_typed_keys_decoder(l1)).toEqual(
+    new Map([
+      ['small', true],
+      ['medium', false],
+    ]),
+  );
+  expect(() => dict_with_typed_keys_decoder(l2)).toThrow();
 });
 
 test('nullable decoder', () => {

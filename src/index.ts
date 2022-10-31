@@ -8,6 +8,7 @@ export {
   set,
   map,
   dict,
+  dictWithTypedKey,
   nullable,
 } from './higher-order-decoders';
 export {

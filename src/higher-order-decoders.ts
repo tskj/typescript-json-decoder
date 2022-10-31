@@ -1,5 +1,5 @@
 import { nil, undef } from './primitive-decoders';
-import { assert_is_pojo, isPojoObject } from './pojo';
+import { assert_is_pojo, isKey, isPojoObject } from './pojo';
 import { decodeType, decode, Decoder, DecoderFunction } from './types';
 
 type evalOver<t> = t extends unknown ? decodeType<t> : never;
@@ -237,5 +237,30 @@ export const dict =
         throw message + `\nwhen decoding the key \`${key}\` in map \`${map}\``;
       }
     });
+    return new Map(decodedPairs);
+  };
+
+export const dictWithTypedKey =
+  <K, D extends Decoder<unknown>>(
+    decoder: D,
+    keys: ReadonlyArray<K>,
+  ): DecoderFunction<Map<K, decodeType<D>>> =>
+  (map: unknown) => {
+    assert_is_pojo(map);
+    if (!isPojoObject(map)) {
+      throw `Value \`${map}\` is not an object and can therefore not be parsed as a map`;
+    }
+    const decodedPairs = Object.entries(map).map(([key, value]) => {
+      try {
+        if (!isKey(key, keys)) {
+          throw `Key \`${key}\` is not in given keys`;
+        }
+
+        return [key, decode(decoder)(value)] as [K, decodeType<D>];
+      } catch (message) {
+        throw message + `\nwhen decoding the key \`${key}\` in map \`${map}\``;
+      }
+    });
+
     return new Map(decodedPairs);
   };
