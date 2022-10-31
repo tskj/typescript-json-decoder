@@ -23,6 +23,7 @@ import {
   Decoder,
   dictWithTypedKey,
 } from '../src';
+import { dictWithTypedKey } from '../src/higher-order-decoders';
 
 test('homogeneous tuple', () => {
   const t: [string, string] = ['a', 'b'];
