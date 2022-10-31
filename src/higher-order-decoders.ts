@@ -241,7 +241,7 @@ export const dict =
   };
 
 export const dictWithTypedKey =
-  <K, D extends Decoder<unknown>>(
+  <K, D extends Decoder<unknown> = Decoder<unknown>>(
     decoder: D,
     keys: ReadonlyArray<K>,
   ): DecoderFunction<Map<K, decodeType<D>>> =>
