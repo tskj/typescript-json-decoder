@@ -36,7 +36,7 @@ const isJsonLiteralForm = (decoder: unknown): decoder is JsonLiteralForm => {
  * helper functions
  */
 
-const a: unique symbol = Symbol()
+const a: unique symbol = Symbol();
 type rem<t> = t extends typeof a ? never : t;
 
 type undefinedKeys<T> = {
@@ -45,13 +45,12 @@ type undefinedKeys<T> = {
 type addQuestionmarksToRecordFields<R extends { [s: string]: unknown }> = {
   [P in Exclude<keyof R, undefinedKeys<R>>]: R[P];
 } & {
-  [P in undefinedKeys<R>]?: R[P] | typeof a
+  [P in undefinedKeys<R>]?: R[P] | typeof a;
 } extends infer P
   ? // this last part is just to flatten the intersection (&)
     // { [K in keyof P]: [string | symbol] extends [P[K]] ? string | undefined | symbol : Exclude<P[K], symbol> }
     { [K in keyof P]: rem<P[K]> }
-  : never
-  ;
+  : never;
 
 /**
  * Run json literal decoder evaluation both at
@@ -110,17 +109,17 @@ type decodeTypeRecur<decoder> =
   decoder extends JsonLiteralForm ?
     [evalJsonLiteralForm<decoder>]:
 
-    [decoder] 
+    [decoder]
   // needs a bit of indirection to avoid
   // circular type reference compiler error
   )[0];
 // export type decodeType<decoder> =
-    // decodeTypeRecur<decoder>;
+// decodeTypeRecur<decoder>;
 
-export type decodeType<T> = 
-    // removeA<
-  decodeTypeRecur<T>
-  // >
+export type decodeType<T> =
+  // removeA<
+  decodeTypeRecur<T>;
+// >
 
 export const decode = <D extends Decoder<unknown>>(
   decoder: D,
@@ -130,3 +129,7 @@ export const decode = <D extends Decoder<unknown>>(
   }
   return decoder as any;
 };
+
+export function isKey<K>(value: unknown, keys: ReadonlyArray<K>): value is K {
+  return keys.includes(value as any);
+}

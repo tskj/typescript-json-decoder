@@ -21,7 +21,6 @@ import {
   nullable,
   intersection,
   Decoder,
-  dictWithTypedKey,
 } from '../src';
 
 test('homogeneous tuple', () => {
@@ -467,7 +466,7 @@ test('dict decoder with typed key', () => {
   const SizeValues = ['small', 'medium', 'large'] as const;
 
   type dict_with_typed_keys = decodeType<typeof dict_with_typed_keys_decoder>;
-  const dict_with_typed_keys_decoder = dictWithTypedKey(boolean, SizeValues);
+  const dict_with_typed_keys_decoder = dict(boolean, SizeValues);
 
   expect<dict_with_typed_keys>(dict_with_typed_keys_decoder({})).toEqual(
     new Map(),

@@ -1,6 +1,6 @@
 import { nil, undef } from './primitive-decoders';
-import { assert_is_pojo, isKey, isPojoObject } from './pojo';
-import { decodeType, decode, Decoder, DecoderFunction } from './types';
+import { assert_is_pojo, isPojoObject } from './pojo';
+import { decodeType, decode, Decoder, DecoderFunction, isKey } from './types';
 
 type evalOver<t> = t extends unknown ? decodeType<t> : never;
 type getSumOfArray<arr> = arr extends (infer elements)[] ? elements : never;
@@ -221,39 +221,30 @@ export const map =
     }
   };
 
-export const dict =
-  <D extends Decoder<unknown>>(
-    decoder: D,
-  ): DecoderFunction<Map<string, decodeType<D>>> =>
-  (map: unknown) => {
+export function dict<D extends Decoder<unknown>>(
+  decoder: D,
+): DecoderFunction<Map<string, decodeType<D>>>;
+export function dict<K extends string, D extends Decoder<unknown>>(
+  decoder: D,
+  keys: ReadonlyArray<K>,
+): DecoderFunction<Map<K, decodeType<D>>>;
+export function dict<
+  K extends string = string,
+  D extends Decoder<unknown> = Decoder<unknown>,
+>(decoder: D, keys?: ReadonlyArray<K>): DecoderFunction<Map<K, decodeType<D>>> {
+  return (map: unknown) => {
     assert_is_pojo(map);
     if (!isPojoObject(map)) {
       throw `Value \`${map}\` is not an object and can therefore not be parsed as a map`;
     }
     const decodedPairs = Object.entries(map).map(([key, value]) => {
       try {
-        return [key, decode(decoder)(value)] as [string, decodeType<D>];
-      } catch (message) {
-        throw message + `\nwhen decoding the key \`${key}\` in map \`${map}\``;
-      }
-    });
-    return new Map(decodedPairs);
-  };
+        if (keys) {
+          if (!isKey(key, keys)) {
+            throw `Key \`${key}\` is not in given keys`;
+          }
 
-export const dictWithTypedKey =
-  <K, D extends Decoder<unknown>>(
-    decoder: D,
-    keys: ReadonlyArray<K>,
-  ): DecoderFunction<Map<K, decodeType<D>>> =>
-  (map: unknown) => {
-    assert_is_pojo(map);
-    if (!isPojoObject(map)) {
-      throw `Value \`${map}\` is not an object and can therefore not be parsed as a map`;
-    }
-    const decodedPairs = Object.entries(map).map(([key, value]) => {
-      try {
-        if (!isKey(key, keys)) {
-          throw `Key \`${key}\` is not in given keys`;
+          return [key, decode(decoder)(value)] as [K, decodeType<D>];
         }
 
         return [key, decode(decoder)(value)] as [K, decodeType<D>];
@@ -261,6 +252,6 @@ export const dictWithTypedKey =
         throw message + `\nwhen decoding the key \`${key}\` in map \`${map}\``;
       }
     });
-
     return new Map(decodedPairs);
   };
+}

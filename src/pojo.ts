@@ -29,7 +29,3 @@ export function assert_is_pojo(value: unknown): asserts value is Pojo {
     throw `Value \`${value}\` is not a type that can be parsed by this library. Only primitive JS values and regular JS objects or arrays can be parsed, not classes (think anything that is valid JSON).`;
   }
 }
-
-export function isKey<K>(value: unknown, keys: ReadonlyArray<K>): value is K {
-  return keys.includes(value as any);
-}
