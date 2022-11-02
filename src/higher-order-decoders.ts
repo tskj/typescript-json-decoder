@@ -221,14 +221,7 @@ export const map =
     }
   };
 
-export function dict<D extends Decoder<unknown>>(
-  decoder: D,
-): DecoderFunction<Map<string, decodeType<D>>>;
-export function dict<K extends string, D extends Decoder<unknown>>(
-  decoder: D,
-  keys: ReadonlyArray<K>,
-): DecoderFunction<Map<K, decodeType<D>>>;
-export function dict<K extends string, D extends Decoder<unknown>>(
+export function dict<D extends Decoder<unknown>, K extends string>(
   decoder: D,
   keys?: ReadonlyArray<K>,
 ): DecoderFunction<Map<K, decodeType<D>>> {
