@@ -228,10 +228,10 @@ export function dict<K extends string, D extends Decoder<unknown>>(
   decoder: D,
   keys: ReadonlyArray<K>,
 ): DecoderFunction<Map<K, decodeType<D>>>;
-export function dict<
-  K extends string = string,
-  D extends Decoder<unknown> = Decoder<unknown>,
->(decoder: D, keys?: ReadonlyArray<K>): DecoderFunction<Map<K, decodeType<D>>> {
+export function dict<K extends string, D extends Decoder<unknown>>(
+  decoder: D,
+  keys?: ReadonlyArray<K>,
+): DecoderFunction<Map<K, decodeType<D>>> {
   return (map: unknown) => {
     assert_is_pojo(map);
     if (!isPojoObject(map)) {
@@ -239,12 +239,8 @@ export function dict<
     }
     const decodedPairs = Object.entries(map).map(([key, value]) => {
       try {
-        if (keys) {
-          if (!isKey(key, keys)) {
-            throw `Key \`${key}\` is not in given keys`;
-          }
-
-          return [key, decode(decoder)(value)] as [K, decodeType<D>];
+        if (keys && !isKey(key, keys)) {
+          throw `Key \`${key}\` is not in given keys`;
         }
 
         return [key, decode(decoder)(value)] as [K, decodeType<D>];
