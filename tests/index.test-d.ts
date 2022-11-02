@@ -15,6 +15,8 @@ import {
   tuple,
   decode,
   nullable,
+  dict,
+  DecoderFunction,
 } from '../src';
 
 let n = 0;
@@ -120,3 +122,8 @@ expectType<'a' | 'b'>(a_or_b_decoder('a'));
 
 const a_b_or_r_decoder = union('a', 'b', { test: string });
 expectType<'a' | 'b' | { test: string }>(a_b_or_r_decoder({ test: '' }));
+
+expectType<DecoderFunction<Map<string, number>>>(dict(number));
+expectType<DecoderFunction<Map<'small' | 'medium', number>>>(
+  dict(number, ['small', 'medium'] as const),
+);
