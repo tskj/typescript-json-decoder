@@ -77,9 +77,14 @@ export const record =
           return [key, decode(decoder)(value)];
         }
         try {
-          const jsonvalue = value[key];
+          const jsonvalue = (value as any)[key];
           return [key, decode(decoder)(jsonvalue)];
         } catch (message) {
+          if (!(key in (value as any))) {
+            throw `The key \`${key}\` is missing in \`${JSON.stringify(
+              value,
+            )}\``;
+          }
           throw (
             message +
             `\nwhen trying to decode the key \`${key}\` in \`${JSON.stringify(

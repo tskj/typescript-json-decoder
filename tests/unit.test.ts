@@ -804,6 +804,21 @@ test('intersection with undefined', () => {
   expect(() => intersect(null)).toThrow;
 })
 
+test('better error for missing key', () => {
+  const decoder = record({ name: string, age: number });
+
+  // Key exists but wrong type - original style error
+  expect(() => decoder({ name: 123, age: 25 })).toThrow('not of type `string`');
+
+  // Key is completely missing - better error
+  expect(() => decoder({ name: 'test' })).toThrow('key `age` is missing');
+  expect(() => decoder({})).toThrow('is missing');
+
+  // Optional keys should still work when missing
+  const optionalDecoder = record({ name: string, nickname: optional(string) });
+  expect(optionalDecoder({ name: 'test' })).toEqual({ name: 'test', nickname: undefined });
+});
+
 test('no intersection for map, set, custom classes', () => {
   const test_value1 = [1, 2, 3, ];
   const test_value2 = 'test';
