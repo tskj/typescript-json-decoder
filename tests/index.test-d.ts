@@ -155,3 +155,14 @@ expectType<{ ok: true; value: string } | { ok: false; error: string }>(safeResul
 if (safeResult.ok) {
   expectType<string>(safeResult.value);
 }
+
+// literal number and boolean decoders
+expectType<1>(literal(1)(1));
+expectType<true>(literal(true)(true));
+expectType<1 | 2 | 3>(union(literal(1), literal(2), literal(3))(1));
+
+// record with literal() wrapper for numbers and booleans
+const literal_record_decoder = record({ type: literal('admin'), level: literal(42), active: literal(true), name: string });
+expectType<{ type: 'admin'; level: 42; active: true; name: string }>(
+  literal_record_decoder({ type: 'admin', level: 42, active: true, name: '' }),
+);

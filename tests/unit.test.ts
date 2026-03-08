@@ -91,15 +91,67 @@ test('literal string', () => {
   expect(() => literal_decoder('b')).toThrow();
 });
 
-// not supported for some reason
-// test('literal number', () => {
-//   const l1: 1 = 1 as const;
+test('literal number', () => {
+  const l1: 1 = 1 as const;
 
-//   type literal = decodeType<typeof literal_decoder>;
-//   const literal_decoder = literal(1);
+  type literal = decodeType<typeof literal_decoder>;
+  const literal_decoder = literal(1);
 
-//   expect<literal>(literal_decoder(l1)).toEqual(l1);
-// });
+  expect<literal>(literal_decoder(l1)).toEqual(l1);
+  expect(() => literal_decoder(2)).toThrow();
+});
+
+test('literal boolean', () => {
+  type literal = decodeType<typeof literal_decoder>;
+  const literal_decoder = literal(true);
+
+  expect<literal>(literal_decoder(true)).toEqual(true);
+  expect(() => literal_decoder(false)).toThrow();
+  expect(() => literal_decoder('true')).toThrow();
+});
+
+test('literal number union with literal()', () => {
+  type decoderType = decodeType<typeof decoder>;
+  const decoder = union(literal(1), literal(2), literal(3));
+
+  expect<decoderType>(decoder(1)).toEqual(1);
+  expect<decoderType>(decoder(2)).toEqual(2);
+  expect<decoderType>(decoder(3)).toEqual(3);
+  expect(() => decoder(4)).toThrow();
+  expect(() => decoder('1')).toThrow();
+});
+
+test('mixed literal union', () => {
+  type decoderType = decodeType<typeof decoder>;
+  const decoder = union('on', 'off', literal(0), literal(1), literal(true), literal(false));
+
+  expect<decoderType>(decoder('on')).toEqual('on');
+  expect<decoderType>(decoder('off')).toEqual('off');
+  expect<decoderType>(decoder(0)).toEqual(0);
+  expect<decoderType>(decoder(1)).toEqual(1);
+  expect<decoderType>(decoder(true)).toEqual(true);
+  expect<decoderType>(decoder(false)).toEqual(false);
+  expect(() => decoder('yes')).toThrow();
+  expect(() => decoder(2)).toThrow();
+  expect(() => decoder(null)).toThrow();
+});
+
+test('record with literal() wrapper', () => {
+  type decoderType = decodeType<typeof decoder>;
+  const decoder = record({
+    type: literal('admin'),
+    level: literal(42),
+    active: literal(true),
+    name: string,
+  });
+
+  expect<decoderType>(
+    decoder({ type: 'admin', level: 42, active: true, name: 'Alice' }),
+  ).toEqual({ type: 'admin', level: 42, active: true, name: 'Alice' });
+  expect(() =>
+    decoder({ type: 'user', level: 42, active: true, name: 'Alice' }),
+  ).toThrow();
+});
 
 test('literal string union', () => {
   type decoderType = decodeType<typeof decoder>;

@@ -9,7 +9,7 @@ import {
 import { tag } from './utils';
 
 export const literal =
-  <p extends JsonLiteralForm>(literal: p): DecoderFunction<p> =>
+  <p extends JsonLiteralForm | number | boolean>(literal: p): DecoderFunction<p> =>
   (value: unknown) => {
     assert_is_pojo(value);
     if (literal !== value) {
