@@ -1,4 +1,4 @@
-export { decode, decodeType, Decoder, DecoderFunction } from './types';
+export { decode, decodeType, Decoder, DecoderFunction, safeDecode } from './types';
 export { tuple, literal, record, field, fields } from './literal-decoders';
 export {
   union,

@@ -130,6 +130,17 @@ export const decode = <D extends Decoder<unknown>>(
   return decoder as any;
 };
 
+export const safeDecode = <D extends Decoder<unknown>>(
+  decoder: D,
+  value: unknown,
+): { ok: true; value: decodeType<D> } | { ok: false; error: string } => {
+  try {
+    return { ok: true, value: decode(decoder)(value) };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+};
+
 export function isKey<K>(value: unknown, keys: ReadonlyArray<K>): value is K {
   return keys.includes(value as any);
 }

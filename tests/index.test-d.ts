@@ -20,6 +20,7 @@ import {
   unknown,
   integer,
   always,
+  safeDecode,
 } from '../src';
 
 let n = 0;
@@ -147,3 +148,10 @@ expectType<string>(always('hello')(42));
 expectAssignable<DecoderFunction<boolean>>(always(false));
 // always as default in union
 expectAssignable<DecoderFunction<boolean>>(union(boolean, always(false)));
+
+// safeDecode should return discriminated union result
+const safeResult = safeDecode(string, 'hello');
+expectType<{ ok: true; value: string } | { ok: false; error: string }>(safeResult);
+if (safeResult.ok) {
+  expectType<string>(safeResult.value);
+}

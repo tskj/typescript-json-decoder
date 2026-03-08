@@ -2,6 +2,7 @@ import {
   decode,
   boolean,
   decodeType,
+  safeDecode,
   number,
   string,
   tuple,
@@ -876,4 +877,55 @@ test('always with string default in union', () => {
   // Non-strings get the default value
   expect<union_type>(decoder(42)).toEqual('default');
   expect<union_type>(decoder(null)).toEqual('default');
+});
+
+test('safeDecode returns value on success', () => {
+  const result = safeDecode(string, 'hello');
+  expect(result.ok).toBe(true);
+  if (result.ok) {
+    expect(result.value).toEqual('hello');
+  }
+
+  const numResult = safeDecode(number, 42);
+  expect(numResult.ok).toBe(true);
+  if (numResult.ok) {
+    expect(numResult.value).toEqual(42);
+  }
+});
+
+test('safeDecode returns error on failure', () => {
+  const result = safeDecode(string, 42);
+  expect(result.ok).toBe(false);
+  if (!result.ok) {
+    expect(result.error).toContain('not of type `string`');
+  }
+});
+
+test('safeDecode with complex decoders', () => {
+  const personDecoder = record({ name: string, age: number });
+
+  const success = safeDecode(personDecoder, { name: 'Alice', age: 30 });
+  expect(success.ok).toBe(true);
+  if (success.ok) {
+    expect(success.value).toEqual({ name: 'Alice', age: 30 });
+  }
+
+  const failure = safeDecode(personDecoder, { name: 'Alice' });
+  expect(failure.ok).toBe(false);
+
+  expect(safeDecode(personDecoder, 'not an object').ok).toBe(false);
+  expect(safeDecode(personDecoder, null).ok).toBe(false);
+});
+
+test('safeDecode with union and literal forms', () => {
+  const decoder = union(string, number);
+  expect(safeDecode(decoder, 'hello').ok).toBe(true);
+  expect(safeDecode(decoder, 42).ok).toBe(true);
+  expect(safeDecode(decoder, true).ok).toBe(false);
+
+  // Literal forms
+  expect(safeDecode({ name: string }, { name: 'test' }).ok).toBe(true);
+  expect(safeDecode({ name: string }, { name: 42 }).ok).toBe(false);
+  expect(safeDecode('hello' as const, 'hello').ok).toBe(true);
+  expect(safeDecode('hello' as const, 'world').ok).toBe(false);
 });
