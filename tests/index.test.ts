@@ -20,6 +20,7 @@ import {
   Decoder,
   decode,
   intersection,
+  always,
 } from '../src';
 
 test('everything', () => {
@@ -33,12 +34,6 @@ test('everything', () => {
     tuple('something-else', { somestuff: string }),
   );
 
-  // test impl
-  const always =
-    <T>(x: T): Decoder<T> =>
-    (json: unknown) =>
-      x;
-  always(false);
   type IEmployee = decodeType<typeof employeeDecoder>;
 
   const employeeDecoder = record({

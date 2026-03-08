@@ -19,6 +19,7 @@ import {
   DecoderFunction,
   unknown,
   integer,
+  always,
 } from '../src';
 
 let n = 0;
@@ -139,3 +140,10 @@ expectAssignable<DecoderFunction<unknown>>(unknown);
 // integer decoder should resolve to `number`
 expectType<number>(integer(42));
 expectAssignable<DecoderFunction<number>>(integer);
+
+// always decoder should resolve to the constant's type
+expectType<boolean>(always(false)('anything'));
+expectType<string>(always('hello')(42));
+expectAssignable<DecoderFunction<boolean>>(always(false));
+// always as default in union
+expectAssignable<DecoderFunction<boolean>>(union(boolean, always(false)));

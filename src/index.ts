@@ -9,6 +9,7 @@ export {
   map,
   dict,
   nullable,
+  always,
 } from './higher-order-decoders';
 export {
   string,

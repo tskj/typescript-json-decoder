@@ -2,6 +2,9 @@ import { nil, undef } from './primitive-decoders';
 import { assert_is_pojo, isPojoObject } from './pojo';
 import { decodeType, decode, Decoder, DecoderFunction, isKey } from './types';
 
+export const always = <T>(value: T): DecoderFunction<T> =>
+  (_input: unknown) => value;
+
 type evalOver<t> = t extends unknown ? decodeType<t> : never;
 type getSumOfArray<arr> = arr extends (infer elements)[] ? elements : never;
 

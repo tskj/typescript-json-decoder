@@ -22,6 +22,7 @@ import {
   intersection,
   unknown,
   integer,
+  always,
   Decoder,
 } from '../src';
 
@@ -819,3 +820,45 @@ test('no intersection for map, set, custom classes', () => {
   expect(() => intersect(new B())(null)).toThrow();
   expect(() => intersect(new Set())(null)).toThrow();
 })
+
+test('always decoder', () => {
+  const always_false = always(false);
+  const always_hello = always('hello');
+  const always_42 = always(42);
+  const always_null = always(null);
+
+  // Always returns the constant value regardless of input
+  expect(always_false('anything')).toEqual(false);
+  expect(always_false(123)).toEqual(false);
+  expect(always_false(null)).toEqual(false);
+  expect(always_false(undefined)).toEqual(false);
+  expect(always_false({})).toEqual(false);
+
+  expect(always_hello(42)).toEqual('hello');
+  expect(always_hello(null)).toEqual('hello');
+
+  expect(always_42('test')).toEqual(42);
+  expect(always_null('test')).toEqual(null);
+});
+
+test('always as default in union', () => {
+  type union_type = decodeType<typeof decoder>;
+  const decoder = union(boolean, always(false));
+
+  expect<union_type>(decoder(true)).toEqual(true);
+  expect<union_type>(decoder(false)).toEqual(false);
+  // Non-booleans get the default value
+  expect<union_type>(decoder('anything')).toEqual(false);
+  expect<union_type>(decoder(null)).toEqual(false);
+  expect<union_type>(decoder(42)).toEqual(false);
+});
+
+test('always with string default in union', () => {
+  type union_type = decodeType<typeof decoder>;
+  const decoder = union(string, always('default'));
+
+  expect<union_type>(decoder('hello')).toEqual('hello');
+  // Non-strings get the default value
+  expect<union_type>(decoder(42)).toEqual('default');
+  expect<union_type>(decoder(null)).toEqual('default');
+});
