@@ -5,6 +5,7 @@ import {
   Decoder,
   DecoderFunction,
   JsonLiteralForm,
+  addQuestionmarksToRecordFields,
 } from './types';
 import { tag } from './utils';
 
@@ -44,12 +45,12 @@ export const tuple =
 export const fieldDecoder: unique symbol = Symbol('field-decoder');
 export const fields = <T extends { [key: string]: Decoder<unknown> }, U>(
   decoder: T,
-  continuation: (x: decodeType<T>) => U,
+  continuation: (x: evalRecordSchema<T>) => U,
 ): DecoderFunction<U> => {
   const dec = (value: unknown) => {
     assert_is_pojo(value);
-    const decoded = decode(decoder)(value);
-    return continuation(decoded);
+    const decoded = record(decoder)(value);
+    return continuation(decoded as any);
   };
   tag(dec, fieldDecoder);
   return dec;
@@ -62,10 +63,14 @@ export const field = <T>(
   return fields({ [key]: decoder }, (x: any) => x[key]);
 };
 
+type evalRecordSchema<schema> = addQuestionmarksToRecordFields<{
+  [key in keyof schema]: decodeType<schema[key]>;
+}>;
+
 export const record =
   <schema extends { [key: string]: Decoder<unknown> }>(
     s: schema,
-  ): DecoderFunction<decodeType<schema>> =>
+  ): DecoderFunction<evalRecordSchema<schema>> =>
   (value: unknown): any => {
     assert_is_pojo(value);
     if (!isPojoObject(value)) {

@@ -981,3 +981,83 @@ test('safeDecode with union and literal forms', () => {
   expect(safeDecode('hello' as const, 'hello').ok).toBe(true);
   expect(safeDecode('hello' as const, 'world').ok).toBe(false);
 });
+
+test('record with bare number literal', () => {
+  const decoder = record({ name: string, level: 42 });
+  type decoded = decodeType<typeof decoder>;
+
+  const result: decoded = decoder({ name: 'admin', level: 42 });
+  expect(result).toEqual({ name: 'admin', level: 42 });
+  expect(() => decoder({ name: 'admin', level: 43 })).toThrow();
+  expect(() => decoder({ name: 'admin', level: '42' })).toThrow();
+});
+
+test('record with bare boolean literal', () => {
+  const decoder = record({ name: string, active: true });
+  type decoded = decodeType<typeof decoder>;
+
+  const result: decoded = decoder({ name: 'test', active: true });
+  expect(result).toEqual({ name: 'test', active: true });
+  expect(() => decoder({ name: 'test', active: false })).toThrow();
+  expect(() => decoder({ name: 'test', active: 'true' })).toThrow();
+});
+
+test('record with mixed bare literals and decoders', () => {
+  const decoder = record({
+    type: 'admin' as const,
+    level: 42,
+    active: true,
+    name: string,
+    age: number,
+  });
+  type decoded = decodeType<typeof decoder>;
+
+  const result: decoded = decoder({
+    type: 'admin',
+    level: 42,
+    active: true,
+    name: 'Alice',
+    age: 30,
+  });
+  expect(result).toEqual({
+    type: 'admin',
+    level: 42,
+    active: true,
+    name: 'Alice',
+    age: 30,
+  });
+  expect(() => decoder({ type: 'admin', level: 43, active: true, name: 'Alice', age: 30 })).toThrow();
+  expect(() => decoder({ type: 'user', level: 42, active: true, name: 'Alice', age: 30 })).toThrow();
+});
+
+test('union with bare number literals', () => {
+  const decoder = union(1, 2, 3);
+  type decoded = decodeType<typeof decoder>;
+
+  const result: decoded = decoder(1);
+  expect(result).toEqual(1);
+  expect(decoder(2)).toEqual(2);
+  expect(decoder(3)).toEqual(3);
+  expect(() => decoder(4)).toThrow();
+  expect(() => decoder('1')).toThrow();
+});
+
+test('union with bare boolean literal', () => {
+  const decoder = union(true, string);
+  type decoded = decodeType<typeof decoder>;
+
+  expect<decoded>(decoder(true)).toEqual(true);
+  expect<decoded>(decoder('hello')).toEqual('hello');
+  expect(() => decoder(false)).toThrow();
+  expect(() => decoder(42)).toThrow();
+});
+
+test('tuple with bare number literal', () => {
+  const decoder = tuple(42, string);
+  type decoded = decodeType<typeof decoder>;
+
+  const result: decoded = decoder([42, 'hello']);
+  expect(result).toEqual([42, 'hello']);
+  expect(() => decoder([43, 'hello'])).toThrow();
+  expect(() => decoder([42, 123])).toThrow();
+});

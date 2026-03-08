@@ -166,3 +166,40 @@ const literal_record_decoder = record({ type: literal('admin'), level: literal(4
 expectType<{ type: 'admin'; level: 42; active: true; name: string }>(
   literal_record_decoder({ type: 'admin', level: 42, active: true, name: '' }),
 );
+
+// bare number and boolean literals in record (without literal() wrapper)
+// Note: TS 4.x widens bare number literals to `number` in generic inference;
+// booleans preserve (true/false) because boolean = true | false union.
+// Use `as const` or `literal()` for exact number literal types.
+const bare_literal_record = record({ type: 'admin' as const, level: 42, active: true, name: string });
+expectType<{ type: 'admin'; level: number; active: true; name: string }>(
+  bare_literal_record({ type: 'admin', level: 42, active: true, name: '' }),
+);
+
+// with `as const`, number literals are preserved
+const bare_literal_record_const = record({ type: 'admin' as const, level: 42 as const, active: true, name: string });
+expectType<{ type: 'admin'; level: 42; active: true; name: string }>(
+  bare_literal_record_const({ type: 'admin', level: 42, active: true, name: '' }),
+);
+
+// with whole-object `as const`, all literals are preserved
+const bare_literal_record_full_const = record({ type: 'admin', level: 42, active: true, name: string } as const);
+expectType<{ type: 'admin'; level: 42; active: true; name: string }>(
+  bare_literal_record_full_const({ type: 'admin', level: 42, active: true, name: '' }),
+);
+
+// bare number literals in union (preserved as direct args)
+const bare_number_union = union(1, 2, 3);
+expectType<1 | 2 | 3>(bare_number_union(1));
+
+// bare boolean in union
+const bare_bool_union = union(true, string);
+expectType<true | string>(bare_bool_union(true));
+
+// bare number literal in tuple (preserved as direct args)
+const bare_tuple = tuple(42, string);
+expectType<[42, string]>(bare_tuple([42, 'hello']));
+
+// mixed: bare literals with decoders in union
+const mixed_union = union(1, 'hello' as const, boolean);
+expectType<1 | 'hello' | boolean>(mixed_union(1));
