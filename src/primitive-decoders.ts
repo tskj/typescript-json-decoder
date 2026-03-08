@@ -51,6 +51,14 @@ export const nil: DecoderFunction<null> = ((u: unknown) => {
   return u as null;
 }) as any;
 
+export const integer: DecoderFunction<number> = (n: unknown) => {
+  const num = number(n);
+  if (!Number.isInteger(num)) {
+    throw `The value \`${JSON.stringify(n)}\` is not an integer`;
+  }
+  return num;
+};
+
 export const date: DecoderFunction<Date> = (value: unknown) => {
   assert_is_pojo(value);
   const dateString = string(value);

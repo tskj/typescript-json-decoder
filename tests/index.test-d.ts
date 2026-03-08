@@ -18,6 +18,7 @@ import {
   dict,
   DecoderFunction,
   unknown,
+  integer,
 } from '../src';
 
 let n = 0;
@@ -134,3 +135,7 @@ expectType<unknown>(unknown('anything'));
 expectType<unknown>(unknown(42));
 expectType<unknown>(unknown(null));
 expectAssignable<DecoderFunction<unknown>>(unknown);
+
+// integer decoder should resolve to `number`
+expectType<number>(integer(42));
+expectAssignable<DecoderFunction<number>>(integer);

@@ -21,6 +21,7 @@ import {
   nullable,
   intersection,
   unknown,
+  integer,
   Decoder,
 } from '../src';
 
@@ -521,6 +522,30 @@ test('number decoder', () => {
   expect(() => decoder('')).toThrow();
   expect(() => decoder('0')).toThrow();
   expect(() => decoder('1')).toThrow();
+  expect(() => decoder(false)).toThrow();
+  expect(() => decoder(undefined)).toThrow();
+  expect(() => decoder(null)).toThrow();
+  expect(() => decoder([])).toThrow();
+  expect(() => decoder({})).toThrow();
+});
+
+test('integer decoder', () => {
+  type primitve_type = decodeType<typeof decoder>;
+  const decoder = integer;
+
+  expect<primitve_type>(decoder(0)).toEqual(0);
+  expect<primitve_type>(decoder(1)).toEqual(1);
+  expect<primitve_type>(decoder(-1)).toEqual(-1);
+  expect<primitve_type>(decoder(42)).toEqual(42);
+  expect<primitve_type>(decoder(-100)).toEqual(-100);
+  expect(() => decoder(0.5)).toThrow();
+  expect(() => decoder(1.1)).toThrow();
+  expect(() => decoder(-0.1)).toThrow();
+  expect(() => decoder(Infinity)).toThrow();
+  expect(() => decoder(-Infinity)).toThrow();
+  expect(() => decoder(NaN)).toThrow();
+  expect(() => decoder('')).toThrow();
+  expect(() => decoder('0')).toThrow();
   expect(() => decoder(false)).toThrow();
   expect(() => decoder(undefined)).toThrow();
   expect(() => decoder(null)).toThrow();

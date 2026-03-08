@@ -17,6 +17,7 @@ export {
   undef,
   nil,
   date,
+  integer,
   unknown,
 } from './primitive-decoders';
 export { Pojo } from './pojo';
