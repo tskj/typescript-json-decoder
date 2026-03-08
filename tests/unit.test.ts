@@ -20,6 +20,7 @@ import {
   dict,
   nullable,
   intersection,
+  unknown,
   Decoder,
 } from '../src';
 
@@ -583,6 +584,31 @@ test('date decoder', () => {
   expect(() => decoder(undefined)).toThrow();
   expect(() => decoder([])).toThrow();
   expect(() => decoder({})).toThrow();
+});
+
+test('unknown decoder', () => {
+  type unknown_type = decodeType<typeof decoder>;
+  const decoder = unknown;
+
+  expect(decoder('')).toEqual('');
+  expect(decoder('test data')).toEqual('test data');
+  expect(decoder(0)).toEqual(0);
+  expect(decoder(42)).toEqual(42);
+  expect(decoder(true)).toEqual(true);
+  expect(decoder(false)).toEqual(false);
+  expect(decoder(undefined)).toEqual(undefined);
+  expect(decoder(null)).toEqual(null);
+  expect(decoder([])).toEqual([]);
+  expect(decoder({})).toEqual({});
+  expect(decoder([1, 'two', null])).toEqual([1, 'two', null]);
+  expect(decoder({ a: 1, b: 'two' })).toEqual({ a: 1, b: 'two' });
+  const sym = Symbol('test');
+  expect(decoder(sym)).toBe(sym);
+  const fn = () => 'hello';
+  expect(decoder(fn)).toBe(fn);
+  const instance = new Date();
+  expect(decoder(instance)).toBe(instance);
+  // Should never throw - that's the whole point
 });
 
 test('intersection fails to override properties', () => {

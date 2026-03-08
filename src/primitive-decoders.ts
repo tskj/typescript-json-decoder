@@ -60,3 +60,7 @@ export const date: DecoderFunction<Date> = (value: unknown) => {
   }
   return new Date(timeStampSinceEpoch);
 };
+
+export const unknown: DecoderFunction<unknown> = (value: unknown) => {
+  return value;
+};

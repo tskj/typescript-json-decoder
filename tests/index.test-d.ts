@@ -17,6 +17,7 @@ import {
   nullable,
   dict,
   DecoderFunction,
+  unknown,
 } from '../src';
 
 let n = 0;
@@ -127,3 +128,9 @@ expectType<DecoderFunction<Map<string, number>>>(dict(number));
 expectType<DecoderFunction<Map<'small' | 'medium', number>>>(
   dict(number, ['small', 'medium'] as const),
 );
+
+// unknown decoder should resolve to `unknown`
+expectType<unknown>(unknown('anything'));
+expectType<unknown>(unknown(42));
+expectType<unknown>(unknown(null));
+expectAssignable<DecoderFunction<unknown>>(unknown);
