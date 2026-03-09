@@ -24,6 +24,7 @@ import {
   always,
   withDefault,
   regex,
+  objectOf,
   safeDecode,
 } from '../src';
 
@@ -541,6 +542,28 @@ expectType<string>(regex_default('123'));
 // regex with withDefault — fallback is a different type
 const regex_default_null = withDefault(regex(/^\d+$/), null);
 expectType<string | null>(regex_default_null('123'));
+
+// --- objectOf decoder ---
+const ro_basic = objectOf(number);
+expectType<Record<string, number>>(ro_basic({ a: 1 }));
+
+// objectOf with constrained keys
+const ro_keys = objectOf(number, ['small', 'medium', 'large'] as const);
+expectType<Record<'small' | 'medium' | 'large', number>>(ro_keys({ small: 1 }));
+
+// objectOf with complex value decoder (using record())
+const ro_complex = objectOf(record({ name: string, score: number }));
+expectAssignable<Record<string, { name: string; score: number }>>(ro_complex({}));
+
+// objectOf with bare POJO value decoder
+const ro_bare = objectOf({ name: string, score: number });
+expectAssignable<Record<string, { name: string; score: number }>>(ro_bare({}));
+
+// objectOf in a record schema
+const ro_nested = record({ name: string, scores: objectOf(number) });
+expectType<{ name: string; scores: Record<string, number> }>(
+  ro_nested({ name: 'x', scores: { a: 1 } }),
+);
 
 // safeDecode returns discriminated union
 const readme_safe = safeDecode(string, 'hello');

@@ -242,6 +242,30 @@ export const map =
     }
   };
 
+export function objectOf<D extends Decoder<unknown>, K extends string = string>(
+  decoder: D,
+  keys?: ReadonlyArray<K>,
+): DecoderFunction<Record<K, decodeType<D>>> {
+  return (obj: unknown) => {
+    assert_is_pojo(obj);
+    if (!isPojoObject(obj)) {
+      throw `Value \`${obj}\` is not an object and can therefore not be parsed as a record`;
+    }
+    const result = {} as Record<K, decodeType<D>>;
+    for (const [key, value] of Object.entries(obj)) {
+      try {
+        if (keys && !isKey(key, keys)) {
+          throw `Key \`${key}\` is not in given keys`;
+        }
+        result[key as K] = decode(decoder)(value) as decodeType<D>;
+      } catch (message) {
+        throw message + `\nwhen decoding the key \`${key}\` in record \`${obj}\``;
+      }
+    }
+    return result;
+  };
+}
+
 export function dict<D extends Decoder<unknown>, K extends string = string>(
   decoder: D,
   keys?: ReadonlyArray<K>,

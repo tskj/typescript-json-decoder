@@ -287,6 +287,23 @@ const myMap = numberDictionaryDecoder(myDictionary); // Map<string, number>
 console.log(myMap.get('two')); // 2
 ```
 
+If you prefer a plain object instead of a `Map`, use `objectOf`. It works the same way but returns a `Record<string, T>`.
+
+```typescript
+import { objectOf, number } from 'typescript-json-decoder';
+
+const scores = objectOf(number);
+const result = scores({ math: 90, english: 85 }); // Record<string, number>
+console.log(result.math); // 90
+```
+
+You can also constrain the allowed keys:
+
+```typescript
+const sizes = objectOf(number, ['small', 'medium', 'large'] as const);
+// Record<'small' | 'medium' | 'large', number>
+```
+
 Although this makes a lot of sense, few APIs actually use Json literals to encode maps. Rather you often see lists of objects, for example lists of `User` objects, which in a sense *are* maps, and maybe you want to treat those as maps from their user id to the user object. Enter the `map` decoder.
 
 The `map` decoder is a function which takes a decoder and a "key" function. The key function takes the decoded object and returns its key. Imagine you have Json of the following form.
@@ -407,6 +424,41 @@ const numDecoder = literal(42);      // decodes to type `42`, not `number`
 // Useful in unions for exact type preservation:
 const levelDecoder = union(literal(1), literal(2), literal(3));
 // decodes to: 1 | 2 | 3
+```
+
+`regex` validates that a string matches a regular expression pattern.
+
+```typescript
+import { regex, record, string } from 'typescript-json-decoder';
+
+const userDecoder = record({
+    name: string,
+    email: regex(/^[^@]+@[^@]+\.[^@]+$/),
+    zip: regex(/^\d{5}$/),
+});
+```
+
+`withDefault` wraps any decoder with a fallback value. If the decoder throws, the fallback is returned instead. The fallback type can differ from the decoder type, in which case the return type is the union of both.
+
+```typescript
+import { record, string, number, withDefault } from 'typescript-json-decoder';
+
+const userDecoder = record({
+    name: string,
+    role: withDefault(string, 'user'),       // string — missing or invalid key gets 'user'
+    score: withDefault(number, null),         // number | null — fallback is a different type
+});
+```
+
+`withDefault` respects the inner decoder's semantics — if the decoder legitimately returns `null` or `undefined` (e.g. via `nullable` or `optional`), those pass through as valid values. The fallback only kicks in when the decoder throws.
+
+```typescript
+import { withDefault, nullable, number } from 'typescript-json-decoder';
+
+const decoder = withDefault(nullable(number), null);
+decoder(42);    // 42
+decoder(null);  // null (valid decoded value, not fallback)
+decoder('bad'); // null (decoder threw, fallback)
 ```
 
 ## Safe decoding

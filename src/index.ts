@@ -11,6 +11,7 @@ export {
   nullable,
   always,
   withDefault,
+  objectOf,
 } from './higher-order-decoders';
 export {
   string,

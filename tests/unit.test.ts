@@ -26,6 +26,7 @@ import {
   always,
   withDefault,
   regex,
+  objectOf,
   Decoder,
 } from '../src';
 
@@ -1660,4 +1661,60 @@ test('regex decoder with withDefault', () => {
   expect(decoder('123')).toBe('123');
   expect(decoder('abc')).toBe('N/A');
   expect(decoder(null)).toBe('N/A');
+});
+
+test('objectOf decodes object to Record<string, T>', () => {
+  const decoder = objectOf(number);
+  const result = decoder({ a: 1, b: 2, c: 3 });
+  expect(result).toEqual({ a: 1, b: 2, c: 3 });
+  expect(result.a).toBe(1);
+  expect(result.b).toBe(2);
+});
+
+test('objectOf validates values', () => {
+  const decoder = objectOf(number);
+  expect(() => decoder({ a: 1, b: 'bad' })).toThrow();
+  expect(() => decoder('not an object')).toThrow();
+  expect(() => decoder(null)).toThrow();
+});
+
+test('objectOf with constrained keys', () => {
+  const decoder = objectOf(number, ['small', 'medium', 'large'] as const);
+  expect(decoder({ small: 1, medium: 2, large: 3 })).toEqual({ small: 1, medium: 2, large: 3 });
+  expect(() => decoder({ small: 1, xl: 4 })).toThrow();
+});
+
+test('objectOf with complex value decoder', () => {
+  const decoder = objectOf(record({ name: string, score: number }));
+  const result = decoder({
+    alice: { name: 'alice', score: 10 },
+    bob: { name: 'bob', score: 20 },
+  });
+  expect(result.alice).toEqual({ name: 'alice', score: 10 });
+  expect(result.bob).toEqual({ name: 'bob', score: 20 });
+});
+
+test('objectOf with bare POJO value decoder', () => {
+  const decoder = objectOf({ name: string, score: number });
+  const result = decoder({
+    alice: { name: 'alice', score: 10 },
+    bob: { name: 'bob', score: 20 },
+  });
+  expect(result.alice).toEqual({ name: 'alice', score: 10 });
+  expect(result.bob).toEqual({ name: 'bob', score: 20 });
+  expect(() => decoder({ alice: { name: 'alice' } })).toThrow();
+});
+
+test('objectOf in a record schema', () => {
+  const decoder = record({
+    name: string,
+    scores: objectOf(number),
+  });
+  expect(decoder({ name: 'alice', scores: { math: 90, english: 85 } }))
+    .toEqual({ name: 'alice', scores: { math: 90, english: 85 } });
+});
+
+test('objectOf with empty object', () => {
+  const decoder = objectOf(string);
+  expect(decoder({})).toEqual({});
 });
