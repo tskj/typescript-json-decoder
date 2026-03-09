@@ -10,6 +10,7 @@ export {
   dict,
   nullable,
   always,
+  withDefault,
 } from './higher-order-decoders';
 export {
   string,

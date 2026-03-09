@@ -24,6 +24,7 @@ import {
   unknown,
   integer,
   always,
+  withDefault,
   Decoder,
 } from '../src';
 
@@ -1476,4 +1477,145 @@ test('README examples: bare literals, unions, and new decoders', () => {
   expect(nestedDecoder({ name: 'x', config: { level: 42, active: true, env: 'prod' } }))
     .toEqual({ name: 'x', config: { level: 42, active: true, env: 'prod' } });
   expect(() => nestedDecoder({ name: 'x', config: { level: 42, active: true, env: 'dev' } })).toThrow();
+});
+
+test('withDefault returns fallback when decoder fails', () => {
+  const decoder = withDefault(string, 'fallback');
+  expect(decoder('hello')).toBe('hello');
+  expect(decoder(undefined)).toBe('fallback');
+  expect(decoder(null)).toBe('fallback');
+  expect(decoder(42)).toBe('fallback');
+});
+
+test('withDefault with number decoder', () => {
+  const decoder = withDefault(number, 0);
+  expect(decoder(42)).toBe(42);
+  expect(decoder(undefined)).toBe(0);
+  expect(decoder(null)).toBe(0);
+  expect(decoder('hello')).toBe(0);
+});
+
+test('withDefault with record decoder', () => {
+  const decoder = withDefault(
+    record({ name: string, level: number }),
+    { name: 'anonymous', level: 1 },
+  );
+  expect(decoder({ name: 'alice', level: 5 })).toEqual({ name: 'alice', level: 5 });
+  expect(decoder(undefined)).toEqual({ name: 'anonymous', level: 1 });
+  expect(decoder(null)).toEqual({ name: 'anonymous', level: 1 });
+  // missing key also falls back
+  expect(decoder({ name: 'alice' })).toEqual({ name: 'anonymous', level: 1 });
+});
+
+test('withDefault in a record schema', () => {
+  const decoder = record({
+    name: string,
+    role: withDefault(string, 'user'),
+    retries: withDefault(number, 3),
+  });
+  expect(decoder({ name: 'alice', role: 'admin', retries: 5 }))
+    .toEqual({ name: 'alice', role: 'admin', retries: 5 });
+  expect(decoder({ name: 'alice' }))
+    .toEqual({ name: 'alice', role: 'user', retries: 3 });
+  expect(decoder({ name: 'alice', role: null, retries: undefined }))
+    .toEqual({ name: 'alice', role: 'user', retries: 3 });
+});
+
+test('withDefault with bare literal decoder', () => {
+  const decoder = withDefault(42, 42);
+  expect(decoder(42)).toBe(42);
+  expect(decoder(undefined)).toBe(42);
+  expect(decoder(null)).toBe(42);
+  expect(decoder(43)).toBe(42);
+});
+
+test('withDefault with array decoder', () => {
+  const decoder = withDefault(array(number), []);
+  expect(decoder([1, 2, 3])).toEqual([1, 2, 3]);
+  expect(decoder(undefined)).toEqual([]);
+  expect(decoder(null)).toEqual([]);
+  expect(decoder('not an array')).toEqual([]);
+});
+
+test('withDefault with nullable — null passes through, fallback on throw', () => {
+  const decoder = withDefault(nullable(number), null);
+  expect(decoder(42)).toBe(42);
+  expect(decoder(null)).toBe(null);     // null is valid, not a fallback
+  expect(decoder('bad')).toBe(null);    // throws → fallback
+  expect(decoder(undefined)).toBe(null); // throws → fallback
+});
+
+test('withDefault with optional — undefined passes through, fallback on throw', () => {
+  const decoder = withDefault(optional(string), undefined);
+  expect(decoder('hello')).toBe('hello');
+  expect(decoder(undefined)).toBeUndefined(); // valid decoded value
+  expect(decoder(42)).toBeUndefined();        // throws → fallback
+});
+
+test('withDefault with union — fallback only on total failure', () => {
+  const decoder = withDefault(union(string, number, nil), null);
+  expect(decoder('hello')).toBe('hello');
+  expect(decoder(42)).toBe(42);
+  expect(decoder(null)).toBe(null);     // valid union case
+  expect(decoder(true)).toBe(null);     // no union case matches → fallback
+  expect(decoder({})).toBe(null);       // no union case matches → fallback
+});
+
+test('withDefault with tagged union — fallback on no match', () => {
+  const decoder = withDefault(
+    union(
+      record({ tag: 'ok' as const, data: string }),
+      record({ tag: 'err' as const, code: number }),
+    ),
+    { tag: 'err' as const, code: 0 },
+  );
+  expect(decoder({ tag: 'ok', data: 'hi' })).toEqual({ tag: 'ok', data: 'hi' });
+  expect(decoder({ tag: 'err', code: 404 })).toEqual({ tag: 'err', code: 404 });
+  expect(decoder({ tag: 'unknown' })).toEqual({ tag: 'err', code: 0 });
+  expect(decoder(null)).toEqual({ tag: 'err', code: 0 });
+});
+
+test('withDefault with nullable in a record — null is valid, missing key falls back', () => {
+  const decoder = record({
+    name: string,
+    data: withDefault(nullable(number), null),
+  });
+  expect(decoder({ name: 'a', data: 42 })).toEqual({ name: 'a', data: 42 });
+  expect(decoder({ name: 'a', data: null })).toEqual({ name: 'a', data: null });
+  expect(decoder({ name: 'a' })).toEqual({ name: 'a', data: null });
+  expect(decoder({ name: 'a', data: 'bad' })).toEqual({ name: 'a', data: null });
+});
+
+test('withDefault in a bare POJO (no record() wrapper)', () => {
+  const decoder = decode({ name: string, score: withDefault(number, 0) });
+  expect(decoder({ name: 'alice', score: 42 })).toEqual({ name: 'alice', score: 42 });
+  expect(decoder({ name: 'alice' })).toEqual({ name: 'alice', score: 0 });
+  expect(decoder({ name: 'alice', score: 'bad' })).toEqual({ name: 'alice', score: 0 });
+});
+
+test('withDefault in a tuple', () => {
+  const decoder = tuple(string, withDefault(number, 0));
+  expect(decoder(['hello', 42])).toEqual(['hello', 42]);
+  expect(decoder(['hello', 'bad'])).toEqual(['hello', 0]);
+  expect(decoder(['hello', null])).toEqual(['hello', 0]);
+});
+
+test('withDefault with fallback type different from decoder type', () => {
+  // fallback is null, decoder is string → string | null
+  const decoder = withDefault(string, null);
+  expect(decoder('hello')).toBe('hello');
+  expect(decoder(42)).toBe(null);
+
+  // fallback is a different string literal
+  const decoder2 = withDefault(number, 'N/A' as const);
+  expect(decoder2(42)).toBe(42);
+  expect(decoder2('bad')).toBe('N/A');
+
+  // fallback is a completely different shape
+  const decoder3 = withDefault(
+    record({ name: string }),
+    { error: 'not found' },
+  );
+  expect(decoder3({ name: 'alice' })).toEqual({ name: 'alice' });
+  expect(decoder3(null)).toEqual({ error: 'not found' });
 });

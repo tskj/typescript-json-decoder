@@ -22,6 +22,7 @@ import {
   unknown,
   integer,
   always,
+  withDefault,
   safeDecode,
 } from '../src';
 
@@ -456,6 +457,72 @@ const same_shape_fallback = union(
 expectAssignable<{ status: 'active'; score: number } | { status: 'inactive'; score: number }>(
   same_shape_fallback({ status: 'active', score: 99 }),
 );
+
+// --- withDefault decoder ---
+
+// withDefault with plain decoder — fallback on throw
+const wd_string = withDefault(string, 'fallback');
+expectType<string>(wd_string('hello'));
+expectAssignable<DecoderFunction<string>>(wd_string);
+
+// withDefault with number
+const wd_number = withDefault(number, 0);
+expectType<number>(wd_number(42));
+
+// withDefault in record — fields get defaults instead of being optional
+const wd_record = record({
+  name: string,
+  role: withDefault(string, 'user'),
+  retries: withDefault(number, 3),
+});
+expectType<{ name: string; role: string; retries: number }>(
+  wd_record({ name: 'alice', role: 'admin', retries: 5 }),
+);
+
+// withDefault with array
+const wd_array = withDefault(array(number), []);
+expectType<number[]>(wd_array([1, 2]));
+
+// withDefault preserves nullable — null is a valid decoded value, not stripped
+const wd_nullable = withDefault(nullable(number), null);
+expectType<number | null>(wd_nullable(42));
+
+// withDefault preserves optional — undefined is a valid decoded value
+const wd_optional = withDefault(optional(string), undefined);
+expectType<string | undefined>(wd_optional('hello'));
+
+// withDefault with union preserves all union cases
+const wd_union = withDefault(union(string, number, nullable(boolean)), null);
+expectAssignable<string | number | boolean | null>(wd_union('hello'));
+
+// withDefault with tagged union
+const wd_tagged = withDefault(
+  union(
+    record({ tag: 'ok' as const, data: string }),
+    record({ tag: 'err' as const, code: number }),
+  ),
+  { tag: 'err' as const, code: 0 },
+);
+expectAssignable<{ tag: 'ok'; data: string } | { tag: 'err'; code: number }>(wd_tagged({}));
+
+// withDefault with nullable in a record
+const wd_nullable_rec = record({
+  name: string,
+  data: withDefault(nullable(number), null),
+});
+expectAssignable<{ name: string; data: number | null }>(
+  wd_nullable_rec({ name: 'a', data: 42 }),
+);
+
+// withDefault where fallback type extends the decoder type
+const wd_string_null = withDefault(string, null);
+expectType<string | null>(wd_string_null('hello'));
+
+const wd_number_na = withDefault(number, 'N/A' as const);
+expectType<number | 'N/A'>(wd_number_na(42));
+
+const wd_different_shape = withDefault(record({ name: string }), { error: 'not found' });
+expectAssignable<{ name: string } | { error: string }>(wd_different_shape({}));
 
 // safeDecode returns discriminated union
 const readme_safe = safeDecode(string, 'hello');

@@ -162,6 +162,24 @@ export const optional = <T extends Decoder<unknown>>(
   decoder: T,
 ): DecoderFunction<decodeType<T> | undefined> => union(undef, decoder as any);
 
+export function withDefault<T extends Decoder<unknown>>(
+  decoder: T,
+  fallback: decodeType<T>,
+): DecoderFunction<decodeType<T>>;
+export function withDefault<T extends Decoder<unknown>, F>(
+  decoder: T,
+  fallback: F,
+): DecoderFunction<decodeType<T> | F>;
+export function withDefault(decoder: any, fallback: any) {
+  return (value: unknown) => {
+    try {
+      return decode(decoder)(value);
+    } catch {
+      return fallback;
+    }
+  };
+}
+
 export function array<D extends Decoder<unknown>>(
   decoder: D,
 ): DecoderFunction<decodeType<D>[]> {
