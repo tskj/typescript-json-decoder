@@ -139,7 +139,7 @@ const stringAndNumberDecoder = tuple(string, number);
 const myTuple = stringAndNumberDecoder(['user', 2]);
 ```
 
-This doesn't really match the syntax of regular TypeScript as much as I would like, so as a convenience feature we also allow a *literal syntax* for tuples. The idea is that a two element list of decoders can be cansidered itself a decoder of the corresponding tuple. The same example as above written in the literal form would be as follows.
+This doesn't really match the syntax of regular TypeScript as much as I would like, so as a convenience feature we also allow a *literal syntax* for tuples. The idea is that a two element list of decoders can be considered itself a decoder of the corresponding tuple. The same example as above written in the literal form would be as follows.
 
 ```typescript
 import { decodeType, decode, string, number } from 'typescript-json-decoder';
@@ -265,13 +265,13 @@ type blogpost = decodeType<typeof blogpostdecoder>;
 const blogpostdecoder = record({
     title: string,
     content: string,
-    createddate: date,
+    createdDate: date,
 });
 ```
 
 Look at that: actual, type safe, automatic parsing of a date encoded as a Json string.
 
-At his point I went a little crazy implementing fun data structures. How about a dictionary? A dictionary is a map from strings to your type `T`, that is, the type `Map<string, T>`. The function `dict` then takes a decoder of `T` and creates a decoder which parses *JavaScript object literals* as maps. Take a look at the following example to understand how it works.
+At this point I went a little crazy implementing fun data structures. How about a dictionary? A dictionary is a map from strings to your type `T`, that is, the type `Map<string, T>`. The function `dict` then takes a decoder of `T` and creates a decoder which parses *JavaScript object literals* as maps. Take a look at the following example to understand how it works.
 
 ```typescript
 import { dict } from 'typescript-json-decoder';
@@ -354,7 +354,7 @@ import { decodeType, record, fields } from 'typescript-json-decoder';
 type User = decodeType<typeof userDecoder>;
 const userDecoder = record({
     identifier: fields({ username: string, userId: number },
-                            ({ username, userId }) => `user:${username}:${userid}`),
+                            ({ username, userId }) => `user:${username}:${userId}`),
 });
 ```
 
