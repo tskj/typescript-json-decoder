@@ -9,24 +9,30 @@ import {
 } from './types';
 import { tag } from './utils';
 
-export const literal =
-  <p extends PrimitiveJsonLiteralForm>(literal: p): DecoderFunction<p> =>
-  (value: unknown) => {
+const apply = (k: any, x: any) => k ? k(x) : x;
+
+export function literal<p extends PrimitiveJsonLiteralForm>(lit: p): DecoderFunction<p>;
+export function literal<p extends PrimitiveJsonLiteralForm, U>(lit: p, k: (x: p) => U): DecoderFunction<U>;
+export function literal(lit: PrimitiveJsonLiteralForm, k?: (x: any) => any) {
+  return (value: unknown) => {
     assert_is_pojo(value);
-    if (literal !== value) {
+    if (lit !== value) {
       throw `The value \`${JSON.stringify(
         value,
-      )}\` is not the literal \`${JSON.stringify(literal)}\``;
+      )}\` is not the literal \`${JSON.stringify(lit)}\``;
     }
-    return literal;
+    return apply(k, lit);
   };
+}
 
-export const tuple =
-  <A extends Decoder<unknown>, B extends Decoder<unknown>>(
-    decoderA: A,
-    decoderB: B,
-  ): DecoderFunction<[decodeType<A>, decodeType<B>]> =>
-  (value: unknown) => {
+export function tuple<A extends Decoder<unknown>, B extends Decoder<unknown>>(
+  decoderA: A, decoderB: B,
+): DecoderFunction<[decodeType<A>, decodeType<B>]>;
+export function tuple<A extends Decoder<unknown>, B extends Decoder<unknown>, U>(
+  decoderA: A, decoderB: B, k: (x: [decodeType<A>, decodeType<B>]) => U,
+): DecoderFunction<U>;
+export function tuple(decoderA: any, decoderB: any, k?: (x: any) => any) {
+  return (value: unknown) => {
     assert_is_pojo(value);
     if (!Array.isArray(value)) {
       throw `The value \`${JSON.stringify(
@@ -39,8 +45,10 @@ export const tuple =
       )}\` is not the proper length for a tuple`;
     }
     const [a, b] = value;
-    return [decode(decoderA as any)(a), decode(decoderB as any)(b)];
+    const result: [any, any] = [decode(decoderA)(a), decode(decoderB)(b)];
+    return apply(k, result);
   };
+}
 
 export const fieldDecoder: unique symbol = Symbol('field-decoder');
 export const fields = <T extends { [key: string]: Decoder<unknown> }, U>(
@@ -56,12 +64,22 @@ export const fields = <T extends { [key: string]: Decoder<unknown> }, U>(
   return dec;
 };
 
-export const field = <T>(
+export function field<D extends Decoder<unknown>>(
   key: string,
-  decoder: Decoder<T>,
-): DecoderFunction<T> => {
-  return fields({ [key]: decoder }, (x: any) => x[key]);
-};
+  decoder: D,
+): DecoderFunction<decodeType<D>>;
+export function field<D extends Decoder<unknown>, U>(
+  key: string,
+  decoder: D,
+  k: (x: decodeType<D>) => U,
+): DecoderFunction<U>;
+export function field(
+  key: string,
+  decoder: Decoder<unknown>,
+  k?: (x: any) => any,
+) {
+  return fields({ [key]: decoder }, (x: any) => apply(k, x[key]));
+}
 
 type evalRecordSchema<schema> = addQuestionmarksToRecordFields<{
   [key in keyof schema]: decodeType<schema[key]>;

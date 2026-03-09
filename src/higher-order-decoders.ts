@@ -2,8 +2,16 @@ import { nil, undef } from './primitive-decoders';
 import { assert_is_pojo, isPojoObject } from './pojo';
 import { decodeType, decode, Decoder, DecoderFunction, isKey } from './types';
 
+const apply = (k: any, x: any) => k ? k(x) : x;
+
 export const always = <T>(value: T): DecoderFunction<T> =>
   (_input: unknown) => value;
+
+export const transform = <D extends Decoder<unknown>, U>(
+  decoder: D,
+  k: (x: decodeType<D>) => U,
+): DecoderFunction<U> =>
+  (value: unknown) => k(decode(decoder)(value) as any);
 
 type evalOver<t> = t extends unknown ? decodeType<t> : never;
 type getSumOfArray<arr> = arr extends (infer elements)[] ? elements : never;
@@ -152,15 +160,35 @@ export const intersection =
     }
   };
 
-export const nullable = <T extends Decoder<unknown>>(
+export function nullable<T extends Decoder<unknown>>(
   decoder: T,
-): DecoderFunction<decodeType<T> | null> => {
-  return union(nil, decoder as any);
-};
+): DecoderFunction<decodeType<T> | null>;
+export function nullable<T extends Decoder<unknown>, U>(
+  decoder: T,
+  k: (x: decodeType<T>) => U,
+): DecoderFunction<U | null>;
+export function nullable(decoder: any, k?: (x: any) => any) {
+  const base = union(nil, decoder);
+  return (value: unknown) => {
+    const result = base(value);
+    return result === null ? result : apply(k, result);
+  };
+}
 
-export const optional = <T extends Decoder<unknown>>(
+export function optional<T extends Decoder<unknown>>(
   decoder: T,
-): DecoderFunction<decodeType<T> | undefined> => union(undef, decoder as any);
+): DecoderFunction<decodeType<T> | undefined>;
+export function optional<T extends Decoder<unknown>, U>(
+  decoder: T,
+  k: (x: decodeType<T>) => U,
+): DecoderFunction<U | undefined>;
+export function optional(decoder: any, k?: (x: any) => any) {
+  const base = union(undef, decoder);
+  return (value: unknown) => {
+    const result = base(value);
+    return result === undefined ? result : apply(k, result);
+  };
+}
 
 export function withDefault<T extends Decoder<unknown>>(
   decoder: T,
@@ -182,7 +210,12 @@ export function withDefault(decoder: any, fallback: any) {
 
 export function array<D extends Decoder<unknown>>(
   decoder: D,
-): DecoderFunction<decodeType<D>[]> {
+): DecoderFunction<decodeType<D>[]>;
+export function array<D extends Decoder<unknown>, U>(
+  decoder: D,
+  k: (x: decodeType<D>[]) => U,
+): DecoderFunction<U>;
+export function array(decoder: any, k?: (x: any) => any) {
   return (xs: unknown): any => {
     assert_is_pojo(xs);
     const arrayToString = (arr: any) => `${JSON.stringify(arr)}`;
@@ -193,10 +226,11 @@ export function array<D extends Decoder<unknown>>(
     }
     let index = 0;
     try {
-      return xs.map((x, i) => {
+      const result = xs.map((x, i) => {
         index = i;
-        return decode(decoder as any)(x);
-      }) as any;
+        return decode(decoder)(x);
+      });
+      return apply(k, result);
     } catch (message) {
       throw (
         message +
@@ -208,18 +242,23 @@ export function array<D extends Decoder<unknown>>(
   };
 }
 
-export const set =
-  <D extends Decoder<unknown>>(
-    decoder: D,
-  ): DecoderFunction<Set<decodeType<D>>> =>
-  (list: unknown) => {
+export function set<D extends Decoder<unknown>>(
+  decoder: D,
+): DecoderFunction<Set<decodeType<D>>>;
+export function set<D extends Decoder<unknown>, U>(
+  decoder: D,
+  k: (x: Set<decodeType<D>>) => U,
+): DecoderFunction<U>;
+export function set(decoder: any, k?: (x: any) => any) {
+  return (list: unknown) => {
     assert_is_pojo(list);
     try {
-      return new Set(decode(array(decoder))(list));
+      return apply(k, new Set(decode(array(decoder))(list)));
     } catch (message) {
       throw message + `\nand can therefore not be parsed as a set`;
     }
   };
+}
 
 export const map =
   <K, D extends Decoder<unknown>>(
@@ -245,31 +284,55 @@ export const map =
 export function objectOf<D extends Decoder<unknown>, K extends string = string>(
   decoder: D,
   keys?: ReadonlyArray<K>,
-): DecoderFunction<Record<K, decodeType<D>>> {
+): DecoderFunction<Record<K, decodeType<D>>>;
+export function objectOf<D extends Decoder<unknown>, U>(
+  decoder: D,
+  k: (x: Record<string, decodeType<D>>) => U,
+): DecoderFunction<U>;
+export function objectOf<D extends Decoder<unknown>, K extends string, U>(
+  decoder: D,
+  keys: ReadonlyArray<K>,
+  k: (x: Record<K, decodeType<D>>) => U,
+): DecoderFunction<U>;
+export function objectOf(decoder: any, keysOrK?: any, k?: any) {
+  const keys = Array.isArray(keysOrK) ? keysOrK : undefined;
+  const cont = typeof keysOrK === 'function' ? keysOrK : k;
   return (obj: unknown) => {
     assert_is_pojo(obj);
     if (!isPojoObject(obj)) {
       throw `Value \`${obj}\` is not an object and can therefore not be parsed as a record`;
     }
-    const result = {} as Record<K, decodeType<D>>;
+    const result = {} as any;
     for (const [key, value] of Object.entries(obj)) {
       try {
         if (keys && !isKey(key, keys)) {
           throw `Key \`${key}\` is not in given keys`;
         }
-        result[key as K] = decode(decoder)(value) as decodeType<D>;
+        result[key] = decode(decoder)(value);
       } catch (message) {
         throw message + `\nwhen decoding the key \`${key}\` in record \`${obj}\``;
       }
     }
-    return result;
+    return apply(cont, result);
   };
 }
 
 export function dict<D extends Decoder<unknown>, K extends string = string>(
   decoder: D,
   keys?: ReadonlyArray<K>,
-): DecoderFunction<Map<K, decodeType<D>>> {
+): DecoderFunction<Map<K, decodeType<D>>>;
+export function dict<D extends Decoder<unknown>, U>(
+  decoder: D,
+  k: (x: Map<string, decodeType<D>>) => U,
+): DecoderFunction<U>;
+export function dict<D extends Decoder<unknown>, K extends string, U>(
+  decoder: D,
+  keys: ReadonlyArray<K>,
+  k: (x: Map<K, decodeType<D>>) => U,
+): DecoderFunction<U>;
+export function dict(decoder: any, keysOrK?: any, k?: any) {
+  const keys = Array.isArray(keysOrK) ? keysOrK : undefined;
+  const cont = typeof keysOrK === 'function' ? keysOrK : k;
   return (map: unknown) => {
     assert_is_pojo(map);
     if (!isPojoObject(map)) {
@@ -280,12 +343,11 @@ export function dict<D extends Decoder<unknown>, K extends string = string>(
         if (keys && !isKey(key, keys)) {
           throw `Key \`${key}\` is not in given keys`;
         }
-
-        return [key, decode(decoder)(value)] as [K, decodeType<D>];
+        return [key, decode(decoder)(value)] as [any, any];
       } catch (message) {
         throw message + `\nwhen decoding the key \`${key}\` in map \`${map}\``;
       }
     });
-    return new Map(decodedPairs);
+    return apply(cont, new Map(decodedPairs));
   };
 }

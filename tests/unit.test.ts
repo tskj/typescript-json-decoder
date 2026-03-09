@@ -28,6 +28,7 @@ import {
   regex,
   objectOf,
   bigint,
+  transform,
   Decoder,
 } from '../src';
 
@@ -1759,4 +1760,454 @@ test('bigint decoder in a record', () => {
   });
   expect(decoder({ name: 'alice', balance: '9007199254740993' }))
     .toEqual({ name: 'alice', balance: BigInt('9007199254740993') });
+});
+
+test('field with continuation — extract and transform', () => {
+  const decoder = record({
+    thing: field('nested', { theThingIWant: string }, x => x.theThingIWant),
+    foo: string,
+  });
+  expect(decoder({ foo: 'bar', nested: { theThingIWant: 'found it' } }))
+    .toEqual({ thing: 'found it', foo: 'bar' });
+});
+
+test('field with continuation — numeric transform', () => {
+  const decoder = record({
+    doubled: field('value', number, x => x * 2),
+  });
+  expect(decoder({ value: 21 })).toEqual({ doubled: 42 });
+});
+
+test('field without continuation — unchanged behavior', () => {
+  const decoder = record({
+    name: field('username', string),
+  });
+  expect(decoder({ username: 'alice' })).toEqual({ name: 'alice' });
+});
+
+// --- transform ---
+
+test('transform — basic usage', () => {
+  const decoder = transform(number, x => x * 2);
+  expect(decoder(21)).toBe(42);
+});
+
+test('transform — with record decoder', () => {
+  const decoder = transform(
+    { name: string, age: number },
+    x => `${x.name} is ${x.age}`,
+  );
+  expect(decoder({ name: 'alice', age: 30 })).toBe('alice is 30');
+});
+
+test('transform — chain with union', () => {
+  const decoder = transform(
+    union(string, number),
+    x => String(x),
+  );
+  expect(decoder('hello')).toBe('hello');
+  expect(decoder(42)).toBe('42');
+});
+
+// --- literal with continuation ---
+
+test('literal with continuation — transform matched value', () => {
+  const decoder = literal('admin', x => x.toUpperCase());
+  expect(decoder('admin')).toBe('ADMIN');
+});
+
+test('literal with continuation — number literal', () => {
+  const decoder = literal(42, x => x + 1);
+  expect(decoder(42)).toBe(43);
+});
+
+test('literal with continuation — boolean literal', () => {
+  const decoder = literal(true, x => (x ? 'yes' : 'no'));
+  expect(decoder(true)).toBe('yes');
+});
+
+test('literal with continuation — still rejects non-matching', () => {
+  const decoder = literal('admin', x => x.toUpperCase());
+  expect(() => decoder('user')).toThrow();
+});
+
+// --- tuple with continuation ---
+
+test('tuple with continuation — destructure and combine', () => {
+  const decoder = tuple(string, number, ([name, age]) => ({ name, age }));
+  expect(decoder(['alice', 30])).toEqual({ name: 'alice', age: 30 });
+});
+
+test('tuple with continuation — sum', () => {
+  const decoder = tuple(number, number, ([a, b]) => a + b);
+  expect(decoder([3, 4])).toBe(7);
+});
+
+// --- array with continuation ---
+
+test('array with continuation — map over decoded', () => {
+  const decoder = array(number, xs => xs.map(x => x * 2));
+  expect(decoder([1, 2, 3])).toEqual([2, 4, 6]);
+});
+
+test('array with continuation — reduce', () => {
+  const decoder = array(number, xs => xs.reduce((a, b) => a + b, 0));
+  expect(decoder([1, 2, 3])).toBe(6);
+});
+
+test('array with continuation — still validates elements', () => {
+  const decoder = array(number, xs => xs.length);
+  expect(() => decoder([1, 'two', 3])).toThrow();
+});
+
+// --- optional with continuation ---
+
+test('optional with continuation — transforms present value', () => {
+  const decoder = record({
+    name: optional(string, s => s.toUpperCase()),
+  });
+  expect(decoder({ name: 'alice' })).toEqual({ name: 'ALICE' });
+});
+
+test('optional with continuation — passes through undefined', () => {
+  const decoder = record({
+    name: optional(string, s => s.toUpperCase()),
+  });
+  expect(decoder({ name: undefined })).toEqual({ name: undefined });
+});
+
+// --- nullable with continuation ---
+
+test('nullable with continuation — transforms non-null value', () => {
+  const decoder = record({
+    name: nullable(string, s => s.toUpperCase()),
+  });
+  expect(decoder({ name: 'alice' })).toEqual({ name: 'ALICE' });
+});
+
+test('nullable with continuation — passes through null', () => {
+  const decoder = record({
+    name: nullable(string, s => s.toUpperCase()),
+  });
+  expect(decoder({ name: null })).toEqual({ name: null });
+});
+
+// --- set with continuation ---
+
+test('set with continuation — transform to array', () => {
+  const decoder = set(number, s => Array.from(s).sort());
+  expect(decoder([3, 1, 2])).toEqual([1, 2, 3]);
+});
+
+test('set with continuation — get size', () => {
+  const decoder = set(string, s => s.size);
+  expect(decoder(['a', 'b', 'a'])).toBe(2);
+});
+
+// --- objectOf with continuation ---
+
+test('objectOf with continuation — transform record', () => {
+  const decoder = objectOf(number, r => Object.values(r).reduce((a, b) => a + b, 0));
+  expect(decoder({ a: 1, b: 2, c: 3 })).toBe(6);
+});
+
+test('objectOf with keys and continuation', () => {
+  const decoder = objectOf(number, ['x', 'y'] as const, r => r.x + r.y);
+  expect(decoder({ x: 10, y: 20 })).toBe(30);
+});
+
+// --- dict with continuation ---
+
+test('dict with continuation — transform map', () => {
+  const decoder = dict(number, m => m.size);
+  expect(decoder({ a: 1, b: 2 })).toBe(2);
+});
+
+test('dict with keys and continuation', () => {
+  const decoder = dict(string, ['a', 'b'] as const, m => Array.from(m.values()).join(','));
+  expect(decoder({ a: 'hello', b: 'world' })).toBe('hello,world');
+});
+
+// --- README examples (verbatim) ---
+
+test('README: User decoder (The idea)', () => {
+  const userDecoder = record({
+    id: number,
+    username: string,
+    isBanned: boolean,
+  });
+  expect(userDecoder({ id: 1, username: 'Fred', isBanned: false }))
+    .toEqual({ id: 1, username: 'Fred', isBanned: false });
+});
+
+test('README: User with optional/array/union (Usage)', () => {
+  const userDecoder = record({
+    id: number,
+    username: string,
+    isBanned: boolean,
+    phoneNumbers: array(string),
+    ssn: optional(string),
+    creditCardNumber: union(string, number),
+  });
+  expect(userDecoder({
+    id: 1, username: 'Fred', isBanned: true,
+    phoneNumbers: ['555-1234'], ssn: undefined, creditCardNumber: '1234',
+  })).toEqual({
+    id: 1, username: 'Fred', isBanned: true,
+    phoneNumbers: ['555-1234'], ssn: undefined, creditCardNumber: '1234',
+  });
+});
+
+test('README: User with nested address (Usage)', () => {
+  const userDecoder = record({
+    id: number,
+    username: string,
+    isBanned: boolean,
+    phoneNumbers: array(string),
+    ssn: optional(string),
+    creditCardNumber: union(string, number),
+    address: {
+      city: string,
+      timezones: array({ info: string, optionalInfo: optional(array(number)) }),
+    },
+  });
+  expect(userDecoder({
+    id: 1, username: 'Fred', isBanned: true,
+    phoneNumbers: ['555-1234'], ssn: undefined, creditCardNumber: 42,
+    address: {
+      city: 'Oslo',
+      timezones: [{ info: 'CET', optionalInfo: [1, 2] }],
+    },
+  })).toEqual({
+    id: 1, username: 'Fred', isBanned: true,
+    phoneNumbers: ['555-1234'], ssn: undefined, creditCardNumber: 42,
+    address: {
+      city: 'Oslo',
+      timezones: [{ info: 'CET', optionalInfo: [1, 2] }],
+    },
+  });
+});
+
+test('README: tuple (Advanced usage)', () => {
+  const stringAndNumberDecoder = tuple(string, number);
+  expect(stringAndNumberDecoder(['user', 2])).toEqual(['user', 2]);
+});
+
+test('README: tuple literal syntax', () => {
+  const stringAndNumberDecoder = decode([string, number]);
+  expect(stringAndNumberDecoder(['user', 2])).toEqual(['user', 2]);
+});
+
+test('README: record with inline tuple literals', () => {
+  const myDecoder = record({
+    username: string,
+    result: [string, number],
+    results: array([string, number]),
+  });
+  expect(myDecoder({
+    username: 'alice',
+    result: ['ok', 42],
+    results: [['a', 1], ['b', 2]],
+  })).toEqual({
+    username: 'alice',
+    result: ['ok', 42],
+    results: [['a', 1], ['b', 2]],
+  });
+});
+
+test('README: dict (Custom decoders)', () => {
+  const myDictionary = { one: 1, two: 2, three: 3 };
+  const numberDictionaryDecoder = dict(number);
+  const myMap = numberDictionaryDecoder(myDictionary);
+  expect(myMap.get('two')).toBe(2);
+});
+
+test('README: objectOf', () => {
+  const scores = objectOf(number);
+  const result = scores({ math: 90, english: 85 });
+  expect(result.math).toBe(90);
+});
+
+test('README: objectOf constrained keys', () => {
+  const sizes = objectOf(number, ['small', 'medium', 'large'] as const);
+  expect(sizes({ small: 1, medium: 2, large: 3 })).toEqual({ small: 1, medium: 2, large: 3 });
+  expect(() => sizes({ small: 1, xl: 4 })).toThrow();
+});
+
+test('README: map inline definition', () => {
+  const userListDecoder = map({
+    id: number,
+    username: string,
+    isBanned: boolean,
+  }, x => x.id);
+  const result = userListDecoder([
+    { id: 1, username: 'Fred', isBanned: true },
+    { id: 2, username: 'Olga', isBanned: false },
+  ]);
+  expect(result.get(1)).toEqual({ id: 1, username: 'Fred', isBanned: true });
+  expect(result.get(2)).toEqual({ id: 2, username: 'Olga', isBanned: false });
+});
+
+test('README: fields (Low level access)', () => {
+  const userDecoder = record({
+    identifier: fields({ username: string, userId: number },
+                       ({ username, userId }) => `user:${username}:${userId}`),
+  });
+  expect(userDecoder({ username: 'hunter2', userId: 3 }))
+    .toEqual({ identifier: 'user:hunter2:3' });
+});
+
+test('README: integer', () => {
+  expect(integer(42)).toBe(42);
+  expect(() => integer(3.14)).toThrow();
+});
+
+test('README: unknown in record', () => {
+  const decoder = record({ name: string, metadata: unknown });
+  expect(decoder({ name: 'x', metadata: { anything: true } }))
+    .toEqual({ name: 'x', metadata: { anything: true } });
+});
+
+test('README: always in union', () => {
+  const decoder = union(
+    record({ status: 'ok' as const, data: string }),
+    always({ status: 'error' as const, data: '' }),
+  );
+  expect(decoder({ status: 'ok', data: 'hello' }))
+    .toEqual({ status: 'ok', data: 'hello' });
+  expect(decoder('garbage')).toEqual({ status: 'error', data: '' });
+});
+
+test('README: literal', () => {
+  const boolDecoder = literal(true);
+  expect(boolDecoder(true)).toBe(true);
+  expect(() => boolDecoder(false)).toThrow();
+
+  const numDecoder = literal(42);
+  expect(numDecoder(42)).toBe(42);
+  expect(() => numDecoder(43)).toThrow();
+
+  const levelDecoder = union(literal(1), literal(2), literal(3));
+  expect(levelDecoder(1)).toBe(1);
+  expect(levelDecoder(2)).toBe(2);
+  expect(levelDecoder(3)).toBe(3);
+  expect(() => levelDecoder(4)).toThrow();
+});
+
+test('README: regex in record', () => {
+  const userDecoder = record({
+    name: string,
+    email: regex(/^[^@]+@[^@]+\.[^@]+$/),
+    zip: regex(/^\d{5}$/),
+  });
+  expect(userDecoder({ name: 'alice', email: 'a@b.c', zip: '12345' }))
+    .toEqual({ name: 'alice', email: 'a@b.c', zip: '12345' });
+  expect(() => userDecoder({ name: 'alice', email: 'bad', zip: '12345' })).toThrow();
+});
+
+test('README: withDefault in record', () => {
+  const userDecoder = record({
+    name: string,
+    role: withDefault(string, 'user'),
+    score: withDefault(number, null),
+  });
+  expect(userDecoder({ name: 'alice', role: 'admin', score: 42 }))
+    .toEqual({ name: 'alice', role: 'admin', score: 42 });
+  expect(userDecoder({ name: 'alice' }))
+    .toEqual({ name: 'alice', role: 'user', score: null });
+});
+
+test('README: bigint', () => {
+  expect(bigint(BigInt(42))).toBe(BigInt(42));
+  expect(bigint(42)).toBe(BigInt(42));
+  expect(bigint('123')).toBe(BigInt(123));
+  expect(() => bigint(3.14)).toThrow();
+
+  const decoder = record({ name: string, balance: bigint });
+  expect(decoder({ name: 'alice', balance: '9007199254740993' }))
+    .toEqual({ name: 'alice', balance: BigInt('9007199254740993') });
+});
+
+test('README: withDefault + nullable pass-through', () => {
+  const decoder = withDefault(nullable(number), null);
+  expect(decoder(42)).toBe(42);
+  expect(decoder(null)).toBe(null);    // valid decoded value, not fallback
+  expect(decoder('bad')).toBe(null);   // decoder threw, fallback
+});
+
+test('README: safeDecode', () => {
+  const result = safeDecode(string, 'hello');
+  expect(result).toEqual({ ok: true, value: 'hello' });
+  if (result.ok) {
+    expect(result.value).toBe('hello');
+  }
+
+  const failure = safeDecode(string, 42);
+  expect(failure.ok).toBe(false);
+  if (!failure.ok) {
+    expect(typeof failure.error).toBe('string');
+  }
+});
+
+test('README: continuation — field extract/transform', () => {
+  const decoder = record({
+    thing: field('nested', { theThingIWant: string }, x => x.theThingIWant),
+    doubled: field('value', number, x => x * 2),
+  });
+  expect(decoder({ nested: { theThingIWant: 'found' }, value: 21 }))
+    .toEqual({ thing: 'found', doubled: 42 });
+});
+
+test('README: continuation — tuple pointDecoder', () => {
+  const pointDecoder = tuple(number, number, ([x, y]) => ({ x, y }));
+  expect(pointDecoder([3, 4])).toEqual({ x: 3, y: 4 });
+});
+
+test('README: continuation — array sumDecoder', () => {
+  const sumDecoder = array(number, xs => xs.reduce((a, b) => a + b, 0));
+  expect(sumDecoder([1, 2, 3])).toBe(6);
+});
+
+test('README: continuation — literal roleDecoder', () => {
+  const roleDecoder = literal('admin', x => x.toUpperCase());
+  expect(roleDecoder('admin')).toBe('ADMIN');
+  expect(() => roleDecoder('user')).toThrow();
+});
+
+test('README: continuation — optional upperName', () => {
+  const upperName = optional(string, s => s.toUpperCase());
+  expect(upperName('alice')).toBe('ALICE');
+  expect(upperName(undefined)).toBe(undefined);
+});
+
+test('README: continuation — nullable upperOrNull', () => {
+  const upperOrNull = nullable(string, s => s.toUpperCase());
+  expect(upperOrNull('alice')).toBe('ALICE');
+  expect(upperOrNull(null)).toBe(null);
+});
+
+test('README: continuation — set countUnique', () => {
+  const countUnique = set(string, s => s.size);
+  expect(countUnique(['a', 'b', 'a'])).toBe(2);
+});
+
+test('README: continuation — objectOf totalScore', () => {
+  const totalScore = objectOf(number, r => Object.values(r).reduce((a, b) => a + b, 0));
+  expect(totalScore({ a: 1, b: 2, c: 3 })).toBe(6);
+});
+
+test('README: continuation — dict joined', () => {
+  const joined = dict(string, ['a', 'b'] as const, m => Array.from(m.values()).join(','));
+  expect(joined({ a: 'hello', b: 'world' })).toBe('hello,world');
+});
+
+test('README: transform with union', () => {
+  const decoder = transform(union(string, number), x => String(x));
+  expect(decoder('hello')).toBe('hello');
+  expect(decoder(42)).toBe('42');
+});
+
+test('README: transform with intersection', () => {
+  const combined = transform(intersection({ a: string }, { b: number }), x => `${x.a}-${x.b}`);
+  expect(combined({ a: 'hello', b: 42 })).toBe('hello-42');
 });

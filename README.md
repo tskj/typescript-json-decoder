@@ -450,6 +450,21 @@ const userDecoder = record({
 });
 ```
 
+`bigint` decodes values to BigInt. It accepts bigint values directly, integer numbers, and numeric strings.
+
+```typescript
+import { bigint, record, string } from 'typescript-json-decoder';
+
+bigint(BigInt(42)); // 42n
+bigint(42);         // 42n (integer numbers are converted)
+bigint('123');      // 123n (numeric strings are parsed)
+bigint(3.14);       // throws (not an integer)
+
+const decoder = record({ name: string, balance: bigint });
+decoder({ name: 'alice', balance: '9007199254740993' });
+// { name: 'alice', balance: 9007199254740993n }
+```
+
 `withDefault` respects the inner decoder's semantics — if the decoder legitimately returns `null` or `undefined` (e.g. via `nullable` or `optional`), those pass through as valid values. The fallback only kicks in when the decoder throws.
 
 ```typescript
@@ -459,6 +474,58 @@ const decoder = withDefault(nullable(number), null);
 decoder(42);    // 42
 decoder(null);  // null (valid decoded value, not fallback)
 decoder('bad'); // null (decoder threw, fallback)
+```
+
+## Transforming decoded values
+
+Most decoders accept an optional continuation (a function applied to the decoded result), giving you an ergonomic way to transform data inline.
+
+```typescript
+import { record, field, string, number, array, tuple, optional, nullable, literal } from 'typescript-json-decoder';
+
+// field — extract and rename a nested value
+const decoder = record({
+    thing: field('nested', { theThingIWant: string }, x => x.theThingIWant),
+    doubled: field('value', number, x => x * 2),
+});
+
+// tuple — destructure into an object
+const pointDecoder = tuple(number, number, ([x, y]) => ({ x, y }));
+
+// array — reduce decoded elements
+const sumDecoder = array(number, xs => xs.reduce((a, b) => a + b, 0));
+
+// literal — transform matched value
+const roleDecoder = literal('admin', x => x.toUpperCase());
+
+// optional — transforms the value when present, passes through undefined
+const upperName = optional(string, s => s.toUpperCase());
+// nullable — same idea, passes through null
+const upperOrNull = nullable(string, s => s.toUpperCase());
+```
+
+Continuations are also available on `set`, `objectOf`, and `dict`:
+
+```typescript
+import { set, objectOf, dict, number, string } from 'typescript-json-decoder';
+
+// set — get the size
+const countUnique = set(string, s => s.size);
+
+// objectOf — sum all values
+const totalScore = objectOf(number, r => Object.values(r).reduce((a, b) => a + b, 0));
+
+// dict with constrained keys — join values
+const joined = dict(string, ['a', 'b'] as const, m => Array.from(m.values()).join(','));
+```
+
+For decoders that don't take a continuation (like `union` and `intersection`), or when you want to transform any decoder generically, use `transform`:
+
+```typescript
+import { transform, union, intersection, string, number } from 'typescript-json-decoder';
+
+const decoder = transform(union(string, number), x => String(x));
+const combined = transform(intersection({ a: string }, { b: number }), x => `${x.a}-${x.b}`);
 ```
 
 ## Safe decoding

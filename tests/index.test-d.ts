@@ -2,6 +2,7 @@ import { expectAssignable, expectType } from 'tsd';
 import {
   boolean,
   Decoder,
+  field,
   fields,
   number,
   optional,
@@ -26,6 +27,7 @@ import {
   regex,
   objectOf,
   bigint,
+  transform,
   safeDecode,
 } from '../src';
 
@@ -566,6 +568,24 @@ expectType<{ name: string; scores: Record<string, number> }>(
   ro_nested({ name: 'x', scores: { a: 1 } }),
 );
 
+// --- field with continuation ---
+const field_cont = record({
+  thing: field('nested', { theThingIWant: string }, x => x.theThingIWant),
+  foo: string,
+});
+expectType<{ thing: string; foo: string }>(
+  field_cont({ foo: 'bar', nested: { theThingIWant: 'found' } }),
+);
+
+const field_transform = record({
+  doubled: field('value', number, x => x * 2),
+});
+expectType<{ doubled: number }>(field_transform({ value: 21 }));
+
+// field without continuation — preserves decoded type
+const field_no_cont = record({ name: field('username', string) });
+expectType<{ name: string }>(field_no_cont({ username: 'alice' }));
+
 // --- bigint decoder ---
 expectType<bigint>(bigint('123'));
 expectAssignable<DecoderFunction<bigint>>(bigint);
@@ -579,3 +599,107 @@ expectType<{ name: string; balance: bigint }>(
 // safeDecode returns discriminated union
 const readme_safe = safeDecode(string, 'hello');
 expectType<{ ok: true; value: string } | { ok: false; error: string }>(readme_safe);
+
+// --- transform ---
+
+// transform with primitive decoder
+const transform_num = transform(number, x => x * 2);
+expectType<number>(transform_num(21));
+
+// transform with record decoder
+const transform_rec = transform(
+  { name: string, age: number },
+  x => `${x.name} is ${x.age}`,
+);
+expectType<string>(transform_rec({ name: 'alice', age: 30 }));
+
+// transform with union
+const transform_union = transform(union(string, number), x => String(x));
+expectType<string>(transform_union('hello'));
+
+// --- literal with continuation ---
+
+const lit_cont_str = literal('admin', x => x.toUpperCase());
+expectType<string>(lit_cont_str('admin'));
+
+const lit_cont_num = literal(42, x => x + 1);
+expectType<number>(lit_cont_num(42));
+
+const lit_cont_bool = literal(true, x => (x ? 'yes' : 'no'));
+expectType<'yes' | 'no'>(lit_cont_bool(true));
+
+// literal without continuation — still preserves exact type
+expectType<'admin'>(literal('admin')('admin'));
+expectType<42>(literal(42)(42));
+
+// --- tuple with continuation ---
+
+const tuple_cont = tuple(string, number, ([name, age]) => ({ name, age }));
+expectType<{ name: string; age: number }>(tuple_cont(['alice', 30]));
+
+const tuple_cont_sum = tuple(number, number, ([a, b]) => a + b);
+expectType<number>(tuple_cont_sum([3, 4]));
+
+// tuple without continuation — preserves tuple type
+expectType<[string, number]>(tuple(string, number)(['a', 1]));
+
+// --- array with continuation ---
+
+const array_cont = array(number, xs => xs.reduce((a, b) => a + b, 0));
+expectType<number>(array_cont([1, 2, 3]));
+
+const array_cont_len = array(string, xs => xs.length);
+expectType<number>(array_cont_len(['a', 'b']));
+
+// array without continuation — preserves array type
+expectType<number[]>(array(number)([1, 2]));
+
+// --- optional with continuation ---
+
+const opt_cont = optional(string, s => s.toUpperCase());
+expectType<string | undefined>(opt_cont('hello'));
+expectType<string | undefined>(opt_cont(undefined));
+
+// optional without continuation — unchanged
+expectType<string | undefined>(optional(string)('hello'));
+
+// --- nullable with continuation ---
+
+const null_cont = nullable(string, s => s.toUpperCase());
+expectType<string | null>(null_cont('hello'));
+expectType<string | null>(null_cont(null));
+
+// nullable without continuation — unchanged
+expectType<string | null>(nullable(string)('hello'));
+
+// --- set with continuation ---
+
+const set_cont = set(number, s => s.size);
+expectType<number>(set_cont([1, 2, 3]));
+
+// set without continuation — unchanged
+expectAssignable<Set<number>>(set(number)([1, 2]));
+
+// --- objectOf with continuation ---
+
+const oo_cont = objectOf(number, (r: Record<string, number>) => Object.keys(r).length);
+expectType<number>(oo_cont({ a: 1, b: 2 }));
+
+// objectOf with keys and continuation
+const oo_keys_cont = objectOf(number, ['x', 'y'] as const, r => r.x + r.y);
+expectType<number>(oo_keys_cont({ x: 1, y: 2 }));
+
+// objectOf without continuation — unchanged
+expectType<Record<string, number>>(objectOf(number)({ a: 1 }));
+
+// --- dict with continuation ---
+
+const dict_cont = dict(number, m => m.size);
+expectType<number>(dict_cont({ a: 1 }));
+
+// dict with keys and continuation
+const dict_keys_cont = dict(string, ['a', 'b'] as const, m => Array.from(m.values()));
+expectType<string[]>(dict_keys_cont({ a: 'x', b: 'y' }));
+
+// dict without continuation — unchanged
+expectAssignable<Map<string, number>>(dict(number)({ a: 1 }));

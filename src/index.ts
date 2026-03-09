@@ -12,6 +12,7 @@ export {
   always,
   withDefault,
   objectOf,
+  transform,
 } from './higher-order-decoders';
 export {
   string,
