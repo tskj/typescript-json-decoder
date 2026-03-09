@@ -25,6 +25,7 @@ import {
   integer,
   always,
   withDefault,
+  regex,
   Decoder,
 } from '../src';
 
@@ -1618,4 +1619,45 @@ test('withDefault with fallback type different from decoder type', () => {
   );
   expect(decoder3({ name: 'alice' })).toEqual({ name: 'alice' });
   expect(decoder3(null)).toEqual({ error: 'not found' });
+});
+
+test('regex decoder matches valid strings', () => {
+  const email = regex(/^[^@]+@[^@]+\.[^@]+$/);
+  expect(email('user@example.com')).toBe('user@example.com');
+  expect(() => email('not-an-email')).toThrow();
+  expect(() => email('')).toThrow();
+  expect(() => email(42)).toThrow();
+});
+
+test('regex decoder with simple patterns', () => {
+  const digits = regex(/^\d+$/);
+  expect(digits('123')).toBe('123');
+  expect(digits('0')).toBe('0');
+  expect(() => digits('abc')).toThrow();
+  expect(() => digits('12.3')).toThrow();
+
+  const hex = regex(/^#[0-9a-f]{6}$/i);
+  expect(hex('#ff00aa')).toBe('#ff00aa');
+  expect(hex('#FF00AA')).toBe('#FF00AA');
+  expect(() => hex('#xyz')).toThrow();
+  expect(() => hex('ff00aa')).toThrow();
+});
+
+test('regex decoder in a record', () => {
+  const decoder = record({
+    name: string,
+    email: regex(/^[^@]+@[^@]+$/),
+    zip: regex(/^\d{5}$/),
+  });
+  expect(decoder({ name: 'alice', email: 'a@b', zip: '12345' }))
+    .toEqual({ name: 'alice', email: 'a@b', zip: '12345' });
+  expect(() => decoder({ name: 'alice', email: 'bad', zip: '12345' })).toThrow();
+  expect(() => decoder({ name: 'alice', email: 'a@b', zip: '123' })).toThrow();
+});
+
+test('regex decoder with withDefault', () => {
+  const decoder = withDefault(regex(/^\d+$/), 'N/A');
+  expect(decoder('123')).toBe('123');
+  expect(decoder('abc')).toBe('N/A');
+  expect(decoder(null)).toBe('N/A');
 });

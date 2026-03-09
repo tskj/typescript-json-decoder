@@ -69,6 +69,16 @@ export const date: DecoderFunction<Date> = (value: unknown) => {
   return new Date(timeStampSinceEpoch);
 };
 
+export const regex =
+  (pattern: RegExp): DecoderFunction<string> =>
+  (value: unknown) => {
+    const str = string(value);
+    if (!pattern.test(str)) {
+      throw `The string \`${str}\` does not match the pattern \`${pattern}\``;
+    }
+    return str;
+  };
+
 export const unknown: DecoderFunction<unknown> = (value: unknown) => {
   return value;
 };

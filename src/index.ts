@@ -20,6 +20,7 @@ export {
   nil,
   date,
   integer,
+  regex,
   unknown,
 } from './primitive-decoders';
 export { Pojo } from './pojo';

@@ -23,6 +23,7 @@ import {
   integer,
   always,
   withDefault,
+  regex,
   safeDecode,
 } from '../src';
 
@@ -523,6 +524,23 @@ expectType<number | 'N/A'>(wd_number_na(42));
 
 const wd_different_shape = withDefault(record({ name: string }), { error: 'not found' });
 expectAssignable<{ name: string } | { error: string }>(wd_different_shape({}));
+
+// --- regex decoder ---
+const regex_decoder = regex(/^[^@]+@[^@]+$/);
+expectType<string>(regex_decoder('a@b'));
+expectAssignable<DecoderFunction<string>>(regex_decoder);
+
+// regex in a record
+const regex_record = record({ email: regex(/^[^@]+@[^@]+$/), name: string });
+expectType<{ email: string; name: string }>(regex_record({ email: 'a@b', name: 'x' }));
+
+// regex with withDefault — fallback is a string so type stays string
+const regex_default = withDefault(regex(/^\d+$/), 'N/A');
+expectType<string>(regex_default('123'));
+
+// regex with withDefault — fallback is a different type
+const regex_default_null = withDefault(regex(/^\d+$/), null);
+expectType<string | null>(regex_default_null('123'));
 
 // safeDecode returns discriminated union
 const readme_safe = safeDecode(string, 'hello');
