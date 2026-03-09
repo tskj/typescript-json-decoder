@@ -25,6 +25,7 @@ import {
   withDefault,
   regex,
   objectOf,
+  bigint,
   safeDecode,
 } from '../src';
 
@@ -563,6 +564,16 @@ expectAssignable<Record<string, { name: string; score: number }>>(ro_bare({}));
 const ro_nested = record({ name: string, scores: objectOf(number) });
 expectType<{ name: string; scores: Record<string, number> }>(
   ro_nested({ name: 'x', scores: { a: 1 } }),
+);
+
+// --- bigint decoder ---
+expectType<bigint>(bigint('123'));
+expectAssignable<DecoderFunction<bigint>>(bigint);
+
+// bigint in a record
+const bigint_record = record({ name: string, balance: bigint });
+expectType<{ name: string; balance: bigint }>(
+  bigint_record({ name: 'x', balance: '123' }),
 );
 
 // safeDecode returns discriminated union

@@ -69,6 +69,29 @@ export const date: DecoderFunction<Date> = (value: unknown) => {
   return new Date(timeStampSinceEpoch);
 };
 
+export const bigint: DecoderFunction<bigint> = (value: unknown) => {
+  assert_is_pojo(value);
+  if (typeof value === 'bigint') {
+    return value;
+  }
+  if (typeof value === 'number') {
+    if (!Number.isInteger(value)) {
+      throw `The number \`${value}\` is not an integer and cannot be converted to a bigint`;
+    }
+    return BigInt(value);
+  }
+  if (typeof value === 'string') {
+    try {
+      return BigInt(value);
+    } catch {
+      throw `The string \`${value}\` cannot be parsed as a bigint`;
+    }
+  }
+  throw `The value \`${JSON.stringify(
+    value,
+  )}\` cannot be converted to a bigint`;
+};
+
 export const regex =
   (pattern: RegExp): DecoderFunction<string> =>
   (value: unknown) => {

@@ -21,6 +21,7 @@ export {
   nil,
   date,
   integer,
+  bigint,
   regex,
   unknown,
 } from './primitive-decoders';

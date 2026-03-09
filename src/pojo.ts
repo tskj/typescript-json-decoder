@@ -4,11 +4,12 @@
  * these are plain old javascript objects
  */
 
-export type PojoPrimitive = string | boolean | number | null | undefined;
+export type PojoPrimitive = string | boolean | number | bigint | null | undefined;
 export const isPojoPrimitve = (value: unknown): value is PojoPrimitive =>
   typeof value === 'string' ||
   typeof value === 'boolean' ||
   typeof value === 'number' ||
+  typeof value === 'bigint' ||
   typeof value === 'undefined' ||
   (typeof value === 'object' && value === null);
 

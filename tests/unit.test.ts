@@ -27,6 +27,7 @@ import {
   withDefault,
   regex,
   objectOf,
+  bigint,
   Decoder,
 } from '../src';
 
@@ -1717,4 +1718,45 @@ test('objectOf in a record schema', () => {
 test('objectOf with empty object', () => {
   const decoder = objectOf(string);
   expect(decoder({})).toEqual({});
+});
+
+test('bigint decoder from string', () => {
+  expect(bigint('123')).toBe(BigInt(123));
+  expect(bigint('0')).toBe(BigInt(0));
+  expect(bigint('-42')).toBe(BigInt(-42));
+  expect(bigint('9007199254740993')).toBe(BigInt('9007199254740993'));
+});
+
+test('bigint decoder from bigint', () => {
+  expect(bigint(BigInt(123))).toBe(BigInt(123));
+  expect(bigint(BigInt(0))).toBe(BigInt(0));
+  expect(bigint(BigInt(-1))).toBe(BigInt(-1));
+});
+
+test('bigint decoder from number', () => {
+  expect(bigint(42)).toBe(BigInt(42));
+  expect(bigint(0)).toBe(BigInt(0));
+  expect(bigint(-1)).toBe(BigInt(-1));
+  expect(() => bigint(3.14)).toThrow();
+});
+
+test('bigint decoder rejects non-numeric types', () => {
+  expect(() => bigint(true)).toThrow();
+  expect(() => bigint(null)).toThrow();
+  expect(() => bigint(undefined)).toThrow();
+  expect(() => bigint({})).toThrow();
+});
+
+test('bigint decoder rejects invalid strings', () => {
+  expect(() => bigint('not a number')).toThrow();
+  expect(() => bigint('3.14')).toThrow();
+});
+
+test('bigint decoder in a record', () => {
+  const decoder = record({
+    name: string,
+    balance: bigint,
+  });
+  expect(decoder({ name: 'alice', balance: '9007199254740993' }))
+    .toEqual({ name: 'alice', balance: BigInt('9007199254740993') });
 });
