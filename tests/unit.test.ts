@@ -1890,6 +1890,32 @@ test('n-ary tuple with transform', () => {
   expect(decoder(['alice', 30, true])).toEqual({ name: 'alice', age: 30, active: true });
 });
 
+test('0-tuple', () => {
+  const decoder = tuple();
+  expect(decoder([])).toEqual([]);
+  expect(() => decoder([1])).toThrow();
+  expect(() => decoder('hi')).toThrow();
+});
+
+test('0-tuple in record', () => {
+  const decoder = record({ unit: tuple(), otherData: string });
+  expect(decoder({ unit: [], otherData: 'hello' }))
+    .toEqual({ unit: [], otherData: 'hello' });
+  expect(() => decoder({ unit: [1], otherData: 'hello' })).toThrow();
+});
+
+test('0-tuple literal form in record via decode()', () => {
+  const decoder = record({ unit: decode([]), otherData: string });
+  expect(decoder({ unit: [], otherData: 'hello' }))
+    .toEqual({ unit: [], otherData: 'hello' });
+});
+
+test('0-tuple bare literal form in record', () => {
+  const decoder = record({ unit: [] as [], otherData: string });
+  expect(decoder({ unit: [], otherData: 'hello' }))
+    .toEqual({ unit: [], otherData: 'hello' });
+});
+
 test('1-tuple', () => {
   const decoder = tuple(string);
   expect(decoder(['hello'])).toEqual(['hello']);

@@ -25,6 +25,7 @@ export function literal(lit: PrimitiveJsonLiteralForm, k?: (x: any) => any) {
   };
 }
 
+export function tuple(): DecoderFunction<[]>;
 export function tuple<A extends Decoder<unknown>>(a: A): DecoderFunction<[decodeType<A>]>;
 export function tuple<A extends Decoder<unknown>, B extends Decoder<unknown>>(a: A, b: B): DecoderFunction<[decodeType<A>, decodeType<B>]>;
 export function tuple<A extends Decoder<unknown>, B extends Decoder<unknown>, C extends Decoder<unknown>>(a: A, b: B, c: C): DecoderFunction<[decodeType<A>, decodeType<B>, decodeType<C>]>;

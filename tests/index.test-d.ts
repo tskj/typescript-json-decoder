@@ -655,6 +655,21 @@ expectType<[42, string]>(tuple(42, string)([42, 'hello']));
 const tuple_transformed = transform(tuple(string, number), ([name, age]) => ({ name, age }));
 expectType<{ name: string; age: number }>(tuple_transformed(['alice', 30]));
 
+// 0-tuple
+expectType<[]>(tuple()([]));
+
+// 0-tuple literal form
+const empty_tuple = decode([]);
+expectType<[]>(empty_tuple([]));
+
+// 0-tuple in record
+const rec_with_unit = record({ unit: decode([]), data: string });
+expectType<{ unit: []; data: string }>(rec_with_unit({ unit: [], data: 'hi' }));
+
+// 0-tuple bare literal form in record
+const rec_with_unit2 = record({ unit: [] as [], data: string });
+expectType<{ unit: []; data: string }>(rec_with_unit2({ unit: [], data: 'hi' }));
+
 // 1-tuple
 expectType<[string]>(tuple(string)(['a']));
 

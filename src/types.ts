@@ -13,13 +13,14 @@ const isPrimitiveJsonLiteralForm = (
   typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
 
 type TupleJsonLiteralForm =
+  | []
   | [Decoder<unknown>]
   | [Decoder<unknown>, Decoder<unknown>]
   | [Decoder<unknown>, Decoder<unknown>, Decoder<unknown>]
   | [Decoder<unknown>, Decoder<unknown>, Decoder<unknown>, Decoder<unknown>]
   | [Decoder<unknown>, Decoder<unknown>, Decoder<unknown>, Decoder<unknown>, Decoder<unknown>];
 const isTupleJsonLiteralForm = (v: unknown): v is TupleJsonLiteralForm =>
-  Array.isArray(v) && v.length >= 1 && v.every(isDecoder);
+  Array.isArray(v) && v.every(isDecoder);
 
 type RecordJsonLiteralForm = { [key: string]: Decoder<unknown> };
 const isRecordJsonLiteralForm = (v: unknown): v is RecordJsonLiteralForm =>
@@ -77,6 +78,8 @@ type evalJsonLiteralForm<decoder> =
     [decodeType<A>, decodeType<B>] :
   [decoder] extends [[infer A]] ?
     [decodeType<A>] :
+  [decoder] extends [[]] ?
+    [] :
 
     addQuestionmarksToRecordFields<
     {
