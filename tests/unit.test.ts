@@ -1343,3 +1343,137 @@ test('kitchen sink: bare literals across all combinators', () => {
   expect(mapResult.get(1)).toEqual({ id: 1, active: true });
   expect(() => mapDecoder([{ id: 1, active: false }])).toThrow();
 });
+
+test('README examples: bare literals, unions, and new decoders', () => {
+  // Config decoder with mixed bare literals (README "bare literals" section)
+  const configDecoder = record({
+    version: 2,
+    env: 'production' as const,
+    debug: false,
+    name: string,
+    retries: number,
+  });
+  expect(configDecoder({ version: 2, env: 'production', debug: false, name: 'app', retries: 3 }))
+    .toEqual({ version: 2, env: 'production', debug: false, name: 'app', retries: 3 });
+  expect(() => configDecoder({ version: 3, env: 'production', debug: false, name: 'app', retries: 3 })).toThrow();
+  expect(() => configDecoder({ version: 2, env: 'staging', debug: false, name: 'app', retries: 3 })).toThrow();
+  expect(() => configDecoder({ version: 2, env: 'production', debug: true, name: 'app', retries: 3 })).toThrow();
+
+  // literal(42) vs 42 as const vs bare 42 — all decode the same at runtime
+  const d1 = record({ level: literal(42), name: string });
+  const d2 = record({ level: 42 as const, name: string });
+  const d3 = record({ level: 42, name: string });
+  const input = { level: 42, name: 'test' };
+  expect(d1(input)).toEqual(input);
+  expect(d2(input)).toEqual(input);
+  expect(d3(input)).toEqual(input);
+  expect(() => d1({ level: 43, name: 'test' })).toThrow();
+  expect(() => d2({ level: 43, name: 'test' })).toThrow();
+  expect(() => d3({ level: 43, name: 'test' })).toThrow();
+
+  // union of bare number literals (README "enum-like" example)
+  const statusCodeDecoder = union(200, 404, 500);
+  expect(statusCodeDecoder(200)).toBe(200);
+  expect(statusCodeDecoder(404)).toBe(404);
+  expect(statusCodeDecoder(500)).toBe(500);
+  expect(() => statusCodeDecoder(201)).toThrow();
+
+  // union of bare string literals, 4 args (README "direction" example)
+  const directionDecoder = union('north', 'south', 'east', 'west');
+  expect(directionDecoder('north')).toBe('north');
+  expect(directionDecoder('west')).toBe('west');
+  expect(() => directionDecoder('up')).toThrow();
+
+  // record with unknown field (README "unknown" example)
+  const withMetadata = record({ name: string, metadata: unknown });
+  expect(withMetadata({ name: 'x', metadata: { anything: [1, 2, 3] } }))
+    .toEqual({ name: 'x', metadata: { anything: [1, 2, 3] } });
+  expect(withMetadata({ name: 'x', metadata: null }))
+    .toEqual({ name: 'x', metadata: null });
+
+  // always as fallback in union of records (README "always" example)
+  const withFallback = union(
+    record({ status: 'ok' as const, data: string }),
+    always({ status: 'error' as const, data: '' }),
+  );
+  expect(withFallback({ status: 'ok', data: 'hello' })).toEqual({ status: 'ok', data: 'hello' });
+  expect(withFallback('garbage')).toEqual({ status: 'error', data: '' });
+  expect(withFallback(null)).toEqual({ status: 'error', data: '' });
+
+  // always(null) as fallback — nullable without nullable()
+  const nullFallback = union(string, always(null));
+  expect(nullFallback('hello')).toBe('hello');
+  expect(nullFallback(42)).toBe(null);
+  expect(nullFallback(undefined)).toBe(null);
+
+  // always(undefined) as fallback — optional without optional()
+  const undefFallback = union(number, always(undefined));
+  expect(undefFallback(42)).toBe(42);
+  expect(undefFallback('nope')).toBe(undefined);
+  expect(undefFallback(null)).toBe(undefined);
+
+  // always with primitive fallback in union of bare literals
+  const literalWithDefault = union(200, 404, always(0));
+  expect(literalWithDefault(200)).toBe(200);
+  expect(literalWithDefault(404)).toBe(404);
+  expect(literalWithDefault(999)).toBe(0);
+  expect(literalWithDefault('garbage')).toBe(0);
+
+  // always with fallback in union of arrays
+  const arrayWithDefault = union(array(number), always([] as number[]));
+  expect(arrayWithDefault([1, 2, 3])).toEqual([1, 2, 3]);
+  expect(arrayWithDefault('not an array')).toEqual([]);
+  expect(arrayWithDefault(null)).toEqual([]);
+
+  // always with fallback in union of tuples
+  const tupleWithDefault = union(tuple(string, number), always(['unknown', 0] as [string, number]));
+  expect(tupleWithDefault(['hello', 42])).toEqual(['hello', 42]);
+  expect(tupleWithDefault('garbage')).toEqual(['unknown', 0]);
+
+  // always with fallback in union of bare POJO
+  const pojoWithDefault = union({ level: 42, name: string }, always({ level: 0, name: 'default' }));
+  expect(pojoWithDefault({ level: 42, name: 'test' })).toEqual({ level: 42, name: 'test' });
+  expect(pojoWithDefault({ level: 99, name: 'test' })).toEqual({ level: 0, name: 'default' });
+  expect(pojoWithDefault(null)).toEqual({ level: 0, name: 'default' });
+
+  // tagged union with always fallback — different shapes
+  const taggedWithFallback = union(
+    record({ tag: 'success' as const, data: string }),
+    record({ tag: 'error' as const, code: number }),
+    always({ tag: 'unknown' as const }),
+  );
+  expect(taggedWithFallback({ tag: 'success', data: 'hi' })).toEqual({ tag: 'success', data: 'hi' });
+  expect(taggedWithFallback({ tag: 'error', code: 404 })).toEqual({ tag: 'error', code: 404 });
+  expect(taggedWithFallback({ tag: 'other' })).toEqual({ tag: 'unknown' });
+  expect(taggedWithFallback(null)).toEqual({ tag: 'unknown' });
+
+  // same-shape fallback — record with always providing defaults for same keys
+  const sameShapeFallback = union(
+    record({ status: 'active' as const, score: number }),
+    always({ status: 'inactive' as const, score: 0 }),
+  );
+  expect(sameShapeFallback({ status: 'active', score: 99 })).toEqual({ status: 'active', score: 99 });
+  expect(sameShapeFallback({ status: 'inactive', score: 'bad' })).toEqual({ status: 'inactive', score: 0 });
+  expect(sameShapeFallback(undefined)).toEqual({ status: 'inactive', score: 0 });
+
+  // Discriminated union with bare string literals in records (README "cool/dumb" example)
+  const coolDecoder = record({ type: 'cool' as const, somestuff: string });
+  const dumbDecoder = record({ type: 'dumb' as const, otherstuff: string });
+  const stuffDecoder = union(coolDecoder, dumbDecoder);
+  expect(stuffDecoder({ type: 'cool', somestuff: 'yes' })).toEqual({ type: 'cool', somestuff: 'yes' });
+  expect(stuffDecoder({ type: 'dumb', otherstuff: 'no' })).toEqual({ type: 'dumb', otherstuff: 'no' });
+  expect(() => stuffDecoder({ type: 'other', somestuff: 'x' })).toThrow();
+
+  // Nested bare POJO from README
+  const nestedDecoder = record({
+    name: string,
+    config: {
+      level: 42,
+      active: true,
+      env: 'prod' as const,
+    },
+  });
+  expect(nestedDecoder({ name: 'x', config: { level: 42, active: true, env: 'prod' } }))
+    .toEqual({ name: 'x', config: { level: 42, active: true, env: 'prod' } });
+  expect(() => nestedDecoder({ name: 'x', config: { level: 42, active: true, env: 'dev' } })).toThrow();
+});

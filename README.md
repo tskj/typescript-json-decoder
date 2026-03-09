@@ -159,46 +159,71 @@ const myDecoder = record({
 });
 ```
 
-It turns out this idea of literal form decoders is actually a lot more general. In fact, you can consider the first example of the `User` type to be a literal decoder where the `User` decoder object is a decoder of a JavaScript object of the same form. For this reason we also consider strings as literal decoders of themselves, that is `decoder('hey')` literally decodes the string `'hey'`. That might seem dumb, but it allows some really cool stuff. Firstly it allows us to decode an object which looks exactly like the following.
+It turns out this idea of literal form decoders is actually a lot more general. In fact, you can consider the first example of the `User` type to be a literal decoder where the `User` decoder object is a decoder of a JavaScript object of the same form. For this reason we also consider primitive values - strings, numbers, and booleans - as literal decoders of themselves. That is, `'hey'` literally decodes the string `'hey'`, `42` decodes the number `42`, and `true` decodes the boolean `true`.
+
+This allows some really cool stuff. You can use bare literals directly in your decoders to assert exact values.
 
 ```typescript
-const x = { type: 'cool', somestuff: "" };
+import { decodeType, record, string, number } from 'typescript-json-decoder';
+
+type Config = decodeType<typeof configDecoder>;
+const configDecoder = record({
+    version: 2,
+    env: 'production' as const,
+    debug: false,
+    name: string,
+    retries: number,
+});
+// Config = { version: number; env: 'production'; debug: false; name: string; retries: number }
 ```
 
-With this decoder.
+Bare literals work everywhere - in records, nested objects, unions, tuples, and any other combinator. If you want to preserve the exact numeric literal type (e.g. `2` instead of `number`), use `as const` or the `literal()` function.
 
 ```typescript
-import { decodeType, decode, record, string } from 'typescript-json-decoder';
+import { literal, record, string } from 'typescript-json-decoder';
 
-type Cool = decodeType<typeof coolDecoder>;
-const coolDecoder = record({ type: decode('cool'), somestuff: string });
+// These are equivalent:
+record({ level: literal(42), name: string })  // level: 42
+record({ level: 42 as const, name: string })  // level: 42
+record({ level: 42, name: string })           // level: number (TS widens bare numbers)
 ```
 
-Similarly we can define another decoder of this type.
+This is especially powerful for discriminated unions. Consider two kinds of API responses:
 
 ```typescript
-const y = { type: 'dumb', otherstuff: 'starbucks' };
-```
+import { decodeType, record, string, number, union } from 'typescript-json-decoder';
 
-With a decoder that looks like this.
-
-```typescript
-import { decodeType, decode, record, string } from 'typescript-json-decoder';
-
-type Dumb = decodeType<typeof dumbDecoder>;
-const dumbDecoder = record({ type: decode('dumb'), otherstuff: string });
-```
-
-This ensures that the `type` key is exactly the string `cool` or `dumb` respectively. If we now combine these decoders using a union we get what is known as a "discriminated union".
-
-```typescript
-import { decodeType, union } from 'typescript-json-decoder';
+const coolDecoder = record({ type: 'cool' as const, somestuff: string });
+const dumbDecoder = record({ type: 'dumb' as const, otherstuff: string });
 
 type Stuff = decodeType<typeof stuffDecoder>;
 const stuffDecoder = union(coolDecoder, dumbDecoder);
 ```
 
 The type `Stuff` represents the union of these two other types, and TypeScript now requires us to check the `type` field before trying to access either `somestuff` or `otherstuff` since they do not appear in both types - but one of them are guaranteed to exist.
+
+You can also use bare literals directly in union arguments for simple enum-like types:
+
+```typescript
+const directionDecoder = union('north', 'south', 'east', 'west');
+// decodes to: 'north' | 'south' | 'east' | 'west'
+
+const statusCodeDecoder = union(200, 404, 500);
+// decodes to: 200 | 404 | 500
+```
+
+Bare number and boolean literals also work in nested objects without needing `record()`:
+
+```typescript
+const decoder = record({
+    name: string,
+    config: {
+        level: 42,
+        active: true,
+        env: 'prod' as const,
+    }
+});
+```
 
 ## Custom decoders
 
@@ -336,3 +361,67 @@ const userDecoder = record({
 This is read as "the `userDecoder` decodes an object which might look like `{ username: "hunter2", userId: 3 }` and decodes to an object which looks like `{ identifier: "user:hunter2:3" }`".
 
 Both the `field` and the `fields` decoder are meant to be used "inside" a record decoder in the way shown here.
+
+## More built-in decoders
+
+In addition to the core decoders (`string`, `number`, `boolean`, `date`), the library provides a few more:
+
+`integer` decodes a number and additionally validates that it is a whole number.
+
+```typescript
+import { integer } from 'typescript-json-decoder';
+
+integer(42);   // 42
+integer(3.14); // throws
+```
+
+`unknown` passes any value through unchanged, typed as `unknown`. Useful when you want to defer validation or keep a portion of the data opaque.
+
+```typescript
+import { record, string, unknown } from 'typescript-json-decoder';
+
+const decoder = record({ name: string, metadata: unknown });
+// metadata: unknown — you can inspect it later
+```
+
+`always` ignores the input and always returns a constant value. This is useful for providing defaults in unions.
+
+```typescript
+import { union, record, string, number, always } from 'typescript-json-decoder';
+
+const decoder = union(
+    record({ status: 'ok' as const, data: string }),
+    always({ status: 'error' as const, data: '' }),
+);
+// If the input doesn't match the first case, you get the default
+```
+
+`literal` creates a decoder for an exact primitive value - a specific string, number, or boolean. The type is preserved exactly.
+
+```typescript
+import { literal, union } from 'typescript-json-decoder';
+
+const boolDecoder = literal(true);   // decodes to type `true`, not `boolean`
+const numDecoder = literal(42);      // decodes to type `42`, not `number`
+
+// Useful in unions for exact type preservation:
+const levelDecoder = union(literal(1), literal(2), literal(3));
+// decodes to: 1 | 2 | 3
+```
+
+## Safe decoding
+
+By default, decoders throw on failure. If you prefer a result type, use `safeDecode`:
+
+```typescript
+import { safeDecode, string } from 'typescript-json-decoder';
+
+const result = safeDecode(string, someValue);
+if (result.ok) {
+    console.log(result.value); // string
+} else {
+    console.log(result.error); // error message
+}
+```
+
+`safeDecode` works with any decoder and returns `{ ok: true, value: T } | { ok: false, error: string }`.

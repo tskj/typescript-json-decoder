@@ -344,3 +344,119 @@ const map_bare = map({ id: number, active: true }, (x: { id: number; active: tru
 expectAssignable<Map<number, { id: number; active: true }>>(
   map_bare([{ id: 1, active: true }]),
 );
+
+// --- 19. README examples: type-level verification ---
+
+// Config decoder with mixed bare literals
+const readme_config = record({
+  version: 2,
+  env: 'production' as const,
+  debug: false,
+  name: string,
+  retries: number,
+});
+expectType<{ version: number; env: 'production'; debug: false; name: string; retries: number }>(
+  readme_config({ version: 2, env: 'production', debug: false, name: 'app', retries: 3 }),
+);
+
+// literal(42) vs 42 as const vs bare 42 — type differences
+const readme_literal_wrap = record({ level: literal(42), name: string });
+const readme_as_const = record({ level: 42 as const, name: string });
+const readme_bare = record({ level: 42, name: string });
+expectType<{ level: 42; name: string }>(readme_literal_wrap({ level: 42, name: '' }));
+expectType<{ level: 42; name: string }>(readme_as_const({ level: 42, name: '' }));
+expectType<{ level: number; name: string }>(readme_bare({ level: 42, name: '' }));
+
+// union of bare number literals
+const readme_status_codes = union(200, 404, 500);
+expectType<200 | 404 | 500>(readme_status_codes(200));
+
+// union of bare string literals
+const readme_directions = union('north', 'south', 'east', 'west');
+expectType<'north' | 'south' | 'east' | 'west'>(readme_directions('north'));
+
+// record with unknown field (unknown includes undefined, so the field is optional)
+const readme_with_metadata = record({ name: string, metadata: unknown });
+expectAssignable<{ name: string; metadata?: unknown }>(
+  readme_with_metadata({ name: 'x', metadata: {} }),
+);
+
+// always as fallback in union of records — both branches typed
+const readme_with_fallback = union(
+  record({ status: 'ok' as const, data: string }),
+  always({ status: 'error' as const, data: '' }),
+);
+const readme_fallback_result = readme_with_fallback({ status: 'ok', data: 'hi' });
+expectAssignable<{ status: 'ok'; data: string } | { status: 'error'; data: string }>(readme_fallback_result);
+// narrowing works: if status is 'ok', data is string; if 'error', data is string
+if ('status' in readme_fallback_result && readme_fallback_result.status === 'ok') {
+  expectType<string>(readme_fallback_result.data);
+}
+
+// Discriminated union with bare string literals
+const readme_cool = record({ type: 'cool' as const, somestuff: string });
+const readme_dumb = record({ type: 'dumb' as const, otherstuff: string });
+const readme_stuff = union(readme_cool, readme_dumb);
+expectType<{ type: 'cool'; somestuff: string } | { type: 'dumb'; otherstuff: string }>(
+  readme_stuff({ type: 'cool', somestuff: '' }),
+);
+
+// Nested bare POJO with mixed literal types
+const readme_nested = record({
+  name: string,
+  config: {
+    level: 42,
+    active: true,
+    env: 'prod' as const,
+  },
+});
+expectAssignable<{ name: string; config: { level: number; active: true; env: 'prod' } }>(
+  readme_nested({ name: '', config: { level: 42, active: true, env: 'prod' } }),
+);
+
+// always(null) as fallback — nullable without nullable()
+const null_fallback = union(string, always(null));
+expectAssignable<string | null>(null_fallback('hello'));
+
+// always(undefined) as fallback — optional without optional()
+const undef_fallback = union(number, always(undefined));
+expectAssignable<number | undefined>(undef_fallback(42));
+
+// always with primitive fallback in union of bare literals
+const literal_with_default = union(200, 404, always(0));
+expectAssignable<200 | 404 | number>(literal_with_default(200));
+
+// always with fallback in union of arrays
+const array_with_default = union(array(number), always([] as number[]));
+expectAssignable<number[]>(array_with_default([1, 2]));
+
+// always with fallback in union of tuples
+const tuple_with_default = union(tuple(string, number), always(['unknown', 0] as [string, number]));
+expectAssignable<[string, number]>(tuple_with_default(['hello', 42]));
+
+// always with fallback in union of bare POJO
+const pojo_with_default = union({ level: 42, name: string }, always({ level: 0, name: 'default' }));
+expectAssignable<{ level: number; name: string }>(pojo_with_default({ level: 42, name: 'test' }));
+
+// tagged union with always fallback — different shapes
+const tagged_with_fallback = union(
+  record({ tag: 'success' as const, data: string }),
+  record({ tag: 'error' as const, code: number }),
+  always({ tag: 'unknown' as const }),
+);
+expectAssignable<
+  { tag: 'success'; data: string } | { tag: 'error'; code: number } | { tag: 'unknown' }
+>(tagged_with_fallback({ tag: 'success', data: 'hi' }));
+
+// same-shape fallback — record with always providing defaults for same keys
+const same_shape_fallback = union(
+  record({ status: 'active' as const, score: number }),
+  always({ status: 'inactive' as const, score: 0 }),
+);
+expectAssignable<{ status: 'active'; score: number } | { status: 'inactive'; score: number }>(
+  same_shape_fallback({ status: 'active', score: 99 }),
+);
+
+// safeDecode returns discriminated union
+const readme_safe = safeDecode(string, 'hello');
+expectType<{ ok: true; value: string } | { ok: false; error: string }>(readme_safe);
