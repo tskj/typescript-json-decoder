@@ -31,6 +31,7 @@ import {
   nonEmptyArray,
   missing,
   lazy,
+  at,
   Decoder,
 } from '../src';
 
@@ -2280,6 +2281,21 @@ test('README: field (Low level access)', () => {
     .toEqual({ month: 6, year: 2000 });
 });
 
+test('README: at standalone', () => {
+  const userName = at('response', 'data', 'user', 'name').chain(string);
+  expect(userName({ response: { data: { user: { name: 'alice' } } } })).toBe('alice');
+});
+
+test('README: at inside record via field', () => {
+  const dec = record({
+    name: field('response').chain(at('data', 'user', 'name')).chain(string),
+    score: field('response').chain(at('data', 'user', 'stats', 'score')).chain(number),
+  });
+  expect(dec({
+    response: { data: { user: { name: 'alice', stats: { score: 99 } } } },
+  })).toEqual({ name: 'alice', score: 99 });
+});
+
 test('README: fields (Low level access)', () => {
   const userDecoder = record({
     identifier: fields({ username: string, userId: number })
@@ -2740,13 +2756,78 @@ test('chain deep pipeline — validate, decode, transform', () => {
 
 test('chain field decoders to drill into nested objects', () => {
   const dec = unknown
-    .chain(field('x', unknown))
-    .chain(field('y', unknown))
-    .chain(field('z', unknown))
+    .chain(field('x'))
+    .chain(field('y'))
+    .chain(field('z'))
     .chain(string);
   expect(dec({ x: { y: { z: 'hello' } } })).toBe('hello');
   expect(() => dec({ x: { y: { z: 42 } } })).toThrow();
   expect(() => dec({ x: { wrong: 'key' } })).toThrow();
+});
+
+test('field without decoder defaults to unknown', () => {
+  const dec = field('name');
+  expect(dec({ name: 'alice' })).toBe('alice');
+  expect(dec({ name: 42 })).toBe(42);
+  expect(dec({ name: { nested: true } })).toEqual({ nested: true });
+});
+
+// --- at() ---
+
+test('at standalone on deeply nested API response', () => {
+  const userName = at('response', 'data', 'user', 'name').chain(string);
+  expect(userName({ response: { data: { user: { name: 'alice' } } } })).toBe('alice');
+  expect(() => userName({ response: { data: { user: { name: 42 } } } })).toThrow();
+  expect(() => userName({ response: { wrong: 'shape' } })).toThrow();
+});
+
+test('field + at combo in record — different source and target keys', () => {
+  const dec = record({
+    name: field('response').chain(at('data', 'user', 'name')).chain(string),
+    score: field('response').chain(at('data', 'user', 'stats', 'score')).chain(number),
+    city: field('meta').chain(at('location', 'city')).chain(string),
+  });
+  const input = {
+    response: { data: { user: { name: 'alice', stats: { score: 99 } } } },
+    meta: { location: { city: 'Oslo' } },
+  };
+  expect(dec(input)).toEqual({ name: 'alice', score: 99, city: 'Oslo' });
+});
+
+test('at drills into nested object', () => {
+  const dec = at('x', 'y', 'z').chain(string);
+  expect(dec({ x: { y: { z: 'hello' } } })).toBe('hello');
+});
+
+test('at single key is equivalent to field', () => {
+  const dec = at('name').chain(string);
+  expect(dec({ name: 'alice' })).toBe('alice');
+});
+
+test('at works inside record via field', () => {
+  const dec = record({
+    city: field('address').chain(at('city')).chain(string),
+    zip: field('address').chain(at('zip')).chain(number),
+    deepName: field('users').chain(at('0', 'name')).chain(string),
+  });
+  expect(dec({ address: { city: 'Oslo', zip: 1234 }, users: { '0': { name: 'alice' } } }))
+    .toEqual({ city: 'Oslo', zip: 1234, deepName: 'alice' });
+});
+
+test('at with .chain into a record literal', () => {
+  const dec = at('response', 'data').chain({ name: string, age: number });
+  expect(dec({ response: { data: { name: 'bob', age: 25 } } }))
+    .toEqual({ name: 'bob', age: 25 });
+});
+
+test('at throws on missing intermediate key', () => {
+  const dec = at('x', 'y', 'z');
+  expect(() => dec({ x: { wrong: 'key' } })).toThrow();
+});
+
+test('at deep drill with map', () => {
+  const dec = at('config', 'db', 'port').chain(number).map(p => `localhost:${p}`);
+  expect(dec({ config: { db: { port: 5432 } } })).toBe('localhost:5432');
 });
 
 test('chain with .map() between steps to unwrap layers', () => {

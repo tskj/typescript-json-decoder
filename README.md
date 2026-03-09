@@ -351,7 +351,7 @@ const userListDecoder =
 
 Sometimes you need direct access to the fields of the object you're decoding. Maybe you want to use the same fields to calculate two different things, or maybe you want to combine two or more different fields.
 
-The `field` decoder accepts a string, the name of the key, and a decoder which decodes the value found at this key.
+The `field` decoder accepts a string, the name of the key, and optionally a decoder for the value (defaults to `unknown`).
 
 Say you have some date in an iso-date-string format in the field `"dateOfBirth"` but are only interested in the year and month, you could use the `field` decoder to access it in the following way.
 
@@ -380,6 +380,21 @@ const userDecoder = record({
 This is read as "the `userDecoder` decodes an object which might look like `{ username: "hunter2", userId: 3 }` and decodes to an object which looks like `{ identifier: "user:hunter2:3" }`".
 
 Both the `field` and the `fields` decoder are meant to be used "inside" a record decoder in the way shown here.
+
+For drilling into deeply nested structures, use `at`. Unlike `field` and `fields`, `at` is a regular decoder (not tied to `record`), and can be used standalone or chained after `field`.
+
+```typescript
+import { at, field, record, string, number } from 'typescript-json-decoder';
+
+// standalone — drill directly into nested data
+const userName = at('response', 'data', 'user', 'name').chain(string);
+
+// inside a record — use field to read from parent, then at to drill deeper
+const decoder = record({
+    name: field('response').chain(at('data', 'user', 'name')).chain(string),
+    score: field('response').chain(at('data', 'user', 'stats', 'score')).chain(number),
+});
+```
 
 ## More built-in decoders
 

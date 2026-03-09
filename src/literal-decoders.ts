@@ -69,11 +69,29 @@ export const missing = Object.assign(
   },
 ) as unknown as Decoder<undefined>;
 
-export const field = <D extends DecoderInput<unknown>>(
-  key: string,
-  d: D,
-): Decoder<decodeType<D>> =>
-  fields({ [key]: d }).map((x: any) => x[key]);
+export function field(key: string): Decoder<unknown>;
+export function field<D extends DecoderInput<unknown>>(key: string, d: D): Decoder<decodeType<D>>;
+export function field(key: string, d?: any) {
+  const dec = d ?? ((x: unknown) => x);
+  return fields({ [key]: dec }).map((x: any) => x[key]);
+}
+
+const pickKey = (key: string): Decoder<unknown> =>
+  makeDecoder((value: unknown) => {
+    assert_is_pojo(value);
+    if (typeof value !== 'object' || value === null || !((key) in value)) {
+      throw err`The key ${key} is missing in ${value}`;
+    }
+    return (value as any)[key];
+  });
+
+export function at(...keys: string[]): Decoder<unknown> {
+  const [first, ...rest] = keys;
+  return rest.reduce(
+    (dec: Decoder<any>, key) => dec.chain(pickKey(key)),
+    pickKey(first),
+  );
+}
 
 type evalRecordSchema<schema> = addQuestionmarksToRecordFields<{
   [key in keyof schema]: decodeType<schema[key]>;
