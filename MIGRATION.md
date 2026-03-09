@@ -131,3 +131,26 @@ const yearFromString = string.chain(date).map(d => d.getFullYear());
 ```
 
 While `.map()` takes a plain function `T → U`, `.chain()` accepts any `DecoderInput` — record literals, tuple literals, or other decoders.
+
+## `field(key)` now defaults to `unknown`
+
+The second argument to `field` is now optional and defaults to `unknown`:
+
+```typescript
+field('name')          // Decoder<unknown> — extracts the key, passes value through
+field('name', string)  // Decoder<string> — extracts and decodes
+```
+
+## New: `at()` for drilling into nested structures
+
+`at` drills into deeply nested objects by key path. Unlike `field`/`fields`, it's a regular decoder (not tied to `record`):
+
+```typescript
+// standalone
+const userName = at('response', 'data', 'user', 'name').chain(string);
+
+// inside a record — use field to read from parent, then at to drill deeper
+const decoder = record({
+    name: field('response').chain(at('data', 'user', 'name')).chain(string),
+});
+```
