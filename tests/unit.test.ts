@@ -982,27 +982,29 @@ test('safeDecode with union and literal forms', () => {
   expect(safeDecode('hello' as const, 'world').ok).toBe(false);
 });
 
-test('record with bare number literal', () => {
-  const decoder = record({ name: string, level: 42 });
-  type decoded = decodeType<typeof decoder>;
+test('record with literal() wrapper', () => {
+  const decoder = record({
+    type: literal('admin'),
+    level: literal(42),
+    active: literal(true),
+    name: string,
+  });
 
-  const result: decoded = decoder({ name: 'admin', level: 42 });
-  expect(result).toEqual({ name: 'admin', level: 42 });
-  expect(() => decoder({ name: 'admin', level: 43 })).toThrow();
-  expect(() => decoder({ name: 'admin', level: '42' })).toThrow();
+  expect(
+    decoder({ type: 'admin', level: 42, active: true, name: 'Alice' }),
+  ).toEqual({ type: 'admin', level: 42, active: true, name: 'Alice' });
+  expect(() =>
+    decoder({ type: 'user', level: 42, active: true, name: 'Alice' }),
+  ).toThrow();
+  expect(() =>
+    decoder({ type: 'admin', level: 43, active: true, name: 'Alice' }),
+  ).toThrow();
+  expect(() =>
+    decoder({ type: 'admin', level: 42, active: false, name: 'Alice' }),
+  ).toThrow();
 });
 
-test('record with bare boolean literal', () => {
-  const decoder = record({ name: string, active: true });
-  type decoded = decodeType<typeof decoder>;
-
-  const result: decoded = decoder({ name: 'test', active: true });
-  expect(result).toEqual({ name: 'test', active: true });
-  expect(() => decoder({ name: 'test', active: false })).toThrow();
-  expect(() => decoder({ name: 'test', active: 'true' })).toThrow();
-});
-
-test('record with mixed bare literals and decoders', () => {
+test('record with bare literals', () => {
   const decoder = record({
     type: 'admin' as const,
     level: 42,
@@ -1010,32 +1012,119 @@ test('record with mixed bare literals and decoders', () => {
     name: string,
     age: number,
   });
-  type decoded = decodeType<typeof decoder>;
 
-  const result: decoded = decoder({
-    type: 'admin',
-    level: 42,
-    active: true,
-    name: 'Alice',
-    age: 30,
+  expect(
+    decoder({ type: 'admin', level: 42, active: true, name: 'Alice', age: 30 }),
+  ).toEqual({ type: 'admin', level: 42, active: true, name: 'Alice', age: 30 });
+  expect(() =>
+    decoder({ type: 'user', level: 42, active: true, name: 'Alice', age: 30 }),
+  ).toThrow();
+  expect(() =>
+    decoder({ type: 'admin', level: 43, active: true, name: 'Alice', age: 30 }),
+  ).toThrow();
+  expect(() =>
+    decoder({ type: 'admin', level: 42, active: false, name: 'Alice', age: 30 }),
+  ).toThrow();
+});
+
+test('record with as const preserves literal types', () => {
+  // per-property as const
+  const decoder1 = record({ level: 42 as const, name: string });
+  type decoded1 = decodeType<typeof decoder1>;
+  const r1: decoded1 = decoder1({ level: 42, name: 'test' });
+  expect(r1).toEqual({ level: 42, name: 'test' });
+
+  // whole-object as const
+  const decoder2 = record({ level: 42, active: true, name: string } as const);
+  type decoded2 = decodeType<typeof decoder2>;
+  const r2: decoded2 = decoder2({ level: 42, active: true, name: 'test' });
+  expect(r2).toEqual({ level: 42, active: true, name: 'test' });
+
+  // all approaches reject wrong values the same way at runtime
+  expect(() => decoder1({ level: 43, name: 'test' })).toThrow();
+  expect(() => decoder2({ level: 43, active: true, name: 'test' })).toThrow();
+});
+
+test('record with bare literal edge cases: 0, false, -1', () => {
+  const decoder = record({ zero: 0, neg: -1, no: false, name: string });
+
+  expect(
+    decoder({ zero: 0, neg: -1, no: false, name: 'test' }),
+  ).toEqual({ zero: 0, neg: -1, no: false, name: 'test' });
+  expect(() => decoder({ zero: 1, neg: -1, no: false, name: 'test' })).toThrow();
+  expect(() => decoder({ zero: 0, neg: 1, no: false, name: 'test' })).toThrow();
+  expect(() => decoder({ zero: 0, neg: -1, no: true, name: 'test' })).toThrow();
+});
+
+test('nested record() with bare literals', () => {
+  const decoder = record({
+    name: string,
+    config: record({ level: 42, active: true }),
   });
-  expect(result).toEqual({
-    type: 'admin',
-    level: 42,
-    active: true,
-    name: 'Alice',
-    age: 30,
+
+  expect(
+    decoder({ name: 'test', config: { level: 42, active: true } }),
+  ).toEqual({ name: 'test', config: { level: 42, active: true } });
+  expect(() =>
+    decoder({ name: 'test', config: { level: 43, active: true } }),
+  ).toThrow();
+});
+
+test('nested bare POJO with literal() wrapper', () => {
+  const decoder = record({
+    name: string,
+    config: { level: literal(42), active: literal(true) },
   });
-  expect(() => decoder({ type: 'admin', level: 43, active: true, name: 'Alice', age: 30 })).toThrow();
-  expect(() => decoder({ type: 'user', level: 42, active: true, name: 'Alice', age: 30 })).toThrow();
+
+  expect(
+    decoder({ name: 'test', config: { level: 42, active: true } }),
+  ).toEqual({ name: 'test', config: { level: 42, active: true } });
+  expect(() =>
+    decoder({ name: 'test', config: { level: 43, active: true } }),
+  ).toThrow();
+  expect(() =>
+    decoder({ name: 'test', config: { level: 42, active: false } }),
+  ).toThrow();
+});
+
+test('nested bare POJO with string literals', () => {
+  // bare POJOs support string literals and decoder functions
+  const decoder = record({
+    name: string,
+    config: { type: 'admin' as const, city: string },
+  });
+
+  expect(
+    decoder({ name: 'test', config: { type: 'admin', city: 'Oslo' } }),
+  ).toEqual({ name: 'test', config: { type: 'admin', city: 'Oslo' } });
+  expect(() =>
+    decoder({ name: 'test', config: { type: 'user', city: 'Oslo' } }),
+  ).toThrow();
+});
+
+test('optional and nullable with bare literals', () => {
+  const opt = record({ level: optional(42) });
+  expect(opt({ level: 42 })).toEqual({ level: 42 });
+  expect(opt({ level: undefined })).toEqual({ level: undefined });
+  expect(opt({})).toEqual({ level: undefined });
+  expect(() => opt({ level: 43 })).toThrow();
+
+  const nul = record({ level: nullable(42) });
+  expect(nul({ level: 42 })).toEqual({ level: 42 });
+  expect(nul({ level: null })).toEqual({ level: null });
+  expect(() => nul({ level: 43 })).toThrow();
+});
+
+test('intersection with literal() in records', () => {
+  const decoder = intersection(record({ type: 42 }), { name: string });
+  expect(decoder({ type: 42, name: 'test' })).toEqual({ type: 42, name: 'test' });
+  expect(() => decoder({ type: 43, name: 'test' })).toThrow();
 });
 
 test('union with bare number literals', () => {
   const decoder = union(1, 2, 3);
-  type decoded = decodeType<typeof decoder>;
 
-  const result: decoded = decoder(1);
-  expect(result).toEqual(1);
+  expect(decoder(1)).toEqual(1);
   expect(decoder(2)).toEqual(2);
   expect(decoder(3)).toEqual(3);
   expect(() => decoder(4)).toThrow();
@@ -1044,20 +1133,17 @@ test('union with bare number literals', () => {
 
 test('union with bare boolean literal', () => {
   const decoder = union(true, string);
-  type decoded = decodeType<typeof decoder>;
 
-  expect<decoded>(decoder(true)).toEqual(true);
-  expect<decoded>(decoder('hello')).toEqual('hello');
+  expect(decoder(true)).toEqual(true);
+  expect(decoder('hello')).toEqual('hello');
   expect(() => decoder(false)).toThrow();
   expect(() => decoder(42)).toThrow();
 });
 
 test('tuple with bare number literal', () => {
   const decoder = tuple(42, string);
-  type decoded = decodeType<typeof decoder>;
 
-  const result: decoded = decoder([42, 'hello']);
-  expect(result).toEqual([42, 'hello']);
+  expect(decoder([42, 'hello'])).toEqual([42, 'hello']);
   expect(() => decoder([43, 'hello'])).toThrow();
   expect(() => decoder([42, 123])).toThrow();
 });

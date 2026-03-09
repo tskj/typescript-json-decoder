@@ -156,50 +156,55 @@ if (safeResult.ok) {
   expectType<string>(safeResult.value);
 }
 
-// literal number and boolean decoders
+// literal() standalone — preserves exact types
 expectType<1>(literal(1)(1));
 expectType<true>(literal(true)(true));
 expectType<1 | 2 | 3>(union(literal(1), literal(2), literal(3))(1));
 
-// record with literal() wrapper for numbers and booleans
-const literal_record_decoder = record({ type: literal('admin'), level: literal(42), active: literal(true), name: string });
+// --- record: 4 ways to use number/boolean literals ---
+
+// 1. literal() wrapper — exact types preserved
+const record_literal_wrap = record({ type: literal('admin'), level: literal(42), active: literal(true), name: string });
 expectType<{ type: 'admin'; level: 42; active: true; name: string }>(
-  literal_record_decoder({ type: 'admin', level: 42, active: true, name: '' }),
+  record_literal_wrap({ type: 'admin', level: 42, active: true, name: '' }),
 );
 
-// bare number and boolean literals in record (without literal() wrapper)
-// Note: TS 4.x widens bare number literals to `number` in generic inference;
-// booleans preserve (true/false) because boolean = true | false union.
-// Use `as const` or `literal()` for exact number literal types.
-const bare_literal_record = record({ type: 'admin' as const, level: 42, active: true, name: string });
+// 2. bare literals — TS 4.x widens numbers to `number`, booleans stay exact (boolean = true | false)
+const record_bare = record({ type: 'admin' as const, level: 42, active: true, name: string });
 expectType<{ type: 'admin'; level: number; active: true; name: string }>(
-  bare_literal_record({ type: 'admin', level: 42, active: true, name: '' }),
+  record_bare({ type: 'admin', level: 42, active: true, name: '' }),
 );
 
-// with `as const`, number literals are preserved
-const bare_literal_record_const = record({ type: 'admin' as const, level: 42 as const, active: true, name: string });
+// 3. per-property `as const` — preserves number literal types
+const record_per_const = record({ type: 'admin' as const, level: 42 as const, active: true, name: string });
 expectType<{ type: 'admin'; level: 42; active: true; name: string }>(
-  bare_literal_record_const({ type: 'admin', level: 42, active: true, name: '' }),
+  record_per_const({ type: 'admin', level: 42, active: true, name: '' }),
 );
 
-// with whole-object `as const`, all literals are preserved
-const bare_literal_record_full_const = record({ type: 'admin', level: 42, active: true, name: string } as const);
+// 4. whole-object `as const` — preserves all literal types
+const record_full_const = record({ type: 'admin', level: 42, active: true, name: string } as const);
 expectType<{ type: 'admin'; level: 42; active: true; name: string }>(
-  bare_literal_record_full_const({ type: 'admin', level: 42, active: true, name: '' }),
+  record_full_const({ type: 'admin', level: 42, active: true, name: '' }),
 );
 
-// bare number literals in union (preserved as direct args)
-const bare_number_union = union(1, 2, 3);
-expectType<1 | 2 | 3>(bare_number_union(1));
+// 5. edge cases: 0, false, -1
+const record_edge = record({ zero: 0, no: false, neg: -1 as const, name: string });
+expectType<{ zero: number; no: false; neg: -1; name: string }>(
+  record_edge({ zero: 0, no: false, neg: -1, name: '' }),
+);
 
-// bare boolean in union
-const bare_bool_union = union(true, string);
-expectType<true | string>(bare_bool_union(true));
+// 6. nested record with bare literals
+const record_nested = record({ name: string, config: record({ level: 42 as const, active: true }) });
+expectType<{ name: string; config: { level: 42; active: true } }>(
+  record_nested({ name: '', config: { level: 42, active: true } }),
+);
 
-// bare number literal in tuple (preserved as direct args)
-const bare_tuple = tuple(42, string);
-expectType<[42, string]>(bare_tuple([42, 'hello']));
+// 7. optional/nullable with bare literals
+expectAssignable<{ level?: number }>(record({ level: optional(42) })({}));
+expectAssignable<{ level: number | null }>(record({ level: nullable(42) })({ level: null }));
 
-// mixed: bare literals with decoders in union
-const mixed_union = union(1, 'hello' as const, boolean);
-expectType<1 | 'hello' | boolean>(mixed_union(1));
+// --- union, tuple: bare literals as direct args always preserve ---
+expectType<1 | 2 | 3>(union(1, 2, 3)(1));
+expectType<true | string>(union(true, string)(true));
+expectType<1 | 'hello' | boolean>(union(1, 'hello' as const, boolean)(1));
+expectType<[42, string]>(tuple(42, string)([42, 'hello']));
