@@ -7,7 +7,7 @@ import {
   PrimitiveJsonLiteralForm,
   addQuestionmarksToRecordFields,
 } from './types';
-import { tag } from './utils';
+import { tag, err } from './utils';
 
 const apply = (k: any, x: any) => k ? k(x) : x;
 
@@ -17,9 +17,7 @@ export function literal(lit: PrimitiveJsonLiteralForm, k?: (x: any) => any) {
   return (value: unknown) => {
     assert_is_pojo(value);
     if (lit !== value) {
-      throw `The value \`${JSON.stringify(
-        value,
-      )}\` is not the literal \`${JSON.stringify(lit)}\``;
+      throw err`The value ${value} is not the literal ${lit}`;
     }
     return apply(k, lit);
   };
@@ -35,14 +33,10 @@ export function tuple(...decoders: any[]) {
   return (value: unknown) => {
     assert_is_pojo(value);
     if (!Array.isArray(value)) {
-      throw `The value \`${JSON.stringify(
-        value,
-      )}\` is not a list and can therefore not be parsed as a tuple`;
+      throw err`The value ${value} is not a list and can therefore not be parsed as a tuple`;
     }
     if (value.length !== decoders.length) {
-      throw `The array \`${JSON.stringify(
-        value,
-      )}\` is not the proper length for a ${decoders.length}-tuple`;
+      throw err`The array ${value} is not the proper length for a ${decoders.length}-tuple`;
     }
     return decoders.map((d, i) => decode(d)(value[i]));
   };
@@ -65,7 +59,7 @@ export const fields = <T extends { [key: string]: Decoder<unknown> }, U>(
 
 export const missing: DecoderFunction<undefined> = Object.assign(
   (_value: unknown): undefined => {
-    throw `should not be called directly`;
+    throw err`should not be called directly`;
   },
   { [missingKey]: true as const },
 );
@@ -98,15 +92,13 @@ export const record =
   (value: unknown): any => {
     assert_is_pojo(value);
     if (!isPojoObject(value)) {
-      throw `Value \`${value}\` is not of type \`object\` but rather \`${typeof value}\``;
+      throw err`Value ${value} is not of type ${'object'} but rather ${typeof value}`;
     }
     const result: any = {};
     for (const [key, decoder] of Object.entries(s) as [string, any][]) {
       if (decoder[missingKey] === true) {
         if (key in (value as any)) {
-          throw `The key \`${key}\` is present in \`${JSON.stringify(
-            value,
-          )}\` but was expected to be missing`;
+          throw err`The key ${key} is present in ${value} but was expected to be missing`;
         }
         continue;
       }
@@ -119,15 +111,11 @@ export const record =
         result[key] = decode(decoder)(jsonvalue);
       } catch (message) {
         if (!(key in (value as any))) {
-          throw `The key \`${key}\` is missing in \`${JSON.stringify(
-            value,
-          )}\``;
+          throw err`The key ${key} is missing in ${value}`;
         }
         throw (
           message +
-          `\nwhen trying to decode the key \`${key}\` in \`${JSON.stringify(
-            value,
-          )}\``
+          err`\nwhen trying to decode the key ${key} in ${value}`
         );
       }
     }

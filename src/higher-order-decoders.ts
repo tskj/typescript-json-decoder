@@ -1,6 +1,7 @@
 import { nil, undef } from './primitive-decoders';
 import { assert_is_pojo, isPojoObject } from './pojo';
 import { decodeType, decode, Decoder, DecoderFunction, isKey } from './types';
+import { err } from './utils';
 
 const apply = (k: any, x: any) => k ? k(x) : x;
 
@@ -24,7 +25,7 @@ export const union =
   (value: unknown): evalOver<getSumOfArray<decoders>> => {
     assert_is_pojo(value);
     if (decoders.length === 0) {
-      throw `Could not match any of the union cases`;
+      throw err`Could not match any of the union cases`;
     }
     const [decoder, ...rest] = decoders;
     try {
@@ -87,9 +88,7 @@ const combineObjectProperties = <A extends Object, B extends Object>(
                   try {
                     return combineResults(aProp, bProp);
                   } catch (message) {
-                    throw `${message}\nWhile trying to combine results for field '${String(
-                      key,
-                    )}'`;
+                    throw `${message}\n` + err`While trying to combine results for field ${String(key)}`;
                   }
                 })()
               : aProp
@@ -104,7 +103,7 @@ const combineObjectProperties = <A extends Object, B extends Object>(
 const validatePrototype = (a: unknown): void => {
   const proto = Object.getPrototypeOf(a);
   if (proto !== Object.prototype && proto !== Array.prototype) {
-    throw `Only Object, and Array, and the primitive types are allowed in intersections, but got ${proto.constructor.name}`;
+    throw err`Only Object, and Array, and the primitive types are allowed in intersections, but got ${proto.constructor.name}`;
   }
 };
 
@@ -113,14 +112,14 @@ const validatePrototype = (a: unknown): void => {
 const combineResults = <A, B>(a: A, b: B): A & B => {
   const jsType = typeof a;
   if (jsType !== typeof b) {
-    throw `Cannot form intersection of ${typeof a} and ${typeof b}, but got ${a} and ${b}`;
+    throw err`Cannot form intersection of ${typeof a} and ${typeof b}, but got ${a} and ${b}`;
   } else if (jsType === 'function') {
-    throw `Combining functions in intersections is not supported`;
+    throw err`Combining functions in intersections is not supported`;
   } else if (jsType === 'object') {
     if ([a, b].some((x) => x === null)) {
       const nonNull = [a, b].find((x) => x !== null);
       if (nonNull !== undefined) {
-        throw `Cannot intersect null with non-null value ${nonNull}`;
+        throw err`Cannot intersect null with non-null value ${nonNull}`;
       } else {
         return null as any;
       }
@@ -133,7 +132,7 @@ const combineResults = <A, B>(a: A, b: B): A & B => {
     return Object.assign(base, result);
   } else {
     if ((a as any) !== (b as any)) {
-      throw `Intersections must produce matching values in all branches, but got ${a} and ${b}`;
+      throw err`Intersections must produce matching values in all branches, but got ${a} and ${b}`;
     }
     return a as A & B;
   }
@@ -158,7 +157,7 @@ export const intersection =
         ? ({} as any)
         : results.reduce((acc, result) => combineResults(acc, result));
     } else {
-      errors.push(`Could not match all of the intersection cases`);
+      errors.push(err`Could not match all of the intersection cases`);
       throw errors.join('\n');
     }
   };
@@ -221,11 +220,8 @@ export function array<D extends Decoder<unknown>, U>(
 export function array(decoder: any, k?: (x: any) => any) {
   return (xs: unknown): any => {
     assert_is_pojo(xs);
-    const arrayToString = (arr: any) => `${JSON.stringify(arr)}`;
     if (!Array.isArray(xs)) {
-      throw `The value \`${arrayToString(
-        xs,
-      )}\` is not of type \`array\`, but is of type \`${typeof xs}\``;
+      throw err`The value ${xs} is not of type ${'array'}, but is of type ${typeof xs}`;
     }
     let index = 0;
     try {
@@ -237,9 +233,7 @@ export function array(decoder: any, k?: (x: any) => any) {
     } catch (message) {
       throw (
         message +
-        `\nwhen trying to decode the array (at index ${index}) \`${arrayToString(
-          xs,
-        )}\``
+        err`\nwhen trying to decode the array (at index ${index}) ${xs}`
       );
     }
   };
@@ -257,7 +251,7 @@ export function nonEmptyArray(decoder: any, k?: (x: any) => any) {
   return (xs: unknown): any => {
     const result = base(xs);
     if (result.length === 0) {
-      throw `Expected a non-empty array, but got an empty array`;
+      throw err`Expected a non-empty array, but got an empty array`;
     }
     return apply(k, result);
   };
@@ -276,7 +270,7 @@ export function set(decoder: any, k?: (x: any) => any) {
     try {
       return apply(k, new Set(decode(array(decoder))(list)));
     } catch (message) {
-      throw message + `\nand can therefore not be parsed as a set`;
+      throw message + err`\nand can therefore not be parsed as a set`;
     }
   };
 }
@@ -298,7 +292,7 @@ export const map =
       }
       return map;
     } catch (message) {
-      throw message + `\nand can therefore not be parsed as a map`;
+      throw message + err`\nand can therefore not be parsed as a map`;
     }
   };
 
@@ -321,17 +315,17 @@ export function objectOf(decoder: any, keysOrK?: any, k?: any) {
   return (obj: unknown) => {
     assert_is_pojo(obj);
     if (!isPojoObject(obj)) {
-      throw `Value \`${obj}\` is not an object and can therefore not be parsed as a record`;
+      throw err`Value ${obj} is not an object and can therefore not be parsed as a record`;
     }
     const result = {} as any;
     for (const [key, value] of Object.entries(obj)) {
       try {
         if (keys && !isKey(key, keys)) {
-          throw `Key \`${key}\` is not in given keys`;
+          throw err`Key ${key} is not in given keys`;
         }
         result[key] = decode(decoder)(value);
       } catch (message) {
-        throw message + `\nwhen decoding the key \`${key}\` in record \`${obj}\``;
+        throw message + err`\nwhen decoding the key ${key} in record ${obj}`;
       }
     }
     return apply(cont, result);
@@ -357,16 +351,16 @@ export function dict(decoder: any, keysOrK?: any, k?: any) {
   return (map: unknown) => {
     assert_is_pojo(map);
     if (!isPojoObject(map)) {
-      throw `Value \`${map}\` is not an object and can therefore not be parsed as a map`;
+      throw err`Value ${map} is not an object and can therefore not be parsed as a map`;
     }
     const decodedPairs = Object.entries(map).map(([key, value]) => {
       try {
         if (keys && !isKey(key, keys)) {
-          throw `Key \`${key}\` is not in given keys`;
+          throw err`Key ${key} is not in given keys`;
         }
         return [key, decode(decoder)(value)] as [any, any];
       } catch (message) {
-        throw message + `\nwhen decoding the key \`${key}\` in map \`${map}\``;
+        throw message + err`\nwhen decoding the key ${key} in map ${map}`;
       }
     });
     return apply(cont, new Map(decodedPairs));

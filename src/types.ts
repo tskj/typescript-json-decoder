@@ -1,4 +1,5 @@
 import { literal, tuple, record } from './literal-decoders';
+import { err } from './utils';
 
 /**
  * Json Literal Decoder
@@ -98,7 +99,7 @@ const decodeJsonLiteralForm = <json extends JsonLiteralForm>(
   if (isRecordJsonLiteralForm(decoder)) {
     return record(decoder as any) as any;
   }
-  throw `shouldn't happen`;
+  throw err`shouldn't happen`;
 };
 
 /**
