@@ -632,16 +632,57 @@ expectType<'yes' | 'no'>(lit_cont_bool(true));
 expectType<'admin'>(literal('admin')('admin'));
 expectType<42>(literal(42)(42));
 
-// --- tuple with continuation ---
+// --- tuple ---
 
-const tuple_cont = tuple(string, number, ([name, age]) => ({ name, age }));
-expectType<{ name: string; age: number }>(tuple_cont(['alice', 30]));
-
-const tuple_cont_sum = tuple(number, number, ([a, b]) => a + b);
-expectType<number>(tuple_cont_sum([3, 4]));
-
-// tuple without continuation — preserves tuple type
+// 2-tuple
 expectType<[string, number]>(tuple(string, number)(['a', 1]));
+
+// 3-tuple
+expectType<[string, number, boolean]>(tuple(string, number, boolean)(['a', 1, true]));
+
+// 4-tuple
+expectType<[string, number, boolean, string]>(tuple(string, number, boolean, string)(['a', 1, true, 'b']));
+
+// 5-tuple
+expectType<[string, number, boolean, string, number]>(
+  tuple(string, number, boolean, string, number)(['a', 1, true, 'b', 2]),
+);
+
+// tuple with bare literals
+expectType<[42, string]>(tuple(42, string)([42, 'hello']));
+
+// tuple with transform (replaces inline continuation)
+const tuple_transformed = transform(tuple(string, number), ([name, age]) => ({ name, age }));
+expectType<{ name: string; age: number }>(tuple_transformed(['alice', 30]));
+
+// 1-tuple
+expectType<[string]>(tuple(string)(['a']));
+
+// 3-tuple literal form via decode()
+const triple = decode([string, number, boolean]);
+expectType<[string, number, boolean]>(triple(['a', 1, true]));
+
+// 1-tuple literal form
+const single = decode([number]);
+expectType<[number]>(single([42]));
+
+// tuple with records inside
+const tuple_records = tuple({ name: string }, { city: string });
+expectType<[{ name: string }, { city: string }]>(
+  tuple_records([{ name: 'alice' }, { city: 'Oslo' }]),
+);
+
+// tuple with nested decoders
+const tuple_nested = tuple(array(number), optional(string), nullable(boolean));
+expectType<[number[], string | undefined, boolean | null]>(
+  tuple_nested([[1], undefined, null]),
+);
+
+// tuple literal form in record
+const rec_with_triple = record({ name: string, point: [number, number, number] });
+expectType<{ name: string; point: [number, number, number] }>(
+  rec_with_triple({ name: 'x', point: [0, 0, 0] }),
+);
 
 // --- array with continuation ---
 

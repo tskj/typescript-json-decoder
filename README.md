@@ -129,7 +129,7 @@ const users: Promise<User[]> =
 
 Everything so far should cover most APIs you need to model. However, I really want to give you the tools to model any kind of API you come across or want to create. Therefore we will look at some more complicated and useful constructs.
 
-Although not as common in Json APIs (yet?), tuples are a very useful data structure. In JavaScript we usually encode them as lists with exactly two elements and possibly of different types, and TypeScript understands this. A tuple with a string and a number (such as `['user', 2]`) can be expressed with the type `[string, number]`. In this library we can use the `tuple` function to the same effect.
+Although not as common in Json APIs (yet?), tuples are a very useful data structure. In JavaScript we usually encode them as lists with a fixed number of elements and possibly of different types, and TypeScript understands this. A tuple with a string and a number (such as `['user', 2]`) can be expressed with the type `[string, number]`. In this library we can use the `tuple` function to the same effect. Tuples of 2 to 5 elements are supported.
 
 ```typescript
 import { decodeType, tuple, string, number } from 'typescript-json-decoder';
@@ -489,8 +489,8 @@ const decoder = record({
     doubled: field('value', number, x => x * 2),
 });
 
-// tuple — destructure into an object
-const pointDecoder = tuple(number, number, ([x, y]) => ({ x, y }));
+// tuple — destructure into an object (use transform since tuple is variadic)
+const pointDecoder = transform(tuple(number, number), ([x, y]) => ({ x, y }));
 
 // array — reduce decoded elements
 const sumDecoder = array(number, xs => xs.reduce((a, b) => a + b, 0));

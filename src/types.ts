@@ -12,9 +12,14 @@ const isPrimitiveJsonLiteralForm = (
 ): v is PrimitiveJsonLiteralForm =>
   typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
 
-type TupleJsonLiteralForm = [Decoder<unknown>, Decoder<unknown>];
+type TupleJsonLiteralForm =
+  | [Decoder<unknown>]
+  | [Decoder<unknown>, Decoder<unknown>]
+  | [Decoder<unknown>, Decoder<unknown>, Decoder<unknown>]
+  | [Decoder<unknown>, Decoder<unknown>, Decoder<unknown>, Decoder<unknown>]
+  | [Decoder<unknown>, Decoder<unknown>, Decoder<unknown>, Decoder<unknown>, Decoder<unknown>];
 const isTupleJsonLiteralForm = (v: unknown): v is TupleJsonLiteralForm =>
-  Array.isArray(v) && v.length === 2 && v.every(isDecoder);
+  Array.isArray(v) && v.length >= 1 && v.every(isDecoder);
 
 type RecordJsonLiteralForm = { [key: string]: Decoder<unknown> };
 const isRecordJsonLiteralForm = (v: unknown): v is RecordJsonLiteralForm =>
@@ -62,8 +67,16 @@ export type addQuestionmarksToRecordFields<R extends { [s: string]: unknown }> =
 type evalJsonLiteralForm<decoder> =
   [decoder] extends [PrimitiveJsonLiteralForm] ?
     decoder :
-  [decoder] extends [[infer decoderA, infer decoderB]] ?
-    [ decodeType<decoderA>, decodeType<decoderB> ] :
+  [decoder] extends [[infer A, infer B, infer C, infer D, infer E]] ?
+    [decodeType<A>, decodeType<B>, decodeType<C>, decodeType<D>, decodeType<E>] :
+  [decoder] extends [[infer A, infer B, infer C, infer D]] ?
+    [decodeType<A>, decodeType<B>, decodeType<C>, decodeType<D>] :
+  [decoder] extends [[infer A, infer B, infer C]] ?
+    [decodeType<A>, decodeType<B>, decodeType<C>] :
+  [decoder] extends [[infer A, infer B]] ?
+    [decodeType<A>, decodeType<B>] :
+  [decoder] extends [[infer A]] ?
+    [decodeType<A>] :
 
     addQuestionmarksToRecordFields<
     {
@@ -77,7 +90,7 @@ const decodeJsonLiteralForm = <json extends JsonLiteralForm>(
     return literal(decoder) as any;
   }
   if (isTupleJsonLiteralForm(decoder)) {
-    return tuple(decoder[0] as any, decoder[1] as any) as any;
+    return (tuple as any)(...decoder) as any;
   }
   if (isRecordJsonLiteralForm(decoder)) {
     return record(decoder as any) as any;
@@ -90,7 +103,7 @@ const decodeJsonLiteralForm = <json extends JsonLiteralForm>(
  *
  * A Decoder<T> is one of:
  * - a primitive literal (string, number, boolean) — decodes to that exact value
- * - a tuple [Decoder, Decoder] — decodes to a pair
+ * - a tuple [Decoder, Decoder, ...] — decodes to a tuple
  * - a record { key: Decoder, ... } — decodes to an object
  * - a decoder function (input: unknown) => T — arbitrary decoding logic
  */

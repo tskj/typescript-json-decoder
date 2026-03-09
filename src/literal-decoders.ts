@@ -25,13 +25,12 @@ export function literal(lit: PrimitiveJsonLiteralForm, k?: (x: any) => any) {
   };
 }
 
-export function tuple<A extends Decoder<unknown>, B extends Decoder<unknown>>(
-  decoderA: A, decoderB: B,
-): DecoderFunction<[decodeType<A>, decodeType<B>]>;
-export function tuple<A extends Decoder<unknown>, B extends Decoder<unknown>, U>(
-  decoderA: A, decoderB: B, k: (x: [decodeType<A>, decodeType<B>]) => U,
-): DecoderFunction<U>;
-export function tuple(decoderA: any, decoderB: any, k?: (x: any) => any) {
+export function tuple<A extends Decoder<unknown>>(a: A): DecoderFunction<[decodeType<A>]>;
+export function tuple<A extends Decoder<unknown>, B extends Decoder<unknown>>(a: A, b: B): DecoderFunction<[decodeType<A>, decodeType<B>]>;
+export function tuple<A extends Decoder<unknown>, B extends Decoder<unknown>, C extends Decoder<unknown>>(a: A, b: B, c: C): DecoderFunction<[decodeType<A>, decodeType<B>, decodeType<C>]>;
+export function tuple<A extends Decoder<unknown>, B extends Decoder<unknown>, C extends Decoder<unknown>, D extends Decoder<unknown>>(a: A, b: B, c: C, d: D): DecoderFunction<[decodeType<A>, decodeType<B>, decodeType<C>, decodeType<D>]>;
+export function tuple<A extends Decoder<unknown>, B extends Decoder<unknown>, C extends Decoder<unknown>, D extends Decoder<unknown>, E extends Decoder<unknown>>(a: A, b: B, c: C, d: D, e: E): DecoderFunction<[decodeType<A>, decodeType<B>, decodeType<C>, decodeType<D>, decodeType<E>]>;
+export function tuple(...decoders: any[]) {
   return (value: unknown) => {
     assert_is_pojo(value);
     if (!Array.isArray(value)) {
@@ -39,14 +38,12 @@ export function tuple(decoderA: any, decoderB: any, k?: (x: any) => any) {
         value,
       )}\` is not a list and can therefore not be parsed as a tuple`;
     }
-    if (value.length !== 2) {
+    if (value.length !== decoders.length) {
       throw `The array \`${JSON.stringify(
         value,
-      )}\` is not the proper length for a tuple`;
+      )}\` is not the proper length for a ${decoders.length}-tuple`;
     }
-    const [a, b] = value;
-    const result: [any, any] = [decode(decoderA)(a), decode(decoderB)(b)];
-    return apply(k, result);
+    return decoders.map((d, i) => decode(d)(value[i]));
   };
 }
 

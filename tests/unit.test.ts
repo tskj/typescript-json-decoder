@@ -1831,16 +1831,128 @@ test('literal with continuation — still rejects non-matching', () => {
   expect(() => decoder('user')).toThrow();
 });
 
-// --- tuple with continuation ---
+// --- tuple with transform ---
 
-test('tuple with continuation — destructure and combine', () => {
-  const decoder = tuple(string, number, ([name, age]) => ({ name, age }));
+test('tuple with transform — destructure and combine', () => {
+  const decoder = transform(tuple(string, number), ([name, age]) => ({ name, age }));
   expect(decoder(['alice', 30])).toEqual({ name: 'alice', age: 30 });
 });
 
-test('tuple with continuation — sum', () => {
-  const decoder = tuple(number, number, ([a, b]) => a + b);
+test('tuple with transform — sum', () => {
+  const decoder = transform(tuple(number, number), ([a, b]) => a + b);
   expect(decoder([3, 4])).toBe(7);
+});
+
+// --- n-ary tuples ---
+
+test('3-tuple', () => {
+  const decoder = tuple(string, number, boolean);
+  expect(decoder(['hello', 42, true])).toEqual(['hello', 42, true]);
+  expect(() => decoder(['hello', 42])).toThrow();
+  expect(() => decoder(['hello', 42, true, 'extra'])).toThrow();
+});
+
+test('4-tuple', () => {
+  const decoder = tuple(string, number, boolean, string);
+  expect(decoder(['a', 1, true, 'b'])).toEqual(['a', 1, true, 'b']);
+});
+
+test('5-tuple', () => {
+  const decoder = tuple(string, number, boolean, string, number);
+  expect(decoder(['a', 1, true, 'b', 2])).toEqual(['a', 1, true, 'b', 2]);
+});
+
+test('3-tuple with bare literals', () => {
+  const decoder = tuple('hello' as const, 42, true);
+  expect(decoder(['hello', 42, true])).toEqual(['hello', 42, true]);
+  expect(() => decoder(['hello', 43, true])).toThrow();
+});
+
+test('3-tuple literal form via decode()', () => {
+  const decoder = decode([string, number, boolean]);
+  expect(decoder(['hello', 42, true])).toEqual(['hello', 42, true]);
+});
+
+test('n-ary tuple in record', () => {
+  const decoder = record({
+    name: string,
+    coords: tuple(number, number, number),
+  });
+  expect(decoder({ name: 'origin', coords: [0, 0, 0] }))
+    .toEqual({ name: 'origin', coords: [0, 0, 0] });
+});
+
+test('n-ary tuple with transform', () => {
+  const decoder = transform(
+    tuple(string, number, boolean),
+    ([name, age, active]) => ({ name, age, active }),
+  );
+  expect(decoder(['alice', 30, true])).toEqual({ name: 'alice', age: 30, active: true });
+});
+
+test('1-tuple', () => {
+  const decoder = tuple(string);
+  expect(decoder(['hello'])).toEqual(['hello']);
+  expect(() => decoder([])).toThrow();
+  expect(() => decoder(['a', 'b'])).toThrow();
+});
+
+test('1-tuple literal form', () => {
+  const decoder = decode([string]);
+  expect(decoder(['hello'])).toEqual(['hello']);
+});
+
+test('tuple with records inside', () => {
+  const decoder = tuple(
+    { name: string, age: number },
+    { city: string },
+  );
+  expect(decoder([{ name: 'alice', age: 30 }, { city: 'Oslo' }]))
+    .toEqual([{ name: 'alice', age: 30 }, { city: 'Oslo' }]);
+});
+
+test('tuple with nested decoders', () => {
+  const decoder = tuple(
+    array(number),
+    optional(string),
+    nullable(boolean),
+  );
+  expect(decoder([[1, 2, 3], 'hello', null]))
+    .toEqual([[1, 2, 3], 'hello', null]);
+  expect(decoder([[1, 2, 3], undefined, true]))
+    .toEqual([[1, 2, 3], undefined, true]);
+});
+
+test('tuple with union and intersection', () => {
+  const decoder = tuple(
+    union(string, number),
+    intersection({ a: string }, { b: number }),
+  );
+  expect(decoder(['hello', { a: 'x', b: 1 }]))
+    .toEqual(['hello', { a: 'x', b: 1 }]);
+  expect(decoder([42, { a: 'x', b: 1 }]))
+    .toEqual([42, { a: 'x', b: 1 }]);
+});
+
+test('tuple literal form in record', () => {
+  const decoder = record({
+    name: string,
+    point: [number, number, number],
+    pair: [string, boolean],
+  });
+  expect(decoder({ name: 'origin', point: [0, 0, 0], pair: ['yes', true] }))
+    .toEqual({ name: 'origin', point: [0, 0, 0], pair: ['yes', true] });
+});
+
+test('array of 3-tuples', () => {
+  const decoder = array(tuple(string, number, boolean));
+  expect(decoder([['a', 1, true], ['b', 2, false]]))
+    .toEqual([['a', 1, true], ['b', 2, false]]);
+});
+
+test('nested tuple in tuple', () => {
+  const decoder = tuple(string, tuple(number, number));
+  expect(decoder(['hello', [1, 2]])).toEqual(['hello', [1, 2]]);
 });
 
 // --- array with continuation ---
@@ -2159,7 +2271,7 @@ test('README: continuation — field extract/transform', () => {
 });
 
 test('README: continuation — tuple pointDecoder', () => {
-  const pointDecoder = tuple(number, number, ([x, y]) => ({ x, y }));
+  const pointDecoder = transform(tuple(number, number), ([x, y]) => ({ x, y }));
   expect(pointDecoder([3, 4])).toEqual({ x: 3, y: 4 });
 });
 
