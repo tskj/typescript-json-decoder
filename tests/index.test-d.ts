@@ -30,6 +30,7 @@ import {
   transform,
   nonEmptyArray,
   missing,
+  lazy,
   safeDecode,
 } from '../src';
 
@@ -715,6 +716,15 @@ expectType<number>(array_cont_len(['a', 'b']));
 
 // array without continuation — preserves array type
 expectType<number[]>(array(number)([1, 2]));
+
+// --- lazy ---
+
+// lazy preserves the inner decoder's type
+expectType<string>(lazy(() => string)('hello'));
+
+// lazy with record decoder
+const lazyRecord = lazy(() => record({ name: string }));
+expectType<{ name: string }>(lazyRecord({ name: 'hi' }));
 
 // --- nonEmptyArray ---
 

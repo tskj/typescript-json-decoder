@@ -14,6 +14,7 @@ export {
   withDefault,
   objectOf,
   transform,
+  lazy,
 } from './higher-order-decoders';
 export {
   string,

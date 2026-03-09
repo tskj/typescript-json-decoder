@@ -31,6 +31,7 @@ import {
   transform,
   nonEmptyArray,
   missing,
+  lazy,
   Decoder,
 } from '../src';
 
@@ -2049,6 +2050,44 @@ test('nonEmptyArray in record', () => {
   });
   expect(decoder({ tags: ['a', 'b'] })).toEqual({ tags: ['a', 'b'] });
   expect(() => decoder({ tags: [] })).toThrow('non-empty');
+});
+
+// --- lazy ---
+
+test('lazy decoder — recursive tree structure', () => {
+  type Tree = { value: string; children: Tree[] };
+  const treeDecoder: Decoder<Tree> = record({
+    value: string,
+    children: array(lazy(() => treeDecoder)),
+  });
+  const input = {
+    value: 'root',
+    children: [
+      { value: 'a', children: [] },
+      { value: 'b', children: [
+        { value: 'c', children: [] },
+      ]},
+    ],
+  };
+  expect(treeDecoder(input)).toEqual(input);
+});
+
+test('lazy decoder — rejects invalid nested data', () => {
+  type Tree = { value: string; children: Tree[] };
+  const treeDecoder: Decoder<Tree> = record({
+    value: string,
+    children: array(lazy(() => treeDecoder)),
+  });
+  expect(() => treeDecoder({
+    value: 'root',
+    children: [{ value: 123, children: [] }],
+  })).toThrow();
+});
+
+test('lazy decoder — simple deferred evaluation', () => {
+  const decoder = lazy(() => string);
+  expect(decoder('hello')).toBe('hello');
+  expect(() => decoder(42)).toThrow();
 });
 
 // --- optional with continuation ---

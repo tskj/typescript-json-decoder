@@ -13,6 +13,9 @@ export const transform = <D extends Decoder<unknown>, U>(
 ): DecoderFunction<U> =>
   (value: unknown) => k(decode(decoder)(value) as any);
 
+export const lazy = <T>(thunk: () => Decoder<T>): DecoderFunction<T> =>
+  (value: unknown) => decode(thunk())(value) as T;
+
 type evalOver<t> = t extends unknown ? decodeType<t> : never;
 type getSumOfArray<arr> = arr extends (infer elements)[] ? elements : never;
 
