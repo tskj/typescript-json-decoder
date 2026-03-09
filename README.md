@@ -465,6 +465,43 @@ decoder({ name: 'alice', balance: '9007199254740993' });
 // { name: 'alice', balance: 9007199254740993n }
 ```
 
+`nonEmptyArray` works like `array` but rejects empty arrays. The return type is a non-empty tuple `[T, ...T[]]`.
+
+```typescript
+import { nonEmptyArray, string, record } from 'typescript-json-decoder';
+
+const decoder = record({
+    tags: nonEmptyArray(string),
+});
+decoder({ tags: ['a', 'b'] }); // { tags: ['a', 'b'] }
+decoder({ tags: [] });          // throws
+```
+
+`missing` asserts that a key does *not* exist in the input. This is useful for ensuring deprecated or forbidden fields have been removed.
+
+```typescript
+import { record, string, missing } from 'typescript-json-decoder';
+
+const decoder = record({
+    name: string,
+    deletedField: missing,
+});
+decoder({ name: 'alice' });                     // { name: 'alice' }
+decoder({ name: 'alice', deletedField: true });  // throws
+```
+
+`lazy` defers decoder evaluation, enabling recursive and self-referential types like trees.
+
+```typescript
+import { record, string, array, lazy, Decoder } from 'typescript-json-decoder';
+
+type Tree = { value: string; children: Tree[] };
+const treeDecoder: Decoder<Tree> = record({
+    value: string,
+    children: array(lazy(() => treeDecoder)),
+});
+```
+
 `withDefault` respects the inner decoder's semantics — if the decoder legitimately returns `null` or `undefined` (e.g. via `nullable` or `optional`), those pass through as valid values. The fallback only kicks in when the decoder throws.
 
 ```typescript

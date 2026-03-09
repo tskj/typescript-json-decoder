@@ -2441,3 +2441,39 @@ test('README: transform with intersection', () => {
   const combined = transform(intersection({ a: string }, { b: number }), x => `${x.a}-${x.b}`);
   expect(combined({ a: 'hello', b: 42 })).toBe('hello-42');
 });
+
+test('README: nonEmptyArray in record', () => {
+  const decoder = record({
+    tags: nonEmptyArray(string),
+  });
+  expect(decoder({ tags: ['a', 'b'] })).toEqual({ tags: ['a', 'b'] });
+  expect(() => decoder({ tags: [] })).toThrow();
+});
+
+test('README: missing decoder', () => {
+  const decoder = record({
+    name: string,
+    deletedField: missing,
+  });
+  expect(decoder({ name: 'alice' })).toEqual({ name: 'alice' });
+  expect(() => decoder({ name: 'alice', deletedField: true })).toThrow();
+});
+
+test('README: lazy recursive tree', () => {
+  type Tree = { value: string; children: Tree[] };
+  const treeDecoder: Decoder<Tree> = record({
+    value: string,
+    children: array(lazy(() => treeDecoder)),
+  });
+  expect(treeDecoder({
+    value: 'root',
+    children: [
+      { value: 'leaf', children: [] },
+    ],
+  })).toEqual({
+    value: 'root',
+    children: [
+      { value: 'leaf', children: [] },
+    ],
+  });
+});
