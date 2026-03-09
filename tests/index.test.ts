@@ -18,7 +18,7 @@ import {
   decodeType,
   Pojo,
   Decoder,
-  decode,
+  decoder,
   intersection,
   always,
 } from '../src';
@@ -38,22 +38,18 @@ test('everything', () => {
 
   const employeeDecoder = record({
     renamedfield: field('phoneNumbers', array(string)),
-    month2: fields({ dateOfBirth: date }, ({ dateOfBirth }) =>
+    month2: fields({ dateOfBirth: date }).map(({ dateOfBirth }) =>
       dateOfBirth.getMonth(),
     ),
-    maybessn: fields({ ssn: optional(string) }, ({ ssn }) => ssn),
+    maybessn: fields({ ssn: optional(string) }).map(({ ssn }) => ssn),
     employeeIdentifier2: fields(
       { name: string, employeeId: optional(number) },
-      ({ name, employeeId }) => `${name}:${employeeId || 0}`,
-    ),
+    ).map(({ name, employeeId }) => `${name}:${employeeId || 0}`),
     month: field('dateOfBirth', (x) => date(x).getMonth()),
-    employeeIdentifier: fields(
-      {
-        name: string,
-        employeeId: number,
-      },
-      ({ name, employeeId }) => `${name}:${employeeId}`,
-    ),
+    employeeIdentifier: fields({
+      name: string,
+      employeeId: number,
+    }).map(({ name, employeeId }) => `${name}:${employeeId}`),
     employeeId: number,
     name: string,
     set: set(union(string, number, { data: boolean })),
@@ -84,8 +80,7 @@ test('everything', () => {
     girlfriend: nullable(string),
     test: fields(
       { girlfriend: nullable(string), dateOfBirth: date },
-      ({ girlfriend, dateOfBirth }) => girlfriend ?? dateOfBirth,
-    ),
+    ).map(({ girlfriend, dateOfBirth }) => girlfriend ?? dateOfBirth),
     just: array(union(boolean, always(false))),
   });
 
@@ -167,7 +162,7 @@ test('everything', () => {
 const nameDecoder = record({ first: string, last: string });
 
 const guestDecoder = record({
-  type: decode('Guest'),
+  type: decoder('Guest'),
   email: string,
   employer: optional({
     id: string,
@@ -176,12 +171,12 @@ const guestDecoder = record({
   }),
   reference: union(
     {
-      ref: decode('SsoMicrosoft'),
+      ref: decoder('SsoMicrosoft'),
       tid: string,
       oid: string,
     },
     {
-      ref: decode('SsoMicrosoftPersonal'),
+      ref: decoder('SsoMicrosoftPersonal'),
       oid: string,
     },
   ),
@@ -190,7 +185,7 @@ const guestDecoder = record({
 const rolesDecoder = array(
   union(
     {
-      type: decode('Accountant'),
+      type: decoder('Accountant'),
       employer: {
         id: string,
         corporateId: string,
@@ -198,7 +193,7 @@ const rolesDecoder = array(
       },
     },
     {
-      type: decode('Employer'),
+      type: decoder('Employer'),
       employer: {
         id: string,
         corporateId: string,
@@ -206,7 +201,7 @@ const rolesDecoder = array(
       },
     },
     {
-      type: decode('Company'),
+      type: decoder('Company'),
       corporateId: string,
       companyName: string,
     },
@@ -214,7 +209,7 @@ const rolesDecoder = array(
 );
 
 const userDecoder = record({
-  type: decode('User'),
+  type: decoder('User'),
   account: {
     id: string,
     name: nameDecoder,

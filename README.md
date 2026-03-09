@@ -26,7 +26,9 @@ const userDecoder = record({
 });
 ```
 
-`userDecoder` is a function from any JavaScript object to `User`, which is the generated type. This type is inferred to be exactly what you expect. `number`, `string`, and `boolean` are also decoders in the same way, and decode values of their respective types. If any of these decoders fail they throw with an appropriate error message.
+`userDecoder` is a callable `Decoder<User>` object. It decodes any JavaScript object to `User`, which is the generated type. This type is inferred to be exactly what you expect. `number`, `string`, and `boolean` are also decoders in the same way, and decode values of their respective types. If any of these decoders fail they throw with an appropriate error message.
+
+Every decoder also has `.map()` for transforming results and `.safeDecode()` for error handling without exceptions — more on those below.
 
 The idea is to have one declaration of the types in your system the same way as you would if you only used TypeScript, but also have decoders of those types. Although we declare decoders and infer the corresponding types, I like to think of the declaration as a normal type declaration like you are used to, and incidentally also getting a decoder.
 
@@ -53,9 +55,9 @@ Although, the `Promise<User>` declaration is redundant; the correct type will be
 
 - All the standard types have decoders provided which you can use directly and never have to write a custom decoder.
 
-- If you'd like you can write custom decoders, operating on whatever data you want and producing whatever you want. Decoders are just functions, and functions can be composed!
+- If you'd like you can write custom decoders, operating on whatever data you want and producing whatever you want. Decoders are callable objects that compose freely!
 
-- Decoders can do arbitrary transformations of your data, massaging it to have the exact shape and structure you want. There is no reason to be stuck with whatever data structure your API supplies.
+- Decoders can do arbitrary transformations of your data via `.map()`, massaging it to have the exact shape and structure you want. There is no reason to be stuck with whatever data structure your API supplies.
 
 - Decoders can do validation! If you want to write a decoder that does validation, simply pass the data through your decoder unchanged if it satisfies your rules, or throw an error if it doesn't.
 
@@ -142,14 +144,14 @@ const myTuple = stringAndNumberDecoder(['user', 2]);
 This doesn't really match the syntax of regular TypeScript as much as I would like, so as a convenience feature we also allow a *literal syntax* for tuples. The idea is that a two element list of decoders can be considered itself a decoder of the corresponding tuple. The same example as above written in the literal form would be as follows.
 
 ```typescript
-import { decodeType, decode, string, number } from 'typescript-json-decoder';
+import { decodeType, decoder, string, number } from 'typescript-json-decoder';
 
 type StringAndNumber = decodeType<typeof stringAndNumberDecoder>;
-const stringAndNumberDecoder = decode([string, number]);
+const stringAndNumberDecoder = decoder([string, number]);
 const myTuple = stringAndNumberDecoder(['user', 2]);
 ```
 
-Notice we now need a call to a `decode` function to make it into an actually callable decoder. `decode` is the low level implementation which all the other decoders are implemented in terms of; that is `record`, `tuple`, and all the other built in decoders eventually call `decode` to do the dirty work. But that's a tangent, the advantage to this approach is that you can use the literal tuple syntax directly in an object, such as the following.
+Notice we now need a call to a `decoder` function to make it into an actually callable decoder. `decoder` is the low level implementation which all the other decoders are implemented in terms of; that is `record`, `tuple`, and all the other built in decoders eventually call `decoder` to do the dirty work. But that's a tangent, the advantage to this approach is that you can use the literal tuple syntax directly in an object, such as the following.
 
 ```typescript
 const myDecoder = record({
@@ -227,7 +229,7 @@ const decoder = record({
 
 ## Custom decoders
 
-All the decoders we have defined so far are in a way custom decoders and can be combined freely, however I encourage people to create arbitrary parsing functions which transform and validate data. Simply create a function which tries to build the data structure you want and throw an error message if you are unable to signify failure. Decoders can be reused and combined however you want, and composition of decoders is simply function composition.
+All the decoders we have defined so far are in a way custom decoders and can be combined freely, however I encourage people to create arbitrary parsing functions which transform and validate data. Simply create a function which tries to build the data structure you want and throw an error message if you are unable to signify failure. You can wrap any function `(input: unknown) => T` with `decoder()` to get a full `Decoder<T>` with `.map()` and `.safeDecode()`. Decoders can be reused and combined however you want.
 
 Here are some decoders I wrote mostly for fun.
 
@@ -354,24 +356,24 @@ The `field` decoder accepts a string, the name of the key, and a decoder which d
 Say you have some date in an iso-date-string format in the field `"dateOfBirth"` but are only interested in the year and month, you could use the `field` decoder to access it in the following way.
 
 ```typescript
-import { decodeType, record, field } from 'typescript-json-decoder';
+import { decodeType, record, field, date } from 'typescript-json-decoder';
 
 type User = decodeType<typeof userDecoder>;
 const userDecoder = record({
-    month: field('dateOfBirth', x => date(x).getMonth() + 1),
-    year: field('dateOfBirth', x => date(x).getFullYear()),
+    month: field('dateOfBirth', date).map(d => d.getMonth() + 1),
+    year: field('dateOfBirth', date).map(d => d.getFullYear()),
 });
 ```
 
-Alternatively if you need both username and id you can use the `fields` decoder. This has a slightly different api. The `fields` decoder accepts an object decoder in the same way `decoder` does, and a second argument, a continuation, which accepts the result of this decoder and produces the resulting value of the `fields` decoder. An example is maybe more explanatory.
+If you need to combine multiple fields, use the `fields` decoder. It accepts an object schema and decodes those keys from the parent object. Chain `.map()` to produce the resulting value.
 
 ```typescript
-import { decodeType, record, fields } from 'typescript-json-decoder';
+import { decodeType, record, fields, string, number } from 'typescript-json-decoder';
 
 type User = decodeType<typeof userDecoder>;
 const userDecoder = record({
-    identifier: fields({ username: string, userId: number },
-                            ({ username, userId }) => `user:${username}:${userId}`),
+    identifier: fields({ username: string, userId: number })
+        .map(({ username, userId }) => `user:${username}:${userId}`),
 });
 ```
 
@@ -515,64 +517,74 @@ decoder('bad'); // null (decoder threw, fallback)
 
 ## Transforming decoded values
 
-Most decoders accept an optional continuation (a function applied to the decoded result), giving you an ergonomic way to transform data inline.
+Every decoder has a `.map()` method that transforms the decoded result, returning a new decoder. This is the universal way to reshape data.
 
 ```typescript
 import { record, field, string, number, array, tuple, optional, nullable, literal } from 'typescript-json-decoder';
 
 // field — extract and rename a nested value
 const decoder = record({
-    thing: field('nested', { theThingIWant: string }, x => x.theThingIWant),
-    doubled: field('value', number, x => x * 2),
+    thing: field('nested', { theThingIWant: string }).map(x => x.theThingIWant),
+    doubled: field('value', number).map(x => x * 2),
 });
 
-// tuple — destructure into an object (use transform since tuple is variadic)
-const pointDecoder = transform(tuple(number, number), ([x, y]) => ({ x, y }));
+// tuple — destructure into an object
+const pointDecoder = tuple(number, number).map(([x, y]) => ({ x, y }));
 
 // array — reduce decoded elements
-const sumDecoder = array(number, xs => xs.reduce((a, b) => a + b, 0));
+const sumDecoder = array(number).map(xs => xs.reduce((a, b) => a + b, 0));
 
 // literal — transform matched value
-const roleDecoder = literal('admin', x => x.toUpperCase());
+const roleDecoder = literal('admin').map(x => x.toUpperCase());
 
-// optional — transforms the value when present, passes through undefined
-const upperName = optional(string, s => s.toUpperCase());
-// nullable — same idea, passes through null
-const upperOrNull = nullable(string, s => s.toUpperCase());
+// optional / nullable — map receives the full union type (including undefined/null)
+const upperName = optional(string).map(s => s?.toUpperCase());
+const upperOrNull = nullable(string).map(s => s !== null ? s.toUpperCase() : null);
 ```
 
-Continuations are also available on `set`, `objectOf`, and `dict`:
+`.map()` works on every decoder — `set`, `objectOf`, `dict`, `union`, `intersection`, and all others:
 
 ```typescript
-import { set, objectOf, dict, number, string } from 'typescript-json-decoder';
+import { set, objectOf, dict, union, intersection, number, string } from 'typescript-json-decoder';
 
-// set — get the size
-const countUnique = set(string, s => s.size);
-
-// objectOf — sum all values
-const totalScore = objectOf(number, r => Object.values(r).reduce((a, b) => a + b, 0));
-
-// dict with constrained keys — join values
-const joined = dict(string, ['a', 'b'] as const, m => Array.from(m.values()).join(','));
+const countUnique = set(string).map(s => s.size);
+const totalScore = objectOf(number).map(r => Object.values(r).reduce((a, b) => a + b, 0));
+const joined = dict(string, ['a', 'b'] as const).map(m => Array.from(m.values()).join(','));
+const asString = union(string, number).map(x => String(x));
+const combined = intersection({ a: string }, { b: number }).map(x => `${x.a}-${x.b}`);
 ```
 
-For decoders that don't take a continuation (like `union` and `intersection`), or when you want to transform any decoder generically, use `transform`:
+You can also chain multiple `.map()` calls:
 
 ```typescript
-import { transform, union, intersection, string, number } from 'typescript-json-decoder';
+const isLong = string.map(s => s.length).map(n => n > 3);
+```
 
-const decoder = transform(union(string, number), x => String(x));
-const combined = transform(intersection({ a: string }, { b: number }), x => `${x.a}-${x.b}`);
+## Chaining decoders
+
+While `.map()` takes a plain function, `.chain()` takes a `DecoderInput` — letting you pipe the output of one decoder into another, including literal forms like records and tuples.
+
+```typescript
+import { field, unknown, string, number, bigint, date, array } from 'typescript-json-decoder';
+
+// parse a JSON string field as bigint
+const balance = field('balance', string).chain(bigint);
+
+// decode a nested payload as a typed record
+const payload = field('data', unknown).chain({ name: string, age: number });
+
+// string → date → year
+const yearFromString = string.chain(date).map(d => d.getFullYear());
 ```
 
 ## Safe decoding
 
-By default, decoders throw on failure. If you prefer a result type, use `safeDecode`:
+By default, decoders throw on failure. Every decoder has a `.safeDecode()` method that returns a result type instead:
 
 ```typescript
-import { safeDecode, string } from 'typescript-json-decoder';
+import { string, record, number } from 'typescript-json-decoder';
 
-const result = safeDecode(string, someValue);
+const result = string.safeDecode(someValue);
 if (result.ok) {
     console.log(result.value); // string
 } else {
@@ -580,4 +592,19 @@ if (result.ok) {
 }
 ```
 
-`safeDecode` works with any decoder and returns `{ ok: true, value: T } | { ok: false, error: string }`.
+This works on any decoder, including composed ones:
+
+```typescript
+const userDecoder = record({ name: string, age: number });
+const result = userDecoder.safeDecode(input);
+```
+
+There is also a standalone `safeDecode` function if you prefer:
+
+```typescript
+import { safeDecode, string } from 'typescript-json-decoder';
+
+const result = safeDecode(string, someValue);
+```
+
+Both return `{ ok: true, value: T } | { ok: false, error: string }`.

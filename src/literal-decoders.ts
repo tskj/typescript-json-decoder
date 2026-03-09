@@ -1,36 +1,35 @@
 import { assert_is_pojo, isPojoObject } from './pojo';
 import {
   decodeType,
-  decode,
+  decoder,
   Decoder,
-  DecoderFunction,
+  DecoderInput,
+  makeDecoder,
   PrimitiveJsonLiteralForm,
   addQuestionmarksToRecordFields,
 } from './types';
 import { tag, err } from './utils';
 
-const apply = (k: any, x: any) => k ? k(x) : x;
-
-export function literal<p extends PrimitiveJsonLiteralForm>(lit: p): DecoderFunction<p>;
-export function literal<p extends PrimitiveJsonLiteralForm, U>(lit: p, k: (x: p) => U): DecoderFunction<U>;
-export function literal(lit: PrimitiveJsonLiteralForm, k?: (x: any) => any) {
-  return (value: unknown) => {
+export function literal<p extends PrimitiveJsonLiteralForm>(lit: p): Decoder<p>;
+export function literal(lit: PrimitiveJsonLiteralForm) {
+  return makeDecoder((value: unknown) => {
     assert_is_pojo(value);
     if (lit !== value) {
       throw err`The value ${value} is not the literal ${lit}`;
     }
-    return apply(k, lit);
-  };
+    return lit;
+  });
 }
 
-export function tuple(): DecoderFunction<[]>;
-export function tuple<A extends Decoder<unknown>>(a: A): DecoderFunction<[decodeType<A>]>;
-export function tuple<A extends Decoder<unknown>, B extends Decoder<unknown>>(a: A, b: B): DecoderFunction<[decodeType<A>, decodeType<B>]>;
-export function tuple<A extends Decoder<unknown>, B extends Decoder<unknown>, C extends Decoder<unknown>>(a: A, b: B, c: C): DecoderFunction<[decodeType<A>, decodeType<B>, decodeType<C>]>;
-export function tuple<A extends Decoder<unknown>, B extends Decoder<unknown>, C extends Decoder<unknown>, D extends Decoder<unknown>>(a: A, b: B, c: C, d: D): DecoderFunction<[decodeType<A>, decodeType<B>, decodeType<C>, decodeType<D>]>;
-export function tuple<A extends Decoder<unknown>, B extends Decoder<unknown>, C extends Decoder<unknown>, D extends Decoder<unknown>, E extends Decoder<unknown>>(a: A, b: B, c: C, d: D, e: E): DecoderFunction<[decodeType<A>, decodeType<B>, decodeType<C>, decodeType<D>, decodeType<E>]>;
+export function tuple(): Decoder<[]>;
+export function tuple<A extends DecoderInput<unknown>>(a: A): Decoder<[decodeType<A>]>;
+export function tuple<A extends DecoderInput<unknown>, B extends DecoderInput<unknown>>(a: A, b: B): Decoder<[decodeType<A>, decodeType<B>]>;
+export function tuple<A extends DecoderInput<unknown>, B extends DecoderInput<unknown>, C extends DecoderInput<unknown>>(a: A, b: B, c: C): Decoder<[decodeType<A>, decodeType<B>, decodeType<C>]>;
+export function tuple<A extends DecoderInput<unknown>, B extends DecoderInput<unknown>, C extends DecoderInput<unknown>, D extends DecoderInput<unknown>>(a: A, b: B, c: C, d: D): Decoder<[decodeType<A>, decodeType<B>, decodeType<C>, decodeType<D>]>;
+export function tuple<A extends DecoderInput<unknown>, B extends DecoderInput<unknown>, C extends DecoderInput<unknown>, D extends DecoderInput<unknown>, E extends DecoderInput<unknown>>(a: A, b: B, c: C, d: D, e: E): Decoder<[decodeType<A>, decodeType<B>, decodeType<C>, decodeType<D>, decodeType<E>]>;
 export function tuple(...decoders: any[]) {
-  return (value: unknown) => {
+  const resolved = decoders.map((d: any) => decoder(d));
+  return makeDecoder((value: unknown) => {
     assert_is_pojo(value);
     if (!Array.isArray(value)) {
       throw err`The value ${value} is not a list and can therefore not be parsed as a tuple`;
@@ -38,77 +37,72 @@ export function tuple(...decoders: any[]) {
     if (value.length !== decoders.length) {
       throw err`The array ${value} is not the proper length for a ${decoders.length}-tuple`;
     }
-    return decoders.map((d, i) => decode(d)(value[i]));
-  };
+    return resolved.map((d, i) => d(value[i]));
+  });
 }
 
 export const fieldDecoder: unique symbol = Symbol('field-decoder');
 export const missingKey: unique symbol = Symbol('missing-key');
-export const fields = <T extends { [key: string]: Decoder<unknown> }, U>(
-  decoder: T,
-  continuation: (x: evalRecordSchema<T>) => U,
-): DecoderFunction<U> => {
-  const dec = (value: unknown) => {
+export const fields = <T extends { [key: string]: DecoderInput<unknown> }>(
+  schema: T,
+): Decoder<evalRecordSchema<T>> => {
+  const dec = makeDecoder((value: unknown) => {
     assert_is_pojo(value);
-    const decoded = record(decoder)(value);
-    return continuation(decoded as any);
-  };
+    return record(schema)(value) as any;
+  });
   tag(dec, fieldDecoder);
   return dec;
 };
 
-export const missing: DecoderFunction<undefined> = Object.assign(
-  (_value: unknown): undefined => {
-    throw err`should not be called directly`;
+// missing is hand-assembled to avoid calling makeDecoder at module load time
+// (circular dependency: types.ts ↔ literal-decoders.ts)
+const _missingFn = (_value: unknown): undefined => {
+  throw err`should not be called directly`;
+};
+export const missing = Object.assign(
+  _missingFn,
+  {
+    [missingKey]: true as const,
+    map: () => missing,
+    chain: () => missing,
+    safeDecode: () => ({ ok: false as const, error: 'missing should not be called directly' }),
   },
-  { [missingKey]: true as const },
-);
+) as unknown as Decoder<undefined>;
 
-export function field<D extends Decoder<unknown>>(
+export const field = <D extends DecoderInput<unknown>>(
   key: string,
-  decoder: D,
-): DecoderFunction<decodeType<D>>;
-export function field<D extends Decoder<unknown>, U>(
-  key: string,
-  decoder: D,
-  k: (x: decodeType<D>) => U,
-): DecoderFunction<U>;
-export function field(
-  key: string,
-  decoder: Decoder<unknown>,
-  k?: (x: any) => any,
-) {
-  return fields({ [key]: decoder }, (x: any) => apply(k, x[key]));
-}
+  d: D,
+): Decoder<decodeType<D>> =>
+  fields({ [key]: d }).map((x: any) => x[key]);
 
 type evalRecordSchema<schema> = addQuestionmarksToRecordFields<{
   [key in keyof schema]: decodeType<schema[key]>;
 }>;
 
 export const record =
-  <schema extends { [key: string]: Decoder<unknown> }>(
+  <schema extends { [key: string]: DecoderInput<unknown> }>(
     s: schema,
-  ): DecoderFunction<evalRecordSchema<schema>> =>
-  (value: unknown): any => {
+  ): Decoder<evalRecordSchema<schema>> =>
+  makeDecoder((value: unknown): any => {
     assert_is_pojo(value);
     if (!isPojoObject(value)) {
       throw err`Value ${value} is not of type ${'object'} but rather ${typeof value}`;
     }
     const result: any = {};
-    for (const [key, decoder] of Object.entries(s) as [string, any][]) {
-      if (decoder[missingKey] === true) {
+    for (const [key, dec] of Object.entries(s) as [string, any][]) {
+      if (dec[missingKey] === true) {
         if (key in (value as any)) {
           throw err`The key ${key} is present in ${value} but was expected to be missing`;
         }
         continue;
       }
-      if (decoder[fieldDecoder] === true) {
-        result[key] = decode(decoder)(value);
+      if (dec[fieldDecoder] === true) {
+        result[key] = decoder(dec)(value);
         continue;
       }
       try {
         const jsonvalue = (value as any)[key];
-        result[key] = decode(decoder)(jsonvalue);
+        result[key] = decoder(dec)(jsonvalue);
       } catch (message) {
         if (!(key in (value as any))) {
           throw err`The key ${key} is missing in ${value}`;
@@ -120,4 +114,4 @@ export const record =
       }
     }
     return result;
-  };
+  });

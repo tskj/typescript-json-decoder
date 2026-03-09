@@ -53,40 +53,29 @@ At the cost of one line of boilerplate this gives you complete type safety when 
 
 The way this works under the hood is pretty interesting. If you pay close attention you see that what we have defined is not a type at all, it's actually a JavaScript object that kind of looks like a type definition. This is because it's actually impossible in TypeScript (without hooking into the compiler) to do the kind of metaprogramming where you inspect the type itself. So instead we do the opposite, we create a regular value which represents the type we wish to generate, and from that we generate both the type itself (and call it `User`) and the decoder. The special TypeScript operator `typeof` (named after a similar, but different, JavaScript operator with the same name) is used to extract the type of the decoder from the JavaScript object that defines it, in our case `userDecoder`. This type is then transformed to the corresponding type which the decoder is supposed to decode to.
 
-The idea is that the library supplies all the primitive decoders such as `number`, `string`, and even `array` (which takes another decoder as a parameter), and then we combine these to build bigger decoders. The way these decoders are defined is really simple, take a look at the following definition of the `string` decoder.
+The idea is that the library supplies all the primitive decoders such as `number`, `string`, and even `array` (which takes another decoder as a parameter), and then we combine these to build bigger decoders. Every decoder is a callable `Decoder<T>` object — you call it like a function to decode a value, and it also has `.map()` for transforming results and `.safeDecode()` for error handling without exceptions. The way the primitive decoders work is really simple though. Consider the `string` decoder: it just checks that the value is a string and returns it, or throws otherwise. This is actually the identity function for strings.
+
+The complexity in the library is elsewhere; the core idea is that JavaScript values are considered to be decoders of themselves. I call these literal decoders. For example, the string `"hello"` is a decoder of the literal value `"hello"`, and only that value. That might not seem so useful, but once you extend it to records, it becomes quite powerful. A record containing decoders, *is a decoder of a record with the same fields*. In a sense, it is a decoder of itself. In other words, it decodes a thing that looks like itself. And this is defined recursively, which allows us to nest objects, or have arrays of objects, or arrays containing objects of objects containing arrays, and so on and so on. In this way you can define your own "custom" decoders and compose them arbitrarily — and with `.map()` you can transform the decoded result at any level.
+
+The way the decoders are evaluated, then, is a pretty straightforward recursive traversal of the tree structure of decoders where it applies the decoders it finds. What is much more interesting, and honestly where all the complexity of this library resides, is in the innocent looking `decodeType` type level function, which is responsible for taking a decoder and producing the type of the thing that decoder decodes.
+
+What. A type level function? So TypeScript actually has an incredibly sophisticated type system. I come from a background of having fallen in love with the intricacies of Haskell's type system, but TypeScript is in many ways more advanced. This comes from the necessity of being able to express a lot of the patterns commonly found in JavaScript, which is by nature very dynamic. Anyway, a type level function is a function, at the type level. Bear with me. `decodeType` in the example above is not actually itself a type, rather it is something that when given a type, returns a type. A function of types! A function from a type to a type? Can types have types? This is sometimes referred to as "the kind" of a type, but if we don't want to confuse ourselves too much, we'll just think of this as something that you can give an existing type to, and get another, new, type out of.
+
+If you think about it, a decoder by necessity does not have the same type as the thing it decodes. A `Decoder<User>` is a callable object that takes any unknown value and returns a `User` (if it can, that is; TypeScript doesn't have checked exceptions, so you won't see the failure case in the type). The type this decoder decodes is `User`. So the following type expression: `decodeType<Decoder<User>>` evaluates to the type `User`, or generally whatever the decoder decodes. This all is complicated further by the fact previously mentioned that not all decoders are callable objects; some decoders, for instance a record decoder, has a literal form.
+
+However, let's ignore that and first think about how to extract the type that a decoder will decode.
 
 ```typescript
-const string: DecoderFunction<string> = (s: Pojo) => {
-  if (typeof s !== 'string') {
-    throw `The value \`${s}\` is not of type \`string\`, but is of type \`${typeof s}\``;
-  }
-  return s;
-};
+type decodeType<decoder> = decoder extends (x: unknown) => (infer T) ? T : never;
 ```
 
-Note that the library refers to regular JavaScript objects as `Pojo`s. This decoder doesn't actually *do* anything! It just returns the string it's passed, if it is a string, or if not, throws. So this is actually the identity function for strings.
-
-The complexity in the library is elsewhere; the core idea is that JavaScript values are considered to be decoders of themselves. I call these literal decoders. For example, the string `"hello"` is a decoder of the literal value `"hello"`, and only that value. That might not seem so useful, but once you extend it to records, it becomes quite powerful. A record containing decoders, *is a decoder of a record with the same fields*. In a sense, it is a decoder of itself. In other words, it decodes a thing that looks like itself. And this is defined recursively, which allows us to nest objects, or have arrays of objects, or arrays containing objects of objects containing arrays, and so on and so on. In this way you can define your own "custom" decoders and compose them arbitrarily.
-
-The way the decoders are evaluated, then, is a pretty straightforward recursive traversal of the tree structure of decoders where it applies the decoders it finds. What is much more interesting, and honestly where all the complexity of this library resides, is in the innocent looking `decode` type level function, which is responsible for taking a decoder and producing the type of the thing that decoder decodes.
-
-What. A type level function? So TypeScript actually has an incredibly sophisticated type system. I come from a background of having fallen in love with the intricacies of Haskell's type system, but TypeScript is in many ways more advanced. This comes from the necessity of being able to express a lot of the patterns commonly found in JavaScript, which is by nature very dynamic. Anyway, a type level function is a function, at the type level. Bear with me. `decode` in the example above is not actually itself a type, rather it is something that when given a type, returns a type. A function of types! A function from a type to a type? Can types have types? This is sometimes referred to as "the kind" of a type, but if we don't want to confuse ourselves too much, we'll just think of this as something that you can give an existing type to, and get another, new, type out of.
-
-If you think about it, a decoder by necessity does not have the same type as the thing it decodes. Instead maybe it has the following type: `(x: Pojo) => User`. So it takes any plain old JavaScript object, and returns a `User` (if it can, that is; TypeScript doesn't have checked exceptions, so you won't see the failure case in the type). The type this decoder decodes, is `User`. So the following type expression: `decode<(x: Pojo) => User>` evaluates to the type `User`, or generally whatever the decoder decodes. This all is complicated further by the fact previously mentioned that not all decoders are functions; some decoders, for instance a record decoder, has a literal form.
-
-However, let's ignore that and first think about how to extract the type that a (function) decoder will decode.
-
-```typescript
-type decodeType<decoder> = decoder extends (x: Pojo) => (infer T) ? T : never;
-```
-
-Now this is the kind of metaprogramming that gets me going. What in the world is going on. Well, first of all we have a ternary - essentially an if test on types. The thing we are testing on is the `decoder extends (x: Pojo) => (infer T)` part, which is a *subtype test*. The extend keyword, I think, is a horribly chosen name in TypeScript, mostly carried over from other contexts. What it means is "is a subtype of". It is a question asked of the type parameter `decoder`, are you a subtype of the type `(x: Pojo) => (infer T)`? Which begs the question, what is `infer T`? Well, it is whatever it needs to be to satisfy the subtype test. If `decoder` is the function type defined above, `(x: Pojo) => User`, then `T` would need to be `User` for the one to be the subtype of the other - at least if you consider being the same type as being a subtype. The keyword `infer` is used to introduce a new type variable. In the first branch of the ternary we return the type `T` if we have a match (that is, the decoder is a function type), and in the second branch we return TypeScript's bottom type `never`, indicating this should never happen. If this does happen, and we try to use the resulting `never` type for anything, we get a compiler error. `never` is the empty set, if you are inclined to think about types as sets. There is no value of this type.
+Now this is the kind of metaprogramming that gets me going. What in the world is going on. Well, first of all we have a ternary - essentially an if test on types. The thing we are testing on is the `decoder extends (x: unknown) => (infer T)` part, which is a *subtype test*. The extend keyword, I think, is a horribly chosen name in TypeScript, mostly carried over from other contexts. What it means is "is a subtype of". It is a question asked of the type parameter `decoder`, are you a subtype of the type `(x: unknown) => (infer T)`? Which begs the question, what is `infer T`? Well, it is whatever it needs to be to satisfy the subtype test. If `decoder` is a `Decoder<User>` (which is callable as `(x: unknown) => User`), then `T` would need to be `User` for the one to be the subtype of the other - at least if you consider being the same type as being a subtype. The keyword `infer` is used to introduce a new type variable. In the first branch of the ternary we return the type `T` if we have a match (that is, the decoder is callable), and in the second branch we return TypeScript's bottom type `never`, indicating this should never happen. If this does happen, and we try to use the resulting `never` type for anything, we get a compiler error. `never` is the empty set, if you are inclined to think about types as sets. There is no value of this type.
 
 This is actually the definition of the type level function for extracting the return type of a function (that's a mouthful), and is in fact available in the standard library under the name `ReturnType`! So that was a lot of type theory for very little. We need to go further. I mentioned that the essence of this library is to understand literal values as decoders of themselves, and to define this recursively in the case of records. So let's add records!
 
 ```typescript
 type decodeType<decoder> =
-    decoder extends (x: Pojo) => (infer T)
+    decoder extends (x: unknown) => (infer T)
         ? T
         : { [key in keyof decoder]: decodeType<decoder[key]> }
 ```
@@ -95,9 +84,9 @@ Here I've formatted the ternary to make it resemble a classical if block a bit m
 
 ```typescript
 type User = decodeType<{
-    id: (x: Pojo) => number;
-    username: (x: Pojo) => string;
-    friends: (x: Pojo) => number[];
+    id: Decoder<number>;
+    username: Decoder<string>;
+    friends: Decoder<number[]>;
 }>;
 ```
 
@@ -130,22 +119,22 @@ we would get the following evaluation steps.
 
 ```typescript
 type User = decodeType<{
-    id: (x: Pojo) => number;
-    username: (x: Pojo) => string;
-    friends: (x: Pojo) => number[];
+    id: Decoder<number>;
+    username: Decoder<string>;
+    friends: Decoder<number[]>;
     address: {
-        city: (x: Pojo) => string;
-        zip: (x: Pojo) => number;
+        city: Decoder<string>;
+        zip: Decoder<number>;
     }
 }>;
 
 type User = {
-    id: decodeType<(x: Pojo) => number>;
-    username: decodeType<(x: Pojo) => string>;
-    friends: decodeType<(x: Pojo) => number[]>;
+    id: decodeType<Decoder<number>>;
+    username: decodeType<Decoder<string>>;
+    friends: decodeType<Decoder<number[]>>;
     address: decodeType<{
-        city: (x: Pojo) => string;
-        zip: (x: Pojo) => number;
+        city: Decoder<string>;
+        zip: Decoder<number>;
     }>,
 }>;
 
@@ -154,8 +143,8 @@ type User = {
     username: string;
     friends: number[];
     address: {
-        city: decodeType<(x: Pojo) => string>;
-        zip: decodeType<(x: Pojo) => number>;
+        city: decodeType<Decoder<string>>;
+        zip: decodeType<Decoder<number>>;
     },
 }>;
 

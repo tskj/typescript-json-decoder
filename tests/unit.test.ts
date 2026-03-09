@@ -1,5 +1,5 @@
 import {
-  decode,
+  decoder,
   boolean,
   decodeType,
   safeDecode,
@@ -28,7 +28,6 @@ import {
   regex,
   objectOf,
   bigint,
-  transform,
   nonEmptyArray,
   missing,
   lazy,
@@ -57,7 +56,7 @@ test('homogeneous tuple literal', () => {
   const t: [string, string] = ['a', 'aa'];
 
   type tuple = decodeType<typeof tuple_decoder>;
-  const tuple_decoder = decode([string, string]);
+  const tuple_decoder = decoder([string, string]);
 
   expect<tuple>(tuple_decoder(t)).toEqual(t);
 });
@@ -66,7 +65,7 @@ test('heterogeneous tuple literal', () => {
   const t: [string, number] = ['a', 1];
 
   type tuple = decodeType<typeof tuple_decoder>;
-  const tuple_decoder = decode([string, number]);
+  const tuple_decoder = decoder([string, number]);
 
   expect<tuple>(tuple_decoder(t)).toEqual(t);
 });
@@ -75,7 +74,7 @@ test('nested tuple', () => {
   const t: [string, [string, string]] = ['a', ['b', 'c']];
 
   type tuple = decodeType<typeof tuple_decoder>;
-  const tuple_decoder = decode(tuple(string, tuple(string, string)));
+  const tuple_decoder = decoder(tuple(string, tuple(string, string)));
 
   expect<tuple>(tuple_decoder(t)).toEqual(t);
 });
@@ -84,7 +83,7 @@ test('nested tuple literal', () => {
   const t: [string, [string, string]] = ['a', ['b', 'c']];
 
   type tuple = decodeType<typeof tuple_decoder>;
-  const tuple_decoder = decode([string, [string, string]]);
+  const tuple_decoder = decoder([string, [string, string]]);
 
   expect<tuple>(tuple_decoder(t)).toEqual(t);
 });
@@ -229,7 +228,7 @@ test('decode string', () => {
   const l1: 'a' = 'a' as const;
 
   type literal = decodeType<typeof literal_decoder>;
-  const literal_decoder = decode(l1);
+  const literal_decoder = decoder(l1);
 
   expect<literal>(literal_decoder(l1)).toEqual(l1);
   expect(() => literal_decoder('b')).toThrow();
@@ -239,7 +238,7 @@ test('decode record', () => {
   const l1: {} = {} as const;
 
   type literal = decodeType<typeof literal_decoder>;
-  const literal_decoder = decode({});
+  const literal_decoder = decoder({});
 
   expect<literal>(literal_decoder(l1)).toEqual(l1);
   expect(() => literal_decoder(null)).toThrow();
@@ -340,7 +339,7 @@ test('fields decoder', () => {
   const record_decoder = record({
     f: string,
     g: number,
-    h: fields({ f: string, g: number }, ({ f, g }) => f + g),
+    h: fields({ f: string, g: number }).map(({ f, g }) => f + g),
   });
 
   const result = { ...l1, h: l1.f + l1.g };
@@ -814,14 +813,14 @@ test('intersection of incompatible tuples', () => {
 
 test('intersection with incompatible tuple lengths', () => {
 
-  const tupleA: Decoder<[number, number]> = (x => {
+  const tupleA: Decoder<[number, number]> = decoder(((x: unknown) => {
     const arr = array(number)(x);
     return [arr[0], arr[1], ];
-  });
-  const tupleB: Decoder<[number, number, number]> = (x => {
+  }) as any);
+  const tupleB: Decoder<[number, number, number]> = decoder(((x: unknown) => {
     const arr = array(number)(x);
     return [arr[0], arr[1], arr[2], ];
-  });
+  }) as any);
   const intersect_decoder = intersection(tupleA, tupleB);
 
   expect(() => intersect_decoder([])).toThrow()
@@ -1148,14 +1147,14 @@ test('nested bare POJO with number and boolean literals', () => {
   ).toThrow();
 });
 
-test('bare POJO with number/boolean via decode()', () => {
-  const decoder = decode({ level: 42, active: true, name: string });
+test('bare POJO with number/boolean via decoder()', () => {
+  const dec = decoder({ level: 42, active: true, name: string });
 
   expect(
-    decoder({ level: 42, active: true, name: 'test' }),
+    dec({ level: 42, active: true, name: 'test' }),
   ).toEqual({ level: 42, active: true, name: 'test' });
-  expect(() => decoder({ level: 43, active: true, name: 'test' })).toThrow();
-  expect(() => decoder({ level: 42, active: false, name: 'test' })).toThrow();
+  expect(() => dec({ level: 43, active: true, name: 'test' })).toThrow();
+  expect(() => dec({ level: 42, active: false, name: 'test' })).toThrow();
 });
 
 test('optional and nullable with bare literals', () => {
@@ -1282,11 +1281,11 @@ test('deeply nested bare POJOs with mixed literal types', () => {
 });
 
 test('bare literal tuple with number and boolean', () => {
-  const decoder = decode([42, true]);
+  const dec = decoder([42, true]);
 
-  expect(decoder([42, true])).toEqual([42, true]);
-  expect(() => decoder([43, true])).toThrow();
-  expect(() => decoder([42, false])).toThrow();
+  expect(dec([42, true])).toEqual([42, true]);
+  expect(() => dec([43, true])).toThrow();
+  expect(() => dec([42, false])).toThrow();
 });
 
 test('record nesting record with optional fields preserves types', () => {
@@ -1330,8 +1329,7 @@ test('kitchen sink: bare literals across all combinators', () => {
   const fieldsDecoder = record({
     combined: fields(
       { level: number, active: true },
-      ({ level, active }) => `${level}-${active}`,
-    ),
+    ).map(({ level, active }) => `${level}-${active}`),
   });
   expect(fieldsDecoder({ level: 5, active: true })).toEqual({ combined: '5-true' });
   expect(() => fieldsDecoder({ level: 5, active: false })).toThrow();
@@ -1359,7 +1357,7 @@ test('kitchen sink: bare literals across all combinators', () => {
   expect(() => nullableIntersect({ type: 'x', level: 99, name: 'hi' })).toThrow();
 
   // optional array of bare literal tuples
-  const optArrayTuples = optional(array(decode([number, true])));
+  const optArrayTuples = optional(array(decoder([number, true])));
   expect(optArrayTuples(undefined)).toBeUndefined();
   expect(optArrayTuples([[1, true], [2, true]])).toEqual([[1, true], [2, true]]);
   expect(() => optArrayTuples([[1, false]])).toThrow();
@@ -1614,10 +1612,10 @@ test('withDefault with nullable in a record — null is valid, missing key falls
 });
 
 test('withDefault in a bare POJO (no record() wrapper)', () => {
-  const decoder = decode({ name: string, score: withDefault(number, 0) });
-  expect(decoder({ name: 'alice', score: 42 })).toEqual({ name: 'alice', score: 42 });
-  expect(decoder({ name: 'alice' })).toEqual({ name: 'alice', score: 0 });
-  expect(decoder({ name: 'alice', score: 'bad' })).toEqual({ name: 'alice', score: 0 });
+  const dec = decoder({ name: string, score: withDefault(number, 0) });
+  expect(dec({ name: 'alice', score: 42 })).toEqual({ name: 'alice', score: 42 });
+  expect(dec({ name: 'alice' })).toEqual({ name: 'alice', score: 0 });
+  expect(dec({ name: 'alice', score: 'bad' })).toEqual({ name: 'alice', score: 0 });
 });
 
 test('withDefault in a tuple', () => {
@@ -1785,85 +1783,81 @@ test('bigint decoder in a record', () => {
     .toEqual({ name: 'alice', balance: BigInt('9007199254740993') });
 });
 
-test('field with continuation — extract and transform', () => {
-  const decoder = record({
-    thing: field('nested', { theThingIWant: string }, x => x.theThingIWant),
+test('field with .map() — extract and transform', () => {
+  const dec = record({
+    thing: field('nested', { theThingIWant: string }).map(x => x.theThingIWant),
     foo: string,
   });
-  expect(decoder({ foo: 'bar', nested: { theThingIWant: 'found it' } }))
+  expect(dec({ foo: 'bar', nested: { theThingIWant: 'found it' } }))
     .toEqual({ thing: 'found it', foo: 'bar' });
 });
 
-test('field with continuation — numeric transform', () => {
-  const decoder = record({
-    doubled: field('value', number, x => x * 2),
+test('field with .map() — numeric transform', () => {
+  const dec = record({
+    doubled: field('value', number).map(x => x * 2),
   });
-  expect(decoder({ value: 21 })).toEqual({ doubled: 42 });
+  expect(dec({ value: 21 })).toEqual({ doubled: 42 });
 });
 
-test('field without continuation — unchanged behavior', () => {
-  const decoder = record({
+test('field without .map() — unchanged behavior', () => {
+  const dec = record({
     name: field('username', string),
   });
-  expect(decoder({ username: 'alice' })).toEqual({ name: 'alice' });
+  expect(dec({ username: 'alice' })).toEqual({ name: 'alice' });
 });
 
-// --- transform ---
+// --- .map() replaces transform ---
 
-test('transform — basic usage', () => {
-  const decoder = transform(number, x => x * 2);
-  expect(decoder(21)).toBe(42);
+test('.map() — basic usage', () => {
+  const dec = number.map(x => x * 2);
+  expect(dec(21)).toBe(42);
 });
 
-test('transform — with record decoder', () => {
-  const decoder = transform(
-    { name: string, age: number },
+test('.map() — with record decoder', () => {
+  const dec = record({ name: string, age: number }).map(
     x => `${x.name} is ${x.age}`,
   );
-  expect(decoder({ name: 'alice', age: 30 })).toBe('alice is 30');
+  expect(dec({ name: 'alice', age: 30 })).toBe('alice is 30');
 });
 
-test('transform — chain with union', () => {
-  const decoder = transform(
-    union(string, number),
-    x => String(x),
-  );
-  expect(decoder('hello')).toBe('hello');
-  expect(decoder(42)).toBe('42');
+test('.map() — chain with union', () => {
+  const dec = union(string, number).map(x => String(x));
+  expect(dec('hello')).toBe('hello');
+  expect(dec(42)).toBe('42');
 });
 
-// --- literal with continuation ---
+// --- literal with .map() ---
 
-test('literal with continuation — transform matched value', () => {
-  const decoder = literal('admin', x => x.toUpperCase());
-  expect(decoder('admin')).toBe('ADMIN');
+test('literal with .map() — transform matched value', () => {
+  const dec = literal('admin').map(x => x.toUpperCase());
+  expect(dec('admin')).toBe('ADMIN');
 });
 
-test('literal with continuation — number literal', () => {
-  const decoder = literal(42, x => x + 1);
-  expect(decoder(42)).toBe(43);
+test('literal with .map() — number literal', () => {
+  const dec = literal(42).map(x => x + 1);
+  expect(dec(42)).toBe(43);
 });
 
-test('literal with continuation — boolean literal', () => {
-  const decoder = literal(true, x => (x ? 'yes' : 'no'));
-  expect(decoder(true)).toBe('yes');
+test('literal with .map() — boolean literal', () => {
+  const dec = literal(true).map(x => (x ? 'yes' : 'no'));
+  expect(dec(true)).toBe('yes');
 });
 
-test('literal with continuation — still rejects non-matching', () => {
-  const decoder = literal('admin', x => x.toUpperCase());
-  expect(() => decoder('user')).toThrow();
+test('literal with .map() — still rejects non-matching', () => {
+  const dec = literal('admin').map(x => x.toUpperCase());
+  expect(() => dec('user')).toThrow();
 });
 
-// --- tuple with transform ---
+// --- tuple with .map() ---
 
-test('tuple with transform — destructure and combine', () => {
-  const decoder = transform(tuple(string, number), ([name, age]) => ({ name, age }));
-  expect(decoder(['alice', 30])).toEqual({ name: 'alice', age: 30 });
+test('tuple with .map() — destructure and combine', () => {
+  const dec = tuple(string, number).map(([name, age]) => ({ name, age }));
+  expect(dec(['alice', 30])).toEqual({ name: 'alice', age: 30 });
 });
 
-test('tuple with transform — sum', () => {
-  const decoder = transform(tuple(number, number), ([a, b]) => a + b);
-  expect(decoder([3, 4])).toBe(7);
+test('tuple with .map() — sum', () => {
+  const dec = tuple(number, number).map(([a, b]) => a + b);
+  expect(dec([3, 4])).toBe(7);
 });
 
 // --- n-ary tuples ---
@@ -1891,9 +1885,9 @@ test('3-tuple with bare literals', () => {
   expect(() => decoder(['hello', 43, true])).toThrow();
 });
 
-test('3-tuple literal form via decode()', () => {
-  const decoder = decode([string, number, boolean]);
-  expect(decoder(['hello', 42, true])).toEqual(['hello', 42, true]);
+test('3-tuple literal form via decoder()', () => {
+  const dec = decoder([string, number, boolean]);
+  expect(dec(['hello', 42, true])).toEqual(['hello', 42, true]);
 });
 
 test('n-ary tuple in record', () => {
@@ -1905,12 +1899,11 @@ test('n-ary tuple in record', () => {
     .toEqual({ name: 'origin', coords: [0, 0, 0] });
 });
 
-test('n-ary tuple with transform', () => {
-  const decoder = transform(
-    tuple(string, number, boolean),
+test('n-ary tuple with .map()', () => {
+  const dec = tuple(string, number, boolean).map(
     ([name, age, active]) => ({ name, age, active }),
   );
-  expect(decoder(['alice', 30, true])).toEqual({ name: 'alice', age: 30, active: true });
+  expect(dec(['alice', 30, true])).toEqual({ name: 'alice', age: 30, active: true });
 });
 
 test('0-tuple', () => {
@@ -1927,9 +1920,9 @@ test('0-tuple in record', () => {
   expect(() => decoder({ unit: [1], otherData: 'hello' })).toThrow();
 });
 
-test('0-tuple literal form in record via decode()', () => {
-  const decoder = record({ unit: decode([]), otherData: string });
-  expect(decoder({ unit: [], otherData: 'hello' }))
+test('0-tuple literal form in record via decoder()', () => {
+  const dec = record({ unit: decoder([]), otherData: string });
+  expect(dec({ unit: [], otherData: 'hello' }))
     .toEqual({ unit: [], otherData: 'hello' });
 });
 
@@ -1947,8 +1940,8 @@ test('1-tuple', () => {
 });
 
 test('1-tuple literal form', () => {
-  const decoder = decode([string]);
-  expect(decoder(['hello'])).toEqual(['hello']);
+  const dec = decoder([string]);
+  expect(dec(['hello'])).toEqual(['hello']);
 });
 
 test('tuple with records inside', () => {
@@ -2004,21 +1997,21 @@ test('nested tuple in tuple', () => {
   expect(decoder(['hello', [1, 2]])).toEqual(['hello', [1, 2]]);
 });
 
-// --- array with continuation ---
+// --- array with .map() ---
 
-test('array with continuation — map over decoded', () => {
-  const decoder = array(number, xs => xs.map(x => x * 2));
-  expect(decoder([1, 2, 3])).toEqual([2, 4, 6]);
+test('array with .map() — map over decoded', () => {
+  const dec = array(number).map(xs => xs.map(x => x * 2));
+  expect(dec([1, 2, 3])).toEqual([2, 4, 6]);
 });
 
-test('array with continuation — reduce', () => {
-  const decoder = array(number, xs => xs.reduce((a, b) => a + b, 0));
-  expect(decoder([1, 2, 3])).toBe(6);
+test('array with .map() — reduce', () => {
+  const dec = array(number).map(xs => xs.reduce((a, b) => a + b, 0));
+  expect(dec([1, 2, 3])).toBe(6);
 });
 
-test('array with continuation — still validates elements', () => {
-  const decoder = array(number, xs => xs.length);
-  expect(() => decoder([1, 'two', 3])).toThrow();
+test('array with .map() — still validates elements', () => {
+  const dec = array(number).map(xs => xs.length);
+  expect(() => dec([1, 'two', 3])).toThrow();
 });
 
 // --- nonEmptyArray ---
@@ -2039,9 +2032,9 @@ test('nonEmptyArray validates elements', () => {
   expect(() => decoder(['a'])).toThrow();
 });
 
-test('nonEmptyArray with continuation', () => {
-  const decoder = nonEmptyArray(number, xs => xs[0]);
-  expect(decoder([10, 20, 30])).toBe(10);
+test('nonEmptyArray with .map()', () => {
+  const dec = nonEmptyArray(number).map(xs => xs[0]);
+  expect(dec([10, 20, 30])).toBe(10);
 });
 
 test('nonEmptyArray in record', () => {
@@ -2090,72 +2083,72 @@ test('lazy decoder — simple deferred evaluation', () => {
   expect(() => decoder(42)).toThrow();
 });
 
-// --- optional with continuation ---
+// --- optional with .map() ---
 
-test('optional with continuation — transforms present value', () => {
-  const decoder = record({
-    name: optional(string, s => s.toUpperCase()),
+test('optional with .map() — transforms present value', () => {
+  const dec = record({
+    name: optional(string).map(s => s?.toUpperCase()),
   });
-  expect(decoder({ name: 'alice' })).toEqual({ name: 'ALICE' });
+  expect(dec({ name: 'alice' })).toEqual({ name: 'ALICE' });
 });
 
-test('optional with continuation — passes through undefined', () => {
-  const decoder = record({
-    name: optional(string, s => s.toUpperCase()),
+test('optional with .map() — passes through undefined', () => {
+  const dec = record({
+    name: optional(string).map(s => s?.toUpperCase()),
   });
-  expect(decoder({ name: undefined })).toEqual({ name: undefined });
+  expect(dec({ name: undefined })).toEqual({ name: undefined });
 });
 
-// --- nullable with continuation ---
+// --- nullable with .map() ---
 
-test('nullable with continuation — transforms non-null value', () => {
-  const decoder = record({
-    name: nullable(string, s => s.toUpperCase()),
+test('nullable with .map() — transforms non-null value', () => {
+  const dec = record({
+    name: nullable(string).map(s => s?.toUpperCase()),
   });
-  expect(decoder({ name: 'alice' })).toEqual({ name: 'ALICE' });
+  expect(dec({ name: 'alice' })).toEqual({ name: 'ALICE' });
 });
 
-test('nullable with continuation — passes through null', () => {
-  const decoder = record({
-    name: nullable(string, s => s.toUpperCase()),
+test('nullable with .map() — maps over null too', () => {
+  const dec = record({
+    name: nullable(string).map(s => s !== null ? s.toUpperCase() : 'N/A'),
   });
-  expect(decoder({ name: null })).toEqual({ name: null });
+  expect(dec({ name: null })).toEqual({ name: 'N/A' });
 });
 
-// --- set with continuation ---
+// --- set with .map() ---
 
-test('set with continuation — transform to array', () => {
-  const decoder = set(number, s => Array.from(s).sort());
-  expect(decoder([3, 1, 2])).toEqual([1, 2, 3]);
+test('set with .map() — transform to array', () => {
+  const dec = set(number).map(s => Array.from(s).sort());
+  expect(dec([3, 1, 2])).toEqual([1, 2, 3]);
 });
 
-test('set with continuation — get size', () => {
-  const decoder = set(string, s => s.size);
-  expect(decoder(['a', 'b', 'a'])).toBe(2);
+test('set with .map() — get size', () => {
+  const dec = set(string).map(s => s.size);
+  expect(dec(['a', 'b', 'a'])).toBe(2);
 });
 
-// --- objectOf with continuation ---
+// --- objectOf with .map() ---
 
-test('objectOf with continuation — transform record', () => {
-  const decoder = objectOf(number, r => Object.values(r).reduce((a, b) => a + b, 0));
-  expect(decoder({ a: 1, b: 2, c: 3 })).toBe(6);
+test('objectOf with .map() — transform record', () => {
+  const dec = objectOf(number).map(r => Object.values(r).reduce((a, b) => a + b, 0));
+  expect(dec({ a: 1, b: 2, c: 3 })).toBe(6);
 });
 
-test('objectOf with keys and continuation', () => {
-  const decoder = objectOf(number, ['x', 'y'] as const, r => r.x + r.y);
-  expect(decoder({ x: 10, y: 20 })).toBe(30);
+test('objectOf with keys and .map()', () => {
+  const dec = objectOf(number, ['x', 'y'] as const).map(r => r.x + r.y);
+  expect(dec({ x: 10, y: 20 })).toBe(30);
 });
 
-// --- dict with continuation ---
+// --- dict with .map() ---
 
-test('dict with continuation — transform map', () => {
-  const decoder = dict(number, m => m.size);
-  expect(decoder({ a: 1, b: 2 })).toBe(2);
+test('dict with .map() — transform map', () => {
+  const dec = dict(number).map(m => m.size);
+  expect(dec({ a: 1, b: 2 })).toBe(2);
 });
 
-test('dict with keys and continuation', () => {
-  const decoder = dict(string, ['a', 'b'] as const, m => Array.from(m.values()).join(','));
-  expect(decoder({ a: 'hello', b: 'world' })).toBe('hello,world');
+test('dict with keys and .map()', () => {
+  const dec = dict(string, ['a', 'b'] as const).map(m => Array.from(m.values()).join(','));
+  expect(dec({ a: 'hello', b: 'world' })).toBe('hello,world');
 });
 
 // --- README examples (verbatim) ---
@@ -2224,7 +2217,7 @@ test('README: tuple (Advanced usage)', () => {
 });
 
 test('README: tuple literal syntax', () => {
-  const stringAndNumberDecoder = decode([string, number]);
+  const stringAndNumberDecoder = decoder([string, number]);
   expect(stringAndNumberDecoder(['user', 2])).toEqual(['user', 2]);
 });
 
@@ -2278,10 +2271,19 @@ test('README: map inline definition', () => {
   expect(result.get(2)).toEqual({ id: 2, username: 'Olga', isBanned: false });
 });
 
+test('README: field (Low level access)', () => {
+  const userDecoder = record({
+    month: field('dateOfBirth', date).map(d => d.getMonth() + 1),
+    year: field('dateOfBirth', date).map(d => d.getFullYear()),
+  });
+  expect(userDecoder({ dateOfBirth: '2000-06-15T00:00:00Z' }))
+    .toEqual({ month: 6, year: 2000 });
+});
+
 test('README: fields (Low level access)', () => {
   const userDecoder = record({
-    identifier: fields({ username: string, userId: number },
-                       ({ username, userId }) => `user:${username}:${userId}`),
+    identifier: fields({ username: string, userId: number })
+      .map(({ username, userId }) => `user:${username}:${userId}`),
   });
   expect(userDecoder({ username: 'hunter2', userId: 3 }))
     .toEqual({ identifier: 'user:hunter2:3' });
@@ -2365,81 +2367,98 @@ test('README: withDefault + nullable pass-through', () => {
   expect(decoder('bad')).toBe(null);   // decoder threw, fallback
 });
 
-test('README: safeDecode', () => {
-  const result = safeDecode(string, 'hello');
+test('README: .safeDecode() method', () => {
+  const result = string.safeDecode('hello');
   expect(result).toEqual({ ok: true, value: 'hello' });
   if (result.ok) {
     expect(result.value).toBe('hello');
   }
 
-  const failure = safeDecode(string, 42);
+  const failure = string.safeDecode(42);
   expect(failure.ok).toBe(false);
   if (!failure.ok) {
     expect(typeof failure.error).toBe('string');
   }
 });
 
-test('README: continuation — field extract/transform', () => {
-  const decoder = record({
-    thing: field('nested', { theThingIWant: string }, x => x.theThingIWant),
-    doubled: field('value', number, x => x * 2),
+test('README: .safeDecode() on record', () => {
+  const userDecoder = record({ name: string, age: number });
+  const result = userDecoder.safeDecode({ name: 'alice', age: 30 });
+  expect(result).toEqual({ ok: true, value: { name: 'alice', age: 30 } });
+});
+
+test('README: standalone safeDecode', () => {
+  const result = safeDecode(string, 'hello');
+  expect(result).toEqual({ ok: true, value: 'hello' });
+});
+
+test('README: .map() — field extract/transform', () => {
+  const dec = record({
+    thing: field('nested', { theThingIWant: string }).map(x => x.theThingIWant),
+    doubled: field('value', number).map(x => x * 2),
   });
-  expect(decoder({ nested: { theThingIWant: 'found' }, value: 21 }))
+  expect(dec({ nested: { theThingIWant: 'found' }, value: 21 }))
     .toEqual({ thing: 'found', doubled: 42 });
 });
 
-test('README: continuation — tuple pointDecoder', () => {
-  const pointDecoder = transform(tuple(number, number), ([x, y]) => ({ x, y }));
+test('README: .map() — tuple pointDecoder', () => {
+  const pointDecoder = tuple(number, number).map(([x, y]) => ({ x, y }));
   expect(pointDecoder([3, 4])).toEqual({ x: 3, y: 4 });
 });
 
-test('README: continuation — array sumDecoder', () => {
-  const sumDecoder = array(number, xs => xs.reduce((a, b) => a + b, 0));
+test('README: .map() — array sumDecoder', () => {
+  const sumDecoder = array(number).map(xs => xs.reduce((a, b) => a + b, 0));
   expect(sumDecoder([1, 2, 3])).toBe(6);
 });
 
-test('README: continuation — literal roleDecoder', () => {
-  const roleDecoder = literal('admin', x => x.toUpperCase());
+test('README: .map() — literal roleDecoder', () => {
+  const roleDecoder = literal('admin').map(x => x.toUpperCase());
   expect(roleDecoder('admin')).toBe('ADMIN');
   expect(() => roleDecoder('user')).toThrow();
 });
 
-test('README: continuation — optional upperName', () => {
-  const upperName = optional(string, s => s.toUpperCase());
+test('README: .map() — optional upperName', () => {
+  const upperName = optional(string).map(s => s?.toUpperCase());
   expect(upperName('alice')).toBe('ALICE');
   expect(upperName(undefined)).toBe(undefined);
 });
 
-test('README: continuation — nullable upperOrNull', () => {
-  const upperOrNull = nullable(string, s => s.toUpperCase());
+test('README: .map() — nullable upperOrNull', () => {
+  const upperOrNull = nullable(string).map(s => s !== null ? s.toUpperCase() : null);
   expect(upperOrNull('alice')).toBe('ALICE');
   expect(upperOrNull(null)).toBe(null);
 });
 
-test('README: continuation — set countUnique', () => {
-  const countUnique = set(string, s => s.size);
+test('README: .map() — set countUnique', () => {
+  const countUnique = set(string).map(s => s.size);
   expect(countUnique(['a', 'b', 'a'])).toBe(2);
 });
 
-test('README: continuation — objectOf totalScore', () => {
-  const totalScore = objectOf(number, r => Object.values(r).reduce((a, b) => a + b, 0));
+test('README: .map() — objectOf totalScore', () => {
+  const totalScore = objectOf(number).map(r => Object.values(r).reduce((a, b) => a + b, 0));
   expect(totalScore({ a: 1, b: 2, c: 3 })).toBe(6);
 });
 
-test('README: continuation — dict joined', () => {
-  const joined = dict(string, ['a', 'b'] as const, m => Array.from(m.values()).join(','));
+test('README: .map() — dict joined', () => {
+  const joined = dict(string, ['a', 'b'] as const).map(m => Array.from(m.values()).join(','));
   expect(joined({ a: 'hello', b: 'world' })).toBe('hello,world');
 });
 
-test('README: transform with union', () => {
-  const decoder = transform(union(string, number), x => String(x));
-  expect(decoder('hello')).toBe('hello');
-  expect(decoder(42)).toBe('42');
+test('README: .map() with union', () => {
+  const dec = union(string, number).map(x => String(x));
+  expect(dec('hello')).toBe('hello');
+  expect(dec(42)).toBe('42');
 });
 
-test('README: transform with intersection', () => {
-  const combined = transform(intersection({ a: string }, { b: number }), x => `${x.a}-${x.b}`);
+test('README: .map() with intersection', () => {
+  const combined = intersection({ a: string }, { b: number }).map(x => `${x.a}-${x.b}`);
   expect(combined({ a: 'hello', b: 42 })).toBe('hello-42');
+});
+
+test('README: .map() chaining', () => {
+  const isLong = string.map(s => s.length).map(n => n > 3);
+  expect(isLong('hello')).toBe(true);
+  expect(isLong('hi')).toBe(false);
 });
 
 test('README: nonEmptyArray in record', () => {
@@ -2448,6 +2467,22 @@ test('README: nonEmptyArray in record', () => {
   });
   expect(decoder({ tags: ['a', 'b'] })).toEqual({ tags: ['a', 'b'] });
   expect(() => decoder({ tags: [] })).toThrow();
+});
+
+test('README: .chain() — string to bigint', () => {
+  const balance = field('balance', string).chain(bigint);
+  expect(balance({ balance: '9007199254740993' })).toBe(BigInt('9007199254740993'));
+});
+
+test('README: .chain() — unknown to record', () => {
+  const payload = field('data', unknown).chain({ name: string, age: number });
+  expect(payload({ data: { name: 'alice', age: 30 } }))
+    .toEqual({ name: 'alice', age: 30 });
+});
+
+test('README: .chain() — string to date to year', () => {
+  const yearFromString = string.chain(date).map(d => d.getFullYear());
+  expect(yearFromString('2025-01-15T00:00:00Z')).toBe(2025);
 });
 
 test('README: missing decoder', () => {
@@ -2476,4 +2511,264 @@ test('README: lazy recursive tree', () => {
       { value: 'leaf', children: [] },
     ],
   });
+});
+
+// ---------------------------------------------------------------------------
+// v2: Callable Decoder objects
+// ---------------------------------------------------------------------------
+
+test('Decoder.map chains transformations', () => {
+  const length = string.map(s => s.length);
+  expect(length('hello')).toBe(5);
+  expect(length('')).toBe(0);
+  expect(() => length(42)).toThrow();
+});
+
+test('Decoder.map chains multiple times', () => {
+  const isLong = string.map(s => s.length).map(n => n > 3);
+  expect(isLong('hello')).toBe(true);
+  expect(isLong('hi')).toBe(false);
+});
+
+test('Decoder.map on record decoder', () => {
+  const getName = record({ name: string, age: number }).map(x => x.name);
+  expect(getName({ name: 'alice', age: 30 })).toBe('alice');
+});
+
+test('Decoder.map on array decoder', () => {
+  const sum = array(number).map(xs => xs.reduce((a, b) => a + b, 0));
+  expect(sum([1, 2, 3])).toBe(6);
+});
+
+test('Decoder.map on union decoder', () => {
+  const asString = union(string, number).map(x => String(x));
+  expect(asString('hello')).toBe('hello');
+  expect(asString(42)).toBe('42');
+});
+
+test('Decoder.safeDecode returns ok on success', () => {
+  const result = string.safeDecode('hello');
+  expect(result).toEqual({ ok: true, value: 'hello' });
+});
+
+test('Decoder.safeDecode returns error on failure', () => {
+  const result = string.safeDecode(42);
+  expect(result.ok).toBe(false);
+  expect((result as any).error).toBeTruthy();
+});
+
+test('Decoder.safeDecode on record', () => {
+  const dec = record({ name: string, age: number });
+  expect(dec.safeDecode({ name: 'alice', age: 30 })).toEqual({
+    ok: true,
+    value: { name: 'alice', age: 30 },
+  });
+  expect(dec.safeDecode({ name: 'alice' }).ok).toBe(false);
+});
+
+test('Decoder.safeDecode on mapped decoder', () => {
+  const length = string.map(s => s.length);
+  expect(length.safeDecode('hello')).toEqual({ ok: true, value: 5 });
+  expect(length.safeDecode(42).ok).toBe(false);
+});
+
+test('decoder() wraps plain function into Decoder', () => {
+  const myDecoder = decoder((input: unknown) => {
+    if (typeof input !== 'string') throw 'not a string';
+    return input.toUpperCase();
+  });
+  expect(myDecoder('hello')).toBe('HELLO');
+  expect(myDecoder.map(s => s.length)('hello')).toBe(5);
+  expect(myDecoder.safeDecode(42).ok).toBe(false);
+});
+
+test('decoder() wraps literal forms', () => {
+  const dec = decoder({ name: string, age: number });
+  expect(dec({ name: 'alice', age: 30 })).toEqual({ name: 'alice', age: 30 });
+  expect(dec.map(x => x.name)({ name: 'alice', age: 30 })).toBe('alice');
+});
+
+test('primitive decoders have .map and .safeDecode', () => {
+  expect(number.map(n => n * 2)(21)).toBe(42);
+  expect(boolean.map(b => !b)(true)).toBe(false);
+  expect(number.safeDecode('bad').ok).toBe(false);
+  expect(number.safeDecode(42)).toEqual({ ok: true, value: 42 });
+});
+
+// --- .map() on remaining combinators ---
+
+test('always.map()', () => {
+  const dec = always(42).map(n => n * 2);
+  expect(dec('anything')).toBe(84);
+  expect(dec(null)).toBe(84);
+});
+
+test('lazy.map()', () => {
+  const dec = lazy(() => string).map(s => s.length);
+  expect(dec('hello')).toBe(5);
+  expect(() => dec(42)).toThrow();
+});
+
+test('withDefault.map()', () => {
+  const dec = withDefault(number, 0).map(n => n + 1);
+  expect(dec(10)).toBe(11);
+  expect(dec('bad')).toBe(1);
+});
+
+test('intersection.map()', () => {
+  const dec = intersection({ a: string }, { b: number }).map(x => `${x.a}:${x.b}`);
+  expect(dec({ a: 'hi', b: 5 })).toBe('hi:5');
+});
+
+test('fields.map()', () => {
+  const dec = record({ x: number, y: number }).map(
+    ({ x, y }) => Math.sqrt(x * x + y * y),
+  );
+  expect(dec({ x: 3, y: 4 })).toBe(5);
+});
+
+test('nullable.map()', () => {
+  const dec = nullable(number).map(n => n !== null ? n * 2 : -1);
+  expect(dec(5)).toBe(10);
+  expect(dec(null)).toBe(-1);
+});
+
+test('optional.map()', () => {
+  const dec = optional(number).map(n => n !== undefined ? n * 2 : -1);
+  expect(dec(5)).toBe(10);
+  expect(dec(undefined)).toBe(-1);
+});
+
+test('set.map()', () => {
+  const dec = set(number).map(s => Array.from(s).sort((a, b) => a - b));
+  expect(dec([3, 1, 2, 3, 1])).toEqual([1, 2, 3]);
+});
+
+test('map combinator .map()', () => {
+  const dec = map(
+    record({ id: number, name: string }),
+    x => x.id,
+  ).map(m => m.size);
+  expect(dec([{ id: 1, name: 'a' }, { id: 2, name: 'b' }])).toBe(2);
+});
+
+// --- .safeDecode() on combinators ---
+
+test('array.safeDecode()', () => {
+  const dec = array(number);
+  expect(dec.safeDecode([1, 2, 3])).toEqual({ ok: true, value: [1, 2, 3] });
+  expect(dec.safeDecode('bad').ok).toBe(false);
+});
+
+test('tuple.safeDecode()', () => {
+  const dec = tuple(string, number);
+  expect(dec.safeDecode(['a', 1])).toEqual({ ok: true, value: ['a', 1] });
+  expect(dec.safeDecode([1, 'a']).ok).toBe(false);
+});
+
+test('union.safeDecode()', () => {
+  const dec = union(string, number);
+  expect(dec.safeDecode('hi')).toEqual({ ok: true, value: 'hi' });
+  expect(dec.safeDecode(true).ok).toBe(false);
+});
+
+test('literal.safeDecode()', () => {
+  const dec = literal('admin');
+  expect(dec.safeDecode('admin')).toEqual({ ok: true, value: 'admin' });
+  expect(dec.safeDecode('user').ok).toBe(false);
+});
+
+// --- .chain() ---
+
+test('chain into a record literal form', () => {
+  // decode a "payload" key, then decode its value as a record
+  const dec = field('payload', unknown).chain({ name: string, age: number });
+  expect(dec({ payload: { name: 'alice', age: 30 } }))
+    .toEqual({ name: 'alice', age: 30 });
+});
+
+test('chain into a tuple literal form', () => {
+  const dec = field('coords', unknown).chain([number, number]);
+  expect(dec({ coords: [3, 4] })).toEqual([3, 4]);
+});
+
+test('chain string into bigint decoder', () => {
+  // parse a JSON field as string, then decode that string as bigint
+  const dec = field('balance', string).chain(bigint);
+  expect(dec({ balance: '9007199254740993' })).toBe(BigInt('9007199254740993'));
+});
+
+test('chain unknown through a decoder pipeline', () => {
+  // unknown -> array(number) -> map to sum
+  const dec = unknown.chain(array(number)).map(xs => xs.reduce((a, b) => a + b, 0));
+  expect(dec([1, 2, 3])).toBe(6);
+});
+
+test('chain with a string literal form', () => {
+  // decode something as unknown, then assert it's the exact string 'ok'
+  const dec = unknown.chain('ok' as const);
+  expect(dec('ok')).toBe('ok');
+  expect(() => dec('nope')).toThrow();
+});
+
+test('chain preserves field tag', () => {
+  // field().chain() should still work inside a record
+  const dec = record({
+    user: field('data', unknown).chain({ name: string, email: string }),
+  });
+  expect(dec({ data: { name: 'bob', email: 'bob@test.com' } }))
+    .toEqual({ user: { name: 'bob', email: 'bob@test.com' } });
+});
+
+test('chain multiple steps', () => {
+  // string -> date -> map to year
+  const yearFromString = string.chain(date).map(d => d.getFullYear());
+  expect(yearFromString('2025-01-15T00:00:00Z')).toBe(2025);
+});
+
+test('chain deep pipeline — validate, decode, transform', () => {
+  // unknown → assert it's a string → validate format with regex → parse as date → extract year
+  const yearPipeline = unknown
+    .chain(string)
+    .chain(regex(/^\d{4}-\d{2}-\d{2}/))
+    .chain(date)
+    .map(d => d.getFullYear());
+  expect(yearPipeline('2025-06-15T00:00:00Z')).toBe(2025);
+  expect(() => yearPipeline('not-a-date')).toThrow();
+  expect(() => yearPipeline(42)).toThrow();
+});
+
+test('chain field decoders to drill into nested objects', () => {
+  const dec = unknown
+    .chain(field('x', unknown))
+    .chain(field('y', unknown))
+    .chain(field('z', unknown))
+    .chain(string);
+  expect(dec({ x: { y: { z: 'hello' } } })).toBe('hello');
+  expect(() => dec({ x: { y: { z: 42 } } })).toThrow();
+  expect(() => dec({ x: { wrong: 'key' } })).toThrow();
+});
+
+test('chain with .map() between steps to unwrap layers', () => {
+  // { wrapper: { payload: { value: '42' } } }
+  // → extract wrapper → extract payload → extract value string → decode as bigint
+  const dec = unknown
+    .chain({ wrapper: { payload: { value: string } } })
+    .map(x => x.wrapper.payload.value)
+    .chain(bigint);
+  expect(dec({ wrapper: { payload: { value: '42' } } })).toBe(BigInt(42));
+});
+
+test('chain rejects invalid intermediate values', () => {
+  const dec = string.chain(bigint);
+  expect(() => dec('not-a-number')).toThrow();
+});
+
+test('chain with nested record literal', () => {
+  const dec = unknown.chain({
+    user: { name: string, scores: [number, number] },
+    active: boolean,
+  });
+  const input = { user: { name: 'eve', scores: [90, 85] }, active: true };
+  expect(dec(input)).toEqual(input);
 });

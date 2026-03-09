@@ -11,3 +11,4 @@
 
 - **Backwards compatibility**: Don't make breaking changes except in a new major version. Existing decoders, type signatures, and exports must continue to work.
 - **README as spec**: Every code example in the README must be exercised verbatim as a runtime test. If you change the README, update the tests to match, and vice versa.
+- **README is up to date**: When adding new features or changing existing ones, update the README to reflect the changes.

@@ -17,7 +17,7 @@ import {
   tuple,
   decodeType,
   Decoder,
-  decode,
+  decoder,
   intersection,
   always,
   integer,
@@ -25,7 +25,6 @@ import {
   bigint,
   withDefault,
   objectOf,
-  transform,
   nonEmptyArray,
   missing,
   lazy,
@@ -83,8 +82,7 @@ const userDecoder = record({
   email: emailDecoder,
   displayName: fields(
     { firstName: string, lastName: string },
-    ({ firstName, lastName }) => `${firstName} ${lastName}`,
-  ),
+  ).map(({ firstName, lastName }) => `${firstName} ${lastName}`),
   avatarColor: withDefault(hexColorDecoder, '#000000'),
   role: roleDecoder,
   tags: set(string),
@@ -118,7 +116,7 @@ const folderDecoder: Decoder<Folder> = record({
 const textDocDecoder = record({
   type: 'text' as const,
   content: string,
-  wordCount: field('content', string, c => c.split(/\s+/).filter(Boolean).length),
+  wordCount: field('content', string).map(c => c.split(/\s+/).filter(Boolean).length),
 });
 
 const spreadsheetDocDecoder = record({
@@ -200,16 +198,13 @@ const notificationSettingsDecoder = dict(
 
 // --- Project: ties everything together ---
 
-// transform: derive a slug-to-id lookup from folders
-const folderLookupDecoder: DecoderFunction<Map<string, number[]>> = transform(
-  array(folderDecoder),
-  folders => {
-    const result = new Map<string, number[]>();
-    const walk = (f: Folder) => { result.set(f.slug, f.documentIds); f.children.forEach(walk); };
-    folders.forEach(walk);
-    return result;
-  },
-);
+// .map(): derive a slug-to-id lookup from folders
+const folderLookupDecoder = array(folderDecoder).map(folders => {
+  const result = new Map<string, number[]>();
+  const walk = (f: Folder) => { result.set(f.slug, f.documentIds); f.children.forEach(walk); };
+  folders.forEach(walk);
+  return result;
+});
 
 // union with nil, undef, and always fallback
 const reasonDecoder = union(
@@ -223,7 +218,7 @@ const projectDecoder = record({
   name: string,
   slug: slugDecoder,
   description: nullable(string),
-  version: decode([integer, integer, integer]),
+  version: decoder([integer, integer, integer]),
   active: literal(true),
   budget: optional(bigint),
 
@@ -248,12 +243,11 @@ const projectDecoder = record({
 
   stats: fields(
     { documents: array(documentDecoder), members: map(userDecoder, u => u.id) },
-    ({ documents, members }) => ({
-      documentCount: documents.length,
-      memberCount: members.size,
-      publishedCount: documents.filter(d => d.status === 'published').length,
-    }),
-  ),
+  ).map(({ documents, members }) => ({
+    documentCount: documents.length,
+    memberCount: members.size,
+    publishedCount: documents.filter(d => d.status === 'published').length,
+  })),
 
   legacyData: missing,
 });

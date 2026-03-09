@@ -15,17 +15,17 @@ const isPrimitiveJsonLiteralForm = (
 
 type TupleJsonLiteralForm =
   | []
-  | [Decoder<unknown>]
-  | [Decoder<unknown>, Decoder<unknown>]
-  | [Decoder<unknown>, Decoder<unknown>, Decoder<unknown>]
-  | [Decoder<unknown>, Decoder<unknown>, Decoder<unknown>, Decoder<unknown>]
-  | [Decoder<unknown>, Decoder<unknown>, Decoder<unknown>, Decoder<unknown>, Decoder<unknown>];
+  | [DecoderInput<unknown>]
+  | [DecoderInput<unknown>, DecoderInput<unknown>]
+  | [DecoderInput<unknown>, DecoderInput<unknown>, DecoderInput<unknown>]
+  | [DecoderInput<unknown>, DecoderInput<unknown>, DecoderInput<unknown>, DecoderInput<unknown>]
+  | [DecoderInput<unknown>, DecoderInput<unknown>, DecoderInput<unknown>, DecoderInput<unknown>, DecoderInput<unknown>];
 const isTupleJsonLiteralForm = (v: unknown): v is TupleJsonLiteralForm =>
-  Array.isArray(v) && v.every(isDecoder);
+  Array.isArray(v) && v.every(isDecoderInput);
 
-type RecordJsonLiteralForm = { [key: string]: Decoder<unknown> };
+type RecordJsonLiteralForm = { [key: string]: DecoderInput<unknown> };
 const isRecordJsonLiteralForm = (v: unknown): v is RecordJsonLiteralForm =>
-  typeof v === 'object' && v !== null && Object.values(v).every(isDecoder);
+  typeof v === 'object' && v !== null && Object.values(v).every(isDecoderInput);
 
 export type JsonLiteralForm =
   | PrimitiveJsonLiteralForm
@@ -105,20 +105,32 @@ const decodeJsonLiteralForm = <json extends JsonLiteralForm>(
 /**
  * General decoder definition
  *
- * A Decoder<T> is one of:
+ * A DecoderInput<T> is anything that can be used as a decoder:
  * - a primitive literal (string, number, boolean) — decodes to that exact value
  * - a tuple [Decoder, Decoder, ...] — decodes to a tuple
  * - a record { key: Decoder, ... } — decodes to an object
  * - a decoder function (input: unknown) => T — arbitrary decoding logic
+ * - a Decoder<T> object (callable with .map, .safeDecode)
  */
 
 export type DecoderFunction<T> = (input: unknown) => T;
 const isDecoderFunction = (f: unknown): f is DecoderFunction<unknown> =>
   typeof f === 'function';
 
-export type Decoder<T> = JsonLiteralForm | DecoderFunction<T>;
-const isDecoder = <T>(decoder: unknown): decoder is Decoder<T> =>
+export type DecoderInput<T> = JsonLiteralForm | DecoderFunction<T>;
+const isDecoderInput = <T>(decoder: unknown): decoder is DecoderInput<T> =>
   isJsonLiteralForm(decoder) || isDecoderFunction(decoder);
+
+/**
+ * A Decoder<T> is a callable object that decodes unknown input to T.
+ * It supports chaining via .map() and safe invocation via .safeDecode().
+ */
+export interface Decoder<T> {
+  (input: unknown): T;
+  map<U>(k: (x: T) => U): Decoder<U>;
+  chain<D extends DecoderInput<unknown>>(dec: D): Decoder<decodeType<D>>;
+  safeDecode(input: unknown): { ok: true; value: T } | { ok: false; error: string };
+}
 
 /**
  * Run evaluation of decoder at both type and
@@ -143,21 +155,60 @@ export type decodeType<decoder> =
     [decoder]
   )[0];
 
-export const decode = <D extends Decoder<unknown>>(
-  decoder: D,
-): DecoderFunction<decodeType<D>> => {
-  if (isDecoderFunction(decoder)) {
-    return decoder as any;
-  }
-  return decodeJsonLiteralForm(decoder as any);
+/**
+ * Create a rich Decoder<T> from a plain decoding function.
+ */
+export const makeDecoder = <T>(fn: DecoderFunction<T>): Decoder<T> => {
+  const dec = Object.assign(
+    (input: unknown) => fn(input),
+    {
+      map: <U>(k: (x: T) => U): Decoder<U> => {
+        const mapped = makeDecoder((input: unknown) => k(fn(input)));
+        // propagate symbol tags (e.g. fieldDecoder) through .map()
+        for (const sym of Object.getOwnPropertySymbols(dec)) {
+          (mapped as any)[sym] = (dec as any)[sym];
+        }
+        return mapped;
+      },
+      chain: <D extends DecoderInput<unknown>>(d: D): Decoder<decodeType<D>> => {
+        const resolved = decoder(d);
+        const chained = makeDecoder((input: unknown) => resolved(fn(input) as any));
+        for (const sym of Object.getOwnPropertySymbols(dec)) {
+          (chained as any)[sym] = (dec as any)[sym];
+        }
+        return chained as any;
+      },
+      safeDecode: (input: unknown): { ok: true; value: T } | { ok: false; error: string } => {
+        try {
+          return { ok: true, value: fn(input) };
+        } catch (error) {
+          return { ok: false, error: String(error) };
+        }
+      },
+    },
+  ) as unknown as Decoder<T>;
+  return dec;
 };
 
-export const safeDecode = <D extends Decoder<unknown>>(
-  decoder: D,
+/**
+ * Wrap any decoder input (plain function, literal form, or existing Decoder)
+ * into a rich Decoder<T> with .map() and .safeDecode().
+ */
+export const decoder = <D extends DecoderInput<unknown>>(
+  d: D,
+): Decoder<decodeType<D>> => {
+  if (isDecoderFunction(d)) {
+    return makeDecoder(d as any);
+  }
+  return decodeJsonLiteralForm(d as any) as any;
+};
+
+export const safeDecode = <D extends DecoderInput<unknown>>(
+  d: D,
   value: unknown,
 ): { ok: true; value: decodeType<D> } | { ok: false; error: string } => {
   try {
-    return { ok: true, value: decode(decoder)(value) };
+    return { ok: true, value: decoder(d)(value) };
   } catch (error) {
     return { ok: false, error: String(error) };
   }

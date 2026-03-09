@@ -1,5 +1,5 @@
 import { assert_is_pojo } from './pojo';
-import { decodeType, decode, Decoder, DecoderFunction } from './types';
+import { decodeType, decoder, Decoder, DecoderInput, makeDecoder } from './types';
 import { err } from './utils';
 
 // ---------------------------------------------------------------------------
@@ -25,7 +25,7 @@ type values<T> = T[keyof T];
 type fromObject<T> = T extends { _: infer V } ? V : never;
 
 // combine helpers to get an intersection of all the item types
-type getProductOfDecoderArray<arr extends Decoder<unknown>[]> = fromObject<
+type getProductOfDecoderArray<arr extends DecoderInput<unknown>[]> = fromObject<
   intersectUnion<values<asObject<arr>>>
 > extends infer P
   ? // trick to normalize intersection type
@@ -109,14 +109,15 @@ const combineResults = <A, B>(a: A, b: B): A & B => {
 // ---------------------------------------------------------------------------
 
 export const intersection =
-  <decoders extends Decoder<unknown>[]>(...decoders: decoders) =>
-  (value: unknown): getProductOfDecoderArray<decoders> => {
+  <decoders extends DecoderInput<unknown>[]>(...decoders: decoders): Decoder<getProductOfDecoderArray<decoders>> => {
+  const resolved = decoders.map((d) => decoder(d as any));
+  return makeDecoder((value: unknown): getProductOfDecoderArray<decoders> => {
     assert_is_pojo(value);
     const errors: string[] = [];
     const results: any[] = [];
-    for (const decoder of decoders) {
+    for (const dec of resolved) {
       try {
-        results.push(decode(decoder)(value));
+        results.push(dec(value));
       } catch (message) {
         errors.push(String(message));
       }
@@ -128,4 +129,5 @@ export const intersection =
     return results.length === 0
       ? ({} as any)
       : results.reduce((acc, result) => combineResults(acc, result));
-  };
+  });
+};

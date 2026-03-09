@@ -1,6 +1,7 @@
 import { expectAssignable, expectType } from 'tsd';
 import {
   boolean,
+  date,
   Decoder,
   field,
   fields,
@@ -14,7 +15,7 @@ import {
   array,
   literal,
   tuple,
-  decode,
+  decoder,
   nullable,
   dict,
   set,
@@ -27,7 +28,6 @@ import {
   regex,
   objectOf,
   bigint,
-  transform,
   nonEmptyArray,
   missing,
   lazy,
@@ -50,12 +50,12 @@ const rec_decoder = record({
   data: string,
   value: number,
   rec: { more: boolean },
-  f: fields({ data: string, value: number }, ({ data, value }) => data + value),
+  f: fields({ data: string, value: number }).map(({ data, value }) => data + value),
   option: optional(string),
   list_of_stuff: array(union(string, boolean)),
   intersect: intersection(union({ a: number }, { a: string, b: number }), {
     c: boolean,
-    a: union(number, decode('foo')),
+    a: union(number, decoder('foo')),
   }),
 });
 expectAssignable<Decoder<rec_t>>(rec_decoder);
@@ -138,8 +138,8 @@ expectType<'a' | 'b'>(a_or_b_decoder('a'));
 const a_b_or_r_decoder = union('a', 'b', { test: string });
 expectType<'a' | 'b' | { test: string }>(a_b_or_r_decoder({ test: '' }));
 
-expectType<DecoderFunction<Map<string, number>>>(dict(number));
-expectType<DecoderFunction<Map<'small' | 'medium', number>>>(
+expectType<Decoder<Map<string, number>>>(dict(number));
+expectType<Decoder<Map<'small' | 'medium', number>>>(
   dict(number, ['small', 'medium'] as const),
 );
 
@@ -220,8 +220,8 @@ expectAssignable<{ name: string; config: { level: number; active: true; type: 'a
   record_nested_bare({ name: '', config: { level: 42, active: true, type: 'admin' } }),
 );
 
-// 9. bare POJO with number/boolean via decode()
-const pojo_with_literals = decode({ level: 42, name: string });
+// 9. bare POJO with number/boolean via decoder()
+const pojo_with_literals = decoder({ level: 42, name: string });
 expectAssignable<{ level: number; name: string }>(
   pojo_with_literals({ level: 42, name: '' }),
 );
@@ -283,7 +283,7 @@ expectAssignable<{ name: string; level1: { level2: { value: number; flag: true; 
 );
 
 // 15. bare literal tuple with number and boolean
-const bare_literal_tuple = decode([42, true]);
+const bare_literal_tuple = decoder([42, true]);
 expectAssignable<[number, boolean]>(bare_literal_tuple([42, true]));
 
 // 16. record nesting record with optional fields preserves types
@@ -318,8 +318,7 @@ expectAssignable<Map<string, number>>(dict_bare({ a: 42 }));
 const fields_bare = record({
   combined: fields(
     { level: number, active: true },
-    ({ level, active }) => `${level}-${active}`,
-  ),
+  ).map(({ level, active }) => `${level}-${active}`),
 });
 expectType<{ combined: string }>(fields_bare({ level: 5, active: true }));
 
@@ -343,7 +342,7 @@ expectAssignable<{ type: 'x'; level: number; name: string } | null>(
 );
 
 // optional array of bare literal tuples
-const opt_array_tuples = optional(array(decode([number, true])));
+const opt_array_tuples = optional(array(decoder([number, true])));
 expectAssignable<[number, boolean][] | undefined>(
   opt_array_tuples([[1, true]]),
 );
@@ -575,23 +574,23 @@ expectType<{ name: string; scores: Record<string, number> }>(
   ro_nested({ name: 'x', scores: { a: 1 } }),
 );
 
-// --- field with continuation ---
-const field_cont = record({
-  thing: field('nested', { theThingIWant: string }, x => x.theThingIWant),
+// --- field ---
+const field_no_cont = record({ name: field('username', string) });
+expectType<{ name: string }>(field_no_cont({ username: 'alice' }));
+
+// field with .map()
+const field_mapped = record({
+  thing: field('nested', { theThingIWant: string }).map(x => x.theThingIWant),
   foo: string,
 });
 expectType<{ thing: string; foo: string }>(
-  field_cont({ foo: 'bar', nested: { theThingIWant: 'found' } }),
+  field_mapped({ foo: 'bar', nested: { theThingIWant: 'found' } }),
 );
 
-const field_transform = record({
-  doubled: field('value', number, x => x * 2),
+const field_doubled = record({
+  doubled: field('value', number).map(x => x * 2),
 });
-expectType<{ doubled: number }>(field_transform({ value: 21 }));
-
-// field without continuation — preserves decoded type
-const field_no_cont = record({ name: field('username', string) });
-expectType<{ name: string }>(field_no_cont({ username: 'alice' }));
+expectType<{ doubled: number }>(field_doubled({ value: 21 }));
 
 // --- bigint decoder ---
 expectType<bigint>(bigint('123'));
@@ -607,37 +606,16 @@ expectType<{ name: string; balance: bigint }>(
 const readme_safe = safeDecode(string, 'hello');
 expectType<{ ok: true; value: string } | { ok: false; error: string }>(readme_safe);
 
-// --- transform ---
-
-// transform with primitive decoder
-const transform_num = transform(number, x => x * 2);
-expectType<number>(transform_num(21));
-
-// transform with record decoder
-const transform_rec = transform(
-  { name: string, age: number },
-  x => `${x.name} is ${x.age}`,
-);
-expectType<string>(transform_rec({ name: 'alice', age: 30 }));
-
-// transform with union
-const transform_union = transform(union(string, number), x => String(x));
-expectType<string>(transform_union('hello'));
-
-// --- literal with continuation ---
-
-const lit_cont_str = literal('admin', x => x.toUpperCase());
-expectType<string>(lit_cont_str('admin'));
-
-const lit_cont_num = literal(42, x => x + 1);
-expectType<number>(lit_cont_num(42));
-
-const lit_cont_bool = literal(true, x => (x ? 'yes' : 'no'));
-expectType<'yes' | 'no'>(lit_cont_bool(true));
-
-// literal without continuation — still preserves exact type
+// --- literal ---
 expectType<'admin'>(literal('admin')('admin'));
 expectType<42>(literal(42)(42));
+
+// literal with .map()
+const lit_upper = literal('admin').map(x => x.toUpperCase());
+expectType<string>(lit_upper('admin'));
+
+const lit_inc = literal(42).map(x => x + 1);
+expectType<number>(lit_inc(42));
 
 // --- tuple ---
 
@@ -658,19 +636,19 @@ expectType<[string, number, boolean, string, number]>(
 // tuple with bare literals
 expectType<[42, string]>(tuple(42, string)([42, 'hello']));
 
-// tuple with transform (replaces inline continuation)
-const tuple_transformed = transform(tuple(string, number), ([name, age]) => ({ name, age }));
-expectType<{ name: string; age: number }>(tuple_transformed(['alice', 30]));
+// tuple with .map()
+const tuple_mapped = tuple(string, number).map(([name, age]) => ({ name, age }));
+expectType<{ name: string; age: number }>(tuple_mapped(['alice', 30]));
 
 // 0-tuple
 expectType<[]>(tuple()([]));
 
 // 0-tuple literal form
-const empty_tuple = decode([]);
+const empty_tuple = decoder([]);
 expectType<[]>(empty_tuple([]));
 
 // 0-tuple in record
-const rec_with_unit = record({ unit: decode([]), data: string });
+const rec_with_unit = record({ unit: decoder([]), data: string });
 expectType<{ unit: []; data: string }>(rec_with_unit({ unit: [], data: 'hi' }));
 
 // 0-tuple bare literal form in record
@@ -680,12 +658,12 @@ expectType<{ unit: []; data: string }>(rec_with_unit2({ unit: [], data: 'hi' }))
 // 1-tuple
 expectType<[string]>(tuple(string)(['a']));
 
-// 3-tuple literal form via decode()
-const triple = decode([string, number, boolean]);
+// 3-tuple literal form via decoder()
+const triple = decoder([string, number, boolean]);
 expectType<[string, number, boolean]>(triple(['a', 1, true]));
 
 // 1-tuple literal form
-const single = decode([number]);
+const single = decoder([number]);
 expectType<[number]>(single([42]));
 
 // tuple with records inside
@@ -706,16 +684,15 @@ expectType<{ name: string; point: [number, number, number] }>(
   rec_with_triple({ name: 'x', point: [0, 0, 0] }),
 );
 
-// --- array with continuation ---
-
-const array_cont = array(number, xs => xs.reduce((a, b) => a + b, 0));
-expectType<number>(array_cont([1, 2, 3]));
-
-const array_cont_len = array(string, xs => xs.length);
-expectType<number>(array_cont_len(['a', 'b']));
-
-// array without continuation — preserves array type
+// --- array ---
 expectType<number[]>(array(number)([1, 2]));
+
+// array with .map()
+const array_sum = array(number).map(xs => xs.reduce((a, b) => a + b, 0));
+expectType<number>(array_sum([1, 2, 3]));
+
+const array_len = array(string).map(xs => xs.length);
+expectType<number>(array_len(['a', 'b']));
 
 // --- lazy ---
 
@@ -731,56 +708,113 @@ expectType<{ name: string }>(lazyRecord({ name: 'hi' }));
 // nonEmptyArray returns a non-empty tuple type
 expectType<[number, ...number[]]>(nonEmptyArray(number)([1, 2]));
 
-// nonEmptyArray with continuation
-const nea_cont = nonEmptyArray(number, xs => xs[0]);
-expectType<number>(nea_cont([1, 2]));
+// nonEmptyArray with .map()
+const nea_first = nonEmptyArray(number).map(xs => xs[0]);
+expectType<number>(nea_first([1, 2]));
 
-// --- optional with continuation ---
-
-const opt_cont = optional(string, s => s.toUpperCase());
-expectType<string | undefined>(opt_cont('hello'));
-expectType<string | undefined>(opt_cont(undefined));
-
-// optional without continuation — unchanged
+// --- optional ---
 expectType<string | undefined>(optional(string)('hello'));
 
-// --- nullable with continuation ---
+// optional with .map()
+const opt_upper = optional(string).map(s => s !== undefined ? s.toUpperCase() : undefined);
+expectType<string | undefined>(opt_upper('hello'));
 
-const null_cont = nullable(string, s => s.toUpperCase());
-expectType<string | null>(null_cont('hello'));
-expectType<string | null>(null_cont(null));
-
-// nullable without continuation — unchanged
+// --- nullable ---
 expectType<string | null>(nullable(string)('hello'));
 
-// --- set with continuation ---
+// nullable with .map()
+const null_upper = nullable(string).map(s => s !== null ? s.toUpperCase() : null);
+expectType<string | null>(null_upper('hello'));
 
-const set_cont = set(number, s => s.size);
-expectType<number>(set_cont([1, 2, 3]));
-
-// set without continuation — unchanged
+// --- set ---
 expectAssignable<Set<number>>(set(number)([1, 2]));
 
-// --- objectOf with continuation ---
+// set with .map()
+const set_size = set(number).map(s => s.size);
+expectType<number>(set_size([1, 2, 3]));
 
-const oo_cont = objectOf(number, (r: Record<string, number>) => Object.keys(r).length);
-expectType<number>(oo_cont({ a: 1, b: 2 }));
-
-// objectOf with keys and continuation
-const oo_keys_cont = objectOf(number, ['x', 'y'] as const, r => r.x + r.y);
-expectType<number>(oo_keys_cont({ x: 1, y: 2 }));
-
-// objectOf without continuation — unchanged
+// --- objectOf ---
 expectType<Record<string, number>>(objectOf(number)({ a: 1 }));
 
-// --- dict with continuation ---
+// objectOf with keys
+const oo_keys = objectOf(number, ['x', 'y'] as const);
+expectType<Record<'x' | 'y', number>>(oo_keys({ x: 1, y: 2 }));
 
-const dict_cont = dict(number, m => m.size);
-expectType<number>(dict_cont({ a: 1 }));
+// objectOf with .map()
+const oo_sum = objectOf(number).map(r => Object.values(r).reduce((a: number, b: number) => a + b, 0));
+expectType<number>(oo_sum({ a: 1, b: 2 }));
 
-// dict with keys and continuation
-const dict_keys_cont = dict(string, ['a', 'b'] as const, m => Array.from(m.values()));
-expectType<string[]>(dict_keys_cont({ a: 'x', b: 'y' }));
-
-// dict without continuation — unchanged
+// --- dict ---
 expectAssignable<Map<string, number>>(dict(number)({ a: 1 }));
+
+// dict with keys
+const dict_keys = dict(number, ['small', 'medium'] as const);
+expectType<Map<'small' | 'medium', number>>(dict_keys({ small: 1, medium: 2 }));
+
+// dict with .map()
+const dict_size = dict(number).map(m => m.size);
+expectType<number>(dict_size({ a: 1 }));
+
+// --- v2: Callable Decoder objects ---
+
+// .map() returns a Decoder with the transformed type
+const mapped_string = string.map(s => s.length);
+expectType<Decoder<number>>(mapped_string);
+expectType<number>(mapped_string('hello'));
+
+// chained .map()
+const chained = string.map(s => s.length).map(n => n > 3);
+expectType<Decoder<boolean>>(chained);
+expectType<boolean>(chained('hello'));
+
+// .map() on record decoder
+const record_mapped = record({ name: string, age: number }).map(x => x.name);
+expectType<Decoder<string>>(record_mapped);
+
+// .safeDecode() returns discriminated union
+const safe = string.safeDecode('hello');
+expectType<{ ok: true; value: string } | { ok: false; error: string }>(safe);
+
+// .safeDecode() on mapped decoder
+const safe_mapped = string.map(s => s.length).safeDecode('hello');
+expectType<{ ok: true; value: number } | { ok: false; error: string }>(safe_mapped);
+
+// decoder() wraps to Decoder<T>
+const wrapped = decoder((input: unknown) => String(input));
+expectType<Decoder<string>>(wrapped);
+expectType<string>(wrapped('hello'));
+
+// decoder() wraps literal form
+const wrapped_literal = decoder({ name: string, age: number });
+expectType<{ name: string; age: number }>(wrapped_literal({ name: '', age: 0 }));
+
+// all combinators return Decoder<T>
+expectType<Decoder<string>>(string);
+expectType<Decoder<number>>(number);
+expectType<Decoder<boolean>>(boolean);
+expectType<Decoder<number>>(integer);
+expectType<Decoder<Date>>(date);
+expectType<Decoder<bigint>>(bigint);
+expectType<Decoder<unknown>>(unknown);
+
+// Decoder<T> is assignable to DecoderFunction<T>
+expectAssignable<DecoderFunction<string>>(string);
+expectAssignable<DecoderFunction<number>>(number);
+
+// --- .chain() types ---
+
+// chain into a record literal form
+const chained_record = unknown.chain({ name: string, age: number });
+expectType<Decoder<{ name: string; age: number }>>(chained_record);
+
+// chain into a tuple literal form
+const chained_tuple = unknown.chain([number, string]);
+expectType<Decoder<[number, string]>>(chained_tuple);
+
+// chain into a decoder
+const chained_decoder = string.chain(bigint);
+expectType<Decoder<bigint>>(chained_decoder);
+
+// chain into a string literal
+const chained_literal = unknown.chain('ok' as const);
+expectType<Decoder<'ok'>>(chained_literal);

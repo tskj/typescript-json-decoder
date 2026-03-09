@@ -1,168 +1,134 @@
 import { nil, undef } from './primitive-decoders';
 import { assert_is_pojo, isPojoObject } from './pojo';
-import { decodeType, decode, Decoder, DecoderFunction, isKey } from './types';
+import { decodeType, decoder, Decoder, DecoderInput, makeDecoder, isKey } from './types';
 import { err } from './utils';
 
-const apply = (k: any, x: any) => k ? k(x) : x;
+export const always = <T>(value: T): Decoder<T> =>
+  makeDecoder((_input: unknown) => value);
 
-export const always = <T>(value: T): DecoderFunction<T> =>
-  (_input: unknown) => value;
-
-export const transform = <D extends Decoder<unknown>, U>(
-  decoder: D,
-  k: (x: decodeType<D>) => U,
-): DecoderFunction<U> =>
-  (value: unknown) => k(decode(decoder)(value) as any);
-
-export const lazy = <T>(thunk: () => Decoder<T>): DecoderFunction<T> =>
-  (value: unknown) => decode(thunk())(value) as T;
+export const lazy = <T>(thunk: () => DecoderInput<T>): Decoder<T> =>
+  makeDecoder((value: unknown) => decoder(thunk())(value) as T);
 
 type evalOver<t> = t extends unknown ? decodeType<t> : never;
 type getSumOfArray<arr> = arr extends (infer elements)[] ? elements : never;
 
-export const union =
-  <decoders extends Decoder<unknown>[]>(...decoders: decoders) =>
-  (value: unknown): evalOver<getSumOfArray<decoders>> => {
-    assert_is_pojo(value);
-    if (decoders.length === 0) {
-      throw err`Could not match any of the union cases`;
-    }
-    const [decoder, ...rest] = decoders;
+const unionImpl = (decoders: DecoderInput<unknown>[], value: unknown): any => {
+  assert_is_pojo(value);
+  if (decoders.length === 0) {
+    throw err`Could not match any of the union cases`;
+  }
+  const [dec, ...rest] = decoders;
+  try {
+    return decoder(dec as any)(value);
+  } catch (messageFromThisDecoder) {
     try {
-      return decode(decoder as any)(value) as any;
-    } catch (messageFromThisDecoder) {
-      try {
-        return union(...(rest as any))(value) as any;
-      } catch (message) {
-        throw `${messageFromThisDecoder}\n${message}`;
-      }
+      return unionImpl(rest, value);
+    } catch (message) {
+      throw `${messageFromThisDecoder}\n${message}`;
     }
-  };
+  }
+};
+
+export const union =
+  <decoders extends DecoderInput<unknown>[]>(...decoders: decoders): Decoder<evalOver<getSumOfArray<decoders>>> =>
+  makeDecoder((value: unknown) => unionImpl(decoders, value));
 
 export { intersection } from './intersection';
 
-export function nullable<T extends Decoder<unknown>>(
-  decoder: T,
-): DecoderFunction<decodeType<T> | null>;
-export function nullable<T extends Decoder<unknown>, U>(
-  decoder: T,
-  k: (x: decodeType<T>) => U,
-): DecoderFunction<U | null>;
-export function nullable(decoder: any, k?: (x: any) => any) {
-  const base = union(nil, decoder);
-  return (value: unknown) => {
-    const result = base(value);
-    return result === null ? result : apply(k, result);
-  };
+export function nullable<T extends DecoderInput<unknown>>(
+  dec: T,
+): Decoder<decodeType<T> | null> {
+  const base = union(nil, dec);
+  return makeDecoder((value: unknown) => base(value));
 }
 
-export function optional<T extends Decoder<unknown>>(
-  decoder: T,
-): DecoderFunction<decodeType<T> | undefined>;
-export function optional<T extends Decoder<unknown>, U>(
-  decoder: T,
-  k: (x: decodeType<T>) => U,
-): DecoderFunction<U | undefined>;
-export function optional(decoder: any, k?: (x: any) => any) {
-  const base = union(undef, decoder);
-  return (value: unknown) => {
-    const result = base(value);
-    return result === undefined ? result : apply(k, result);
-  };
+export function optional<T extends DecoderInput<unknown>>(
+  dec: T,
+): Decoder<decodeType<T> | undefined> {
+  const base = union(undef, dec);
+  return makeDecoder((value: unknown) => base(value));
 }
 
-export function withDefault<T extends Decoder<unknown>>(
-  decoder: T,
+export function withDefault<T extends DecoderInput<unknown>>(
+  dec: T,
   fallback: decodeType<T>,
-): DecoderFunction<decodeType<T>>;
-export function withDefault<T extends Decoder<unknown>, F>(
-  decoder: T,
+): Decoder<decodeType<T>>;
+export function withDefault<T extends DecoderInput<unknown>, F>(
+  dec: T,
   fallback: F,
-): DecoderFunction<decodeType<T> | F>;
-export function withDefault(decoder: any, fallback: any) {
-  return (value: unknown) => {
+): Decoder<decodeType<T> | F>;
+export function withDefault(dec: any, fallback: any) {
+  const d = decoder(dec);
+  return makeDecoder((value: unknown) => {
     try {
-      return decode(decoder)(value);
+      return d(value);
     } catch {
       return fallback;
     }
-  };
+  });
 }
 
-export function array<D extends Decoder<unknown>>(
-  decoder: D,
-): DecoderFunction<decodeType<D>[]>;
-export function array<D extends Decoder<unknown>, U>(
-  decoder: D,
-  k: (x: decodeType<D>[]) => U,
-): DecoderFunction<U>;
-export function array(decoder: any, k?: (x: any) => any) {
-  return (xs: unknown): any => {
+export function array<D extends DecoderInput<unknown>>(
+  dec: D,
+): Decoder<decodeType<D>[]> {
+  const d = decoder(dec);
+  return makeDecoder((xs: unknown): any => {
     assert_is_pojo(xs);
     if (!Array.isArray(xs)) {
       throw err`The value ${xs} is not of type ${'array'}, but is of type ${typeof xs}`;
     }
     let index = 0;
     try {
-      const result = xs.map((x, i) => {
+      return xs.map((x, i) => {
         index = i;
-        return decode(decoder)(x);
+        return d(x);
       });
-      return apply(k, result);
     } catch (message) {
       throw (
         message +
         err`\nwhen trying to decode the array (at index ${index}) ${xs}`
       );
     }
-  };
+  });
 }
 
-export function nonEmptyArray<D extends Decoder<unknown>>(
-  decoder: D,
-): DecoderFunction<[decodeType<D>, ...decodeType<D>[]]>;
-export function nonEmptyArray<D extends Decoder<unknown>, U>(
-  decoder: D,
-  k: (x: [decodeType<D>, ...decodeType<D>[]]) => U,
-): DecoderFunction<U>;
-export function nonEmptyArray(decoder: any, k?: (x: any) => any) {
-  const base = array(decoder);
-  return (xs: unknown): any => {
+export function nonEmptyArray<D extends DecoderInput<unknown>>(
+  dec: D,
+): Decoder<[decodeType<D>, ...decodeType<D>[]]> {
+  const base = array(dec);
+  return makeDecoder((xs: unknown): any => {
     const result = base(xs);
     if (result.length === 0) {
       throw err`Expected a non-empty array, but got an empty array`;
     }
-    return apply(k, result);
-  };
+    return result;
+  });
 }
 
-export function set<D extends Decoder<unknown>>(
-  decoder: D,
-): DecoderFunction<Set<decodeType<D>>>;
-export function set<D extends Decoder<unknown>, U>(
-  decoder: D,
-  k: (x: Set<decodeType<D>>) => U,
-): DecoderFunction<U>;
-export function set(decoder: any, k?: (x: any) => any) {
-  return (list: unknown) => {
+export function set<D extends DecoderInput<unknown>>(
+  dec: D,
+): Decoder<Set<decodeType<D>>> {
+  const base = array(dec);
+  return makeDecoder((list: unknown) => {
     assert_is_pojo(list);
     try {
-      return apply(k, new Set(decode(array(decoder))(list)));
+      return new Set(base(list));
     } catch (message) {
       throw message + err`\nand can therefore not be parsed as a set`;
     }
-  };
+  });
 }
 
 export const map =
-  <K, D extends Decoder<unknown>>(
-    decoder: D,
+  <K, D extends DecoderInput<unknown>>(
+    dec: D,
     key: (x: decodeType<D>) => K,
-  ): DecoderFunction<Map<K, decodeType<D>>> =>
-  (listOfObjects: unknown) => {
+  ): Decoder<Map<K, decodeType<D>>> => {
+  const base = array(dec);
+  return makeDecoder((listOfObjects: unknown) => {
     assert_is_pojo(listOfObjects);
     try {
-      const parsedObjects = decode(array(decoder))(listOfObjects);
+      const parsedObjects = base(listOfObjects);
       const map = new Map(parsedObjects.map((value) => [key(value), value]));
       if (parsedObjects.length !== map.size) {
         console.warn(
@@ -173,25 +139,16 @@ export const map =
     } catch (message) {
       throw message + err`\nand can therefore not be parsed as a map`;
     }
-  };
+  });
+};
 
-export function objectOf<D extends Decoder<unknown>, K extends string = string>(
-  decoder: D,
+export function objectOf<D extends DecoderInput<unknown>, K extends string = string>(
+  dec: D,
   keys?: ReadonlyArray<K>,
-): DecoderFunction<Record<K, decodeType<D>>>;
-export function objectOf<D extends Decoder<unknown>, U>(
-  decoder: D,
-  k: (x: Record<string, decodeType<D>>) => U,
-): DecoderFunction<U>;
-export function objectOf<D extends Decoder<unknown>, K extends string, U>(
-  decoder: D,
-  keys: ReadonlyArray<K>,
-  k: (x: Record<K, decodeType<D>>) => U,
-): DecoderFunction<U>;
-export function objectOf(decoder: any, keysOrK?: any, k?: any) {
-  const keys = Array.isArray(keysOrK) ? keysOrK : undefined;
-  const cont = typeof keysOrK === 'function' ? keysOrK : k;
-  return (obj: unknown) => {
+): Decoder<Record<K, decodeType<D>>>;
+export function objectOf(dec: any, keys?: any) {
+  const d = decoder(dec);
+  return makeDecoder((obj: unknown) => {
     assert_is_pojo(obj);
     if (!isPojoObject(obj)) {
       throw err`Value ${obj} is not an object and can therefore not be parsed as a record`;
@@ -202,46 +159,36 @@ export function objectOf(decoder: any, keysOrK?: any, k?: any) {
         if (keys && !isKey(key, keys)) {
           throw err`Key ${key} is not in given keys`;
         }
-        result[key] = decode(decoder)(value);
+        result[key] = d(value);
       } catch (message) {
         throw message + err`\nwhen decoding the key ${key} in record ${obj}`;
       }
     }
-    return apply(cont, result);
-  };
+    return result;
+  });
 }
 
-export function dict<D extends Decoder<unknown>, K extends string = string>(
-  decoder: D,
+export function dict<D extends DecoderInput<unknown>, K extends string = string>(
+  dec: D,
   keys?: ReadonlyArray<K>,
-): DecoderFunction<Map<K, decodeType<D>>>;
-export function dict<D extends Decoder<unknown>, U>(
-  decoder: D,
-  k: (x: Map<string, decodeType<D>>) => U,
-): DecoderFunction<U>;
-export function dict<D extends Decoder<unknown>, K extends string, U>(
-  decoder: D,
-  keys: ReadonlyArray<K>,
-  k: (x: Map<K, decodeType<D>>) => U,
-): DecoderFunction<U>;
-export function dict(decoder: any, keysOrK?: any, k?: any) {
-  const keys = Array.isArray(keysOrK) ? keysOrK : undefined;
-  const cont = typeof keysOrK === 'function' ? keysOrK : k;
-  return (map: unknown) => {
-    assert_is_pojo(map);
-    if (!isPojoObject(map)) {
-      throw err`Value ${map} is not an object and can therefore not be parsed as a map`;
+): Decoder<Map<K, decodeType<D>>>;
+export function dict(dec: any, keys?: any) {
+  const d = decoder(dec);
+  return makeDecoder((obj: unknown) => {
+    assert_is_pojo(obj);
+    if (!isPojoObject(obj)) {
+      throw err`Value ${obj} is not an object and can therefore not be parsed as a map`;
     }
-    const decodedPairs = Object.entries(map).map(([key, value]) => {
+    const decodedPairs = Object.entries(obj).map(([key, value]) => {
       try {
         if (keys && !isKey(key, keys)) {
           throw err`Key ${key} is not in given keys`;
         }
-        return [key, decode(decoder)(value)] as [any, any];
+        return [key, d(value)] as [any, any];
       } catch (message) {
-        throw message + err`\nwhen decoding the key ${key} in map ${map}`;
+        throw message + err`\nwhen decoding the key ${key} in map ${obj}`;
       }
     });
-    return apply(cont, new Map(decodedPairs));
-  };
+    return new Map(decodedPairs);
+  });
 }
