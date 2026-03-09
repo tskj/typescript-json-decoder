@@ -242,6 +242,24 @@ export function array(decoder: any, k?: (x: any) => any) {
   };
 }
 
+export function nonEmptyArray<D extends Decoder<unknown>>(
+  decoder: D,
+): DecoderFunction<[decodeType<D>, ...decodeType<D>[]]>;
+export function nonEmptyArray<D extends Decoder<unknown>, U>(
+  decoder: D,
+  k: (x: [decodeType<D>, ...decodeType<D>[]]) => U,
+): DecoderFunction<U>;
+export function nonEmptyArray(decoder: any, k?: (x: any) => any) {
+  const base = array(decoder);
+  return (xs: unknown): any => {
+    const result = base(xs);
+    if (result.length === 0) {
+      throw `Expected a non-empty array, but got an empty array`;
+    }
+    return apply(k, result);
+  };
+}
+
 export function set<D extends Decoder<unknown>>(
   decoder: D,
 ): DecoderFunction<Set<decodeType<D>>>;

@@ -5,6 +5,7 @@ export {
   intersection,
   optional,
   array,
+  nonEmptyArray,
   set,
   map,
   dict,

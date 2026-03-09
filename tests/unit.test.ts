@@ -29,6 +29,7 @@ import {
   objectOf,
   bigint,
   transform,
+  nonEmptyArray,
   Decoder,
 } from '../src';
 
@@ -1996,6 +1997,37 @@ test('array with continuation — reduce', () => {
 test('array with continuation — still validates elements', () => {
   const decoder = array(number, xs => xs.length);
   expect(() => decoder([1, 'two', 3])).toThrow();
+});
+
+// --- nonEmptyArray ---
+
+test('nonEmptyArray decodes non-empty arrays', () => {
+  const decoder = nonEmptyArray(number);
+  expect(decoder([1, 2, 3])).toEqual([1, 2, 3]);
+  expect(decoder([42])).toEqual([42]);
+});
+
+test('nonEmptyArray rejects empty arrays', () => {
+  const decoder = nonEmptyArray(number);
+  expect(() => decoder([])).toThrow('non-empty');
+});
+
+test('nonEmptyArray validates elements', () => {
+  const decoder = nonEmptyArray(number);
+  expect(() => decoder(['a'])).toThrow();
+});
+
+test('nonEmptyArray with continuation', () => {
+  const decoder = nonEmptyArray(number, xs => xs[0]);
+  expect(decoder([10, 20, 30])).toBe(10);
+});
+
+test('nonEmptyArray in record', () => {
+  const decoder = record({
+    tags: nonEmptyArray(string),
+  });
+  expect(decoder({ tags: ['a', 'b'] })).toEqual({ tags: ['a', 'b'] });
+  expect(() => decoder({ tags: [] })).toThrow('non-empty');
 });
 
 // --- optional with continuation ---

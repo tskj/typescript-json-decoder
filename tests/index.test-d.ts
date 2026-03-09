@@ -28,6 +28,7 @@ import {
   objectOf,
   bigint,
   transform,
+  nonEmptyArray,
   safeDecode,
 } from '../src';
 
@@ -709,6 +710,15 @@ expectType<number>(array_cont_len(['a', 'b']));
 
 // array without continuation — preserves array type
 expectType<number[]>(array(number)([1, 2]));
+
+// --- nonEmptyArray ---
+
+// nonEmptyArray returns a non-empty tuple type
+expectType<[number, ...number[]]>(nonEmptyArray(number)([1, 2]));
+
+// nonEmptyArray with continuation
+const nea_cont = nonEmptyArray(number, xs => xs[0]);
+expectType<number>(nea_cont([1, 2]));
 
 // --- optional with continuation ---
 
