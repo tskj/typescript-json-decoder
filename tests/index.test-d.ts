@@ -29,6 +29,7 @@ import {
   bigint,
   transform,
   nonEmptyArray,
+  missing,
   safeDecode,
 } from '../src';
 
@@ -387,6 +388,10 @@ const readme_with_metadata = record({ name: string, metadata: unknown });
 expectAssignable<{ name: string; metadata?: unknown }>(
   readme_with_metadata({ name: 'x', metadata: {} }),
 );
+
+// missing decoder — key becomes optional undefined in the type
+const with_missing = record({ name: string, deleted: missing });
+expectType<{ name: string; deleted?: undefined }>(with_missing({ name: 'alice' }));
 
 // always as fallback in union of records — both branches typed
 const readme_with_fallback = union(

@@ -30,6 +30,7 @@ import {
   bigint,
   transform,
   nonEmptyArray,
+  missing,
   Decoder,
 } from '../src';
 
@@ -876,6 +877,26 @@ test('better error for missing key', () => {
   // Optional keys should still work when missing
   const optionalDecoder = record({ name: string, nickname: optional(string) });
   expect(optionalDecoder({ name: 'test' })).toEqual({ name: 'test', nickname: undefined });
+});
+
+test('missing decoder — succeeds when key is absent', () => {
+  const decoder = record({ name: string, deleted: missing });
+  expect(decoder({ name: 'alice' })).toEqual({ name: 'alice' });
+});
+
+test('missing decoder — fails when key is present', () => {
+  const decoder = record({ name: string, deleted: missing });
+  expect(() => decoder({ name: 'alice', deleted: true })).toThrow('expected to be missing');
+  expect(() => decoder({ name: 'alice', deleted: undefined })).toThrow('expected to be missing');
+  expect(() => decoder({ name: 'alice', deleted: null })).toThrow('expected to be missing');
+});
+
+test('missing decoder — multiple missing keys, extra keys allowed', () => {
+  const decoder = record({ name: string, old: missing, deprecated: missing });
+  expect(decoder({ name: 'bob' })).toEqual({ name: 'bob' });
+  expect(decoder({ name: 'bob', other: 'stuff' })).toEqual({ name: 'bob' });
+  expect(() => decoder({ name: 'bob', old: 1 })).toThrow('`old`');
+  expect(() => decoder({ name: 'bob', deprecated: 'x' })).toThrow('`deprecated`');
 });
 
 test('no intersection for map, set, custom classes', () => {

@@ -49,6 +49,7 @@ export function tuple(...decoders: any[]) {
 }
 
 export const fieldDecoder: unique symbol = Symbol('field-decoder');
+export const missingKey: unique symbol = Symbol('missing-key');
 export const fields = <T extends { [key: string]: Decoder<unknown> }, U>(
   decoder: T,
   continuation: (x: evalRecordSchema<T>) => U,
@@ -61,6 +62,13 @@ export const fields = <T extends { [key: string]: Decoder<unknown> }, U>(
   tag(dec, fieldDecoder);
   return dec;
 };
+
+export const missing: DecoderFunction<undefined> = Object.assign(
+  (_value: unknown): undefined => {
+    throw `should not be called directly`;
+  },
+  { [missingKey]: true as const },
+);
 
 export function field<D extends Decoder<unknown>>(
   key: string,
@@ -92,27 +100,36 @@ export const record =
     if (!isPojoObject(value)) {
       throw `Value \`${value}\` is not of type \`object\` but rather \`${typeof value}\``;
     }
-    return Object.entries(s)
-      .map(([key, decoder]: [string, any]) => {
-        if (decoder[fieldDecoder] === true) {
-          return [key, decode(decoder)(value)];
+    const result: any = {};
+    for (const [key, decoder] of Object.entries(s) as [string, any][]) {
+      if (decoder[missingKey] === true) {
+        if (key in (value as any)) {
+          throw `The key \`${key}\` is present in \`${JSON.stringify(
+            value,
+          )}\` but was expected to be missing`;
         }
-        try {
-          const jsonvalue = (value as any)[key];
-          return [key, decode(decoder)(jsonvalue)];
-        } catch (message) {
-          if (!(key in (value as any))) {
-            throw `The key \`${key}\` is missing in \`${JSON.stringify(
-              value,
-            )}\``;
-          }
-          throw (
-            message +
-            `\nwhen trying to decode the key \`${key}\` in \`${JSON.stringify(
-              value,
-            )}\``
-          );
+        continue;
+      }
+      if (decoder[fieldDecoder] === true) {
+        result[key] = decode(decoder)(value);
+        continue;
+      }
+      try {
+        const jsonvalue = (value as any)[key];
+        result[key] = decode(decoder)(jsonvalue);
+      } catch (message) {
+        if (!(key in (value as any))) {
+          throw `The key \`${key}\` is missing in \`${JSON.stringify(
+            value,
+          )}\``;
         }
-      })
-      .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+        throw (
+          message +
+          `\nwhen trying to decode the key \`${key}\` in \`${JSON.stringify(
+            value,
+          )}\``
+        );
+      }
+    }
+    return result;
   };
