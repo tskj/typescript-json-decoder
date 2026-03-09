@@ -4,13 +4,13 @@ import {
   decode,
   Decoder,
   DecoderFunction,
-  JsonLiteralForm,
+  PrimitiveJsonLiteralForm,
   addQuestionmarksToRecordFields,
 } from './types';
 import { tag } from './utils';
 
 export const literal =
-  <p extends JsonLiteralForm | number | boolean>(literal: p): DecoderFunction<p> =>
+  <p extends PrimitiveJsonLiteralForm>(literal: p): DecoderFunction<p> =>
   (value: unknown) => {
     assert_is_pojo(value);
     if (literal !== value) {

@@ -1102,6 +1102,34 @@ test('nested bare POJO with string literals', () => {
   ).toThrow();
 });
 
+test('nested bare POJO with number and boolean literals', () => {
+  // bare numbers and booleans work in nested POJOs — no literal() wrapper needed
+  const decoder = record({
+    name: string,
+    config: { level: 42, active: true, type: 'admin' as const },
+  });
+
+  expect(
+    decoder({ name: 'test', config: { level: 42, active: true, type: 'admin' } }),
+  ).toEqual({ name: 'test', config: { level: 42, active: true, type: 'admin' } });
+  expect(() =>
+    decoder({ name: 'test', config: { level: 43, active: true, type: 'admin' } }),
+  ).toThrow();
+  expect(() =>
+    decoder({ name: 'test', config: { level: 42, active: false, type: 'admin' } }),
+  ).toThrow();
+});
+
+test('bare POJO with number/boolean via decode()', () => {
+  const decoder = decode({ level: 42, active: true, name: string });
+
+  expect(
+    decoder({ level: 42, active: true, name: 'test' }),
+  ).toEqual({ level: 42, active: true, name: 'test' });
+  expect(() => decoder({ level: 43, active: true, name: 'test' })).toThrow();
+  expect(() => decoder({ level: 42, active: false, name: 'test' })).toThrow();
+});
+
 test('optional and nullable with bare literals', () => {
   const opt = record({ level: optional(42) });
   expect(opt({ level: 42 })).toEqual({ level: 42 });
@@ -1146,4 +1174,172 @@ test('tuple with bare number literal', () => {
   expect(decoder([42, 'hello'])).toEqual([42, 'hello']);
   expect(() => decoder([43, 'hello'])).toThrow();
   expect(() => decoder([42, 123])).toThrow();
+});
+
+test('nested bare POJO with optional containing bare literals', () => {
+  const decoder = record({
+    name: string,
+    config: optional({ level: 42, active: true }),
+  });
+
+  expect(
+    decoder({ name: 'test', config: { level: 42, active: true } }),
+  ).toEqual({ name: 'test', config: { level: 42, active: true } });
+  expect(decoder({ name: 'test' })).toEqual({ name: 'test', config: undefined });
+  expect(() =>
+    decoder({ name: 'test', config: { level: 43, active: true } }),
+  ).toThrow();
+});
+
+test('nested bare POJO with nullable containing bare literals', () => {
+  const decoder = record({
+    name: string,
+    config: nullable({ level: 42, active: true }),
+  });
+
+  expect(
+    decoder({ name: 'test', config: { level: 42, active: true } }),
+  ).toEqual({ name: 'test', config: { level: 42, active: true } });
+  expect(decoder({ name: 'test', config: null })).toEqual({ name: 'test', config: null });
+  expect(() =>
+    decoder({ name: 'test', config: { level: 43, active: true } }),
+  ).toThrow();
+});
+
+test('union of bare POJOs with number/boolean literals', () => {
+  const decoder = union(
+    { type: 'a' as const, level: 1 },
+    { type: 'b' as const, active: true },
+  );
+
+  expect(decoder({ type: 'a', level: 1 })).toEqual({ type: 'a', level: 1 });
+  expect(decoder({ type: 'b', active: true })).toEqual({ type: 'b', active: true });
+  expect(() => decoder({ type: 'a', level: 2 })).toThrow();
+});
+
+test('array of bare POJOs with number/boolean literals', () => {
+  const decoder = array({ id: number, active: true });
+
+  expect(decoder([
+    { id: 1, active: true },
+    { id: 2, active: true },
+  ])).toEqual([
+    { id: 1, active: true },
+    { id: 2, active: true },
+  ]);
+  expect(() => decoder([{ id: 1, active: false }])).toThrow();
+});
+
+test('deeply nested bare POJOs with mixed literal types', () => {
+  const decoder = record({
+    name: string,
+    level1: {
+      level2: {
+        value: 42,
+        flag: true,
+        tag: 'deep' as const,
+      },
+    },
+  });
+
+  expect(
+    decoder({ name: 'test', level1: { level2: { value: 42, flag: true, tag: 'deep' } } }),
+  ).toEqual({ name: 'test', level1: { level2: { value: 42, flag: true, tag: 'deep' } } });
+  expect(() =>
+    decoder({ name: 'test', level1: { level2: { value: 43, flag: true, tag: 'deep' } } }),
+  ).toThrow();
+  expect(() =>
+    decoder({ name: 'test', level1: { level2: { value: 42, flag: false, tag: 'deep' } } }),
+  ).toThrow();
+});
+
+test('bare literal tuple with number and boolean', () => {
+  const decoder = decode([42, true]);
+
+  expect(decoder([42, true])).toEqual([42, true]);
+  expect(() => decoder([43, true])).toThrow();
+  expect(() => decoder([42, false])).toThrow();
+});
+
+test('record nesting record with optional fields preserves types', () => {
+  // This was the regression case: nested record() with optional fields
+  const inner = record({ a: optional(string), b: number });
+  const outer = record({ x: inner, y: string });
+
+  expect(outer({ x: { b: 1 }, y: 'hi' })).toEqual({ x: { a: undefined, b: 1 }, y: 'hi' });
+  expect(outer({ x: { a: 'val', b: 2 }, y: 'hi' })).toEqual({ x: { a: 'val', b: 2 }, y: 'hi' });
+  expect(() => outer({ x: { b: 'wrong' }, y: 'hi' })).toThrow();
+});
+
+test('intersection of bare POJO with number literals', () => {
+  const decoder = intersection(
+    { type: 'admin' as const, level: 42 },
+    { name: string },
+  );
+
+  expect(decoder({ type: 'admin', level: 42, name: 'test' })).toEqual({
+    type: 'admin', level: 42, name: 'test',
+  });
+  expect(() => decoder({ type: 'admin', level: 43, name: 'test' })).toThrow();
+});
+
+test('kitchen sink: bare literals across all combinators', () => {
+  // set of bare POJOs with number/boolean literals
+  const setDecoder = set({ id: number, active: true });
+  const setResult = setDecoder([{ id: 1, active: true }, { id: 2, active: true }]);
+  expect(setResult).toBeInstanceOf(Set);
+  expect(setResult.size).toBe(2);
+  expect(() => setDecoder([{ id: 1, active: false }])).toThrow();
+
+  // dict with bare number literal values
+  const dictDecoder = dict(42);
+  const dictResult = dictDecoder({ a: 42, b: 42 });
+  expect(dictResult).toBeInstanceOf(Map);
+  expect(dictResult.get('a')).toBe(42);
+  expect(() => dictDecoder({ a: 43 })).toThrow();
+
+  // fields with bare number/boolean in schema
+  const fieldsDecoder = record({
+    combined: fields(
+      { level: number, active: true },
+      ({ level, active }) => `${level}-${active}`,
+    ),
+  });
+  expect(fieldsDecoder({ level: 5, active: true })).toEqual({ combined: '5-true' });
+  expect(() => fieldsDecoder({ level: 5, active: false })).toThrow();
+
+  // always as fallback in union with bare literal POJO
+  const withDefault = union({ status: 'ok' as const, code: 200 }, always({ status: 'error' as const, code: 0 }));
+  expect(withDefault({ status: 'ok', code: 200 })).toEqual({ status: 'ok', code: 200 });
+  expect(withDefault('anything')).toEqual({ status: 'error', code: 0 });
+
+  // union mixing bare literals, decoder functions, and POJOs
+  const mixedUnion = union(42, string, { tag: true });
+  expect(mixedUnion(42)).toBe(42);
+  expect(mixedUnion('hello')).toBe('hello');
+  expect(mixedUnion({ tag: true })).toEqual({ tag: true });
+  expect(() => mixedUnion(43)).toThrow();
+  expect(() => mixedUnion({ tag: false })).toThrow();
+
+  // nullable intersection with bare literal POJO
+  const nullableIntersect = nullable(intersection(
+    { type: 'x' as const, level: 42 },
+    { name: string },
+  ));
+  expect(nullableIntersect(null)).toBe(null);
+  expect(nullableIntersect({ type: 'x', level: 42, name: 'hi' })).toEqual({ type: 'x', level: 42, name: 'hi' });
+  expect(() => nullableIntersect({ type: 'x', level: 99, name: 'hi' })).toThrow();
+
+  // optional array of bare literal tuples
+  const optArrayTuples = optional(array(decode([number, true])));
+  expect(optArrayTuples(undefined)).toBeUndefined();
+  expect(optArrayTuples([[1, true], [2, true]])).toEqual([[1, true], [2, true]]);
+  expect(() => optArrayTuples([[1, false]])).toThrow();
+
+  // map keyed by a field from bare literal POJO
+  const mapDecoder = map({ id: number, active: true }, (x: any) => x.id);
+  const mapResult = mapDecoder([{ id: 1, active: true }, { id: 2, active: true }]);
+  expect(mapResult).toBeInstanceOf(Map);
+  expect(mapResult.get(1)).toEqual({ id: 1, active: true });
+  expect(() => mapDecoder([{ id: 1, active: false }])).toThrow();
 });

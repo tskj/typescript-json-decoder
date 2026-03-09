@@ -16,6 +16,8 @@ import {
   decode,
   nullable,
   dict,
+  set,
+  map,
   DecoderFunction,
   unknown,
   integer,
@@ -203,8 +205,142 @@ expectType<{ name: string; config: { level: 42; active: true } }>(
 expectAssignable<{ level?: number }>(record({ level: optional(42) })({}));
 expectAssignable<{ level: number | null }>(record({ level: nullable(42) })({ level: null }));
 
+// 8. bare number/boolean in nested POJOs (no record() wrapper needed)
+const record_nested_bare = record({ name: string, config: { level: 42, active: true, type: 'admin' as const } });
+expectAssignable<{ name: string; config: { level: number; active: true; type: 'admin' } }>(
+  record_nested_bare({ name: '', config: { level: 42, active: true, type: 'admin' } }),
+);
+
+// 9. bare POJO with number/boolean via decode()
+const pojo_with_literals = decode({ level: 42, name: string });
+expectAssignable<{ level: number; name: string }>(
+  pojo_with_literals({ level: 42, name: '' }),
+);
+
 // --- union, tuple: bare literals as direct args always preserve ---
 expectType<1 | 2 | 3>(union(1, 2, 3)(1));
 expectType<true | string>(union(true, string)(true));
 expectType<1 | 'hello' | boolean>(union(1, 'hello' as const, boolean)(1));
 expectType<[42, string]>(tuple(42, string)([42, 'hello']));
+
+// --- type-level tests mirroring runtime combination tests ---
+
+// 10. optional wrapping bare POJO with number/boolean literals
+const record_optional_pojo = record({
+  name: string,
+  config: optional({ level: 42, active: true }),
+});
+expectAssignable<{ name: string; config?: { level: number; active: true } }>(
+  record_optional_pojo({ name: '', config: { level: 42, active: true } }),
+);
+
+// 11. nullable wrapping bare POJO with number/boolean literals
+const record_nullable_pojo = record({
+  name: string,
+  config: nullable({ level: 42, active: true }),
+});
+expectAssignable<{ name: string; config: { level: number; active: true } | null }>(
+  record_nullable_pojo({ name: '', config: { level: 42, active: true } }),
+);
+
+// 12. union of bare POJOs with number/boolean literals
+const union_bare_pojo = union(
+  { type: 'a' as const, level: 1 },
+  { type: 'b' as const, active: true },
+);
+expectAssignable<{ type: 'a'; level: number } | { type: 'b'; active: true }>(
+  union_bare_pojo({ type: 'a', level: 1 }),
+);
+
+// 13. array of bare POJOs with number/boolean literals
+const array_bare_pojo = array({ id: number, active: true });
+expectAssignable<{ id: number; active: true }[]>(
+  array_bare_pojo([{ id: 1, active: true }]),
+);
+
+// 14. deeply nested bare POJOs with mixed literal types
+const deeply_nested = record({
+  name: string,
+  level1: {
+    level2: {
+      value: 42,
+      flag: true,
+      tag: 'deep' as const,
+    },
+  },
+});
+expectAssignable<{ name: string; level1: { level2: { value: number; flag: true; tag: 'deep' } } }>(
+  deeply_nested({ name: '', level1: { level2: { value: 42, flag: true, tag: 'deep' } } }),
+);
+
+// 15. bare literal tuple with number and boolean
+const bare_literal_tuple = decode([42, true]);
+expectAssignable<[number, boolean]>(bare_literal_tuple([42, true]));
+
+// 16. record nesting record with optional fields preserves types
+const inner_rec = record({ a: optional(string), b: number });
+const outer_rec = record({ x: inner_rec, y: string });
+expectType<{ x: { a?: string | undefined; b: number }; y: string }>(
+  outer_rec({ x: { b: 1 }, y: 'hi' }),
+);
+
+// 17. intersection of bare POJOs with number literals
+const intersect_bare_pojo = intersection(
+  { type: 'admin' as const, level: 42 },
+  { name: string },
+);
+expectAssignable<{ type: 'admin'; level: number; name: string }>(
+  intersect_bare_pojo({ type: 'admin', level: 42, name: 'test' }),
+);
+
+// --- 18. kitchen sink: bare literals across all combinators ---
+
+// set of bare POJOs with number/boolean literals
+const set_bare = set({ id: number, active: true });
+expectAssignable<Set<{ id: number; active: true }>>(
+  set_bare([{ id: 1, active: true }]),
+);
+
+// dict with bare number literal values
+const dict_bare = dict(42);
+expectAssignable<Map<string, number>>(dict_bare({ a: 42 }));
+
+// fields with bare number/boolean in schema
+const fields_bare = record({
+  combined: fields(
+    { level: number, active: true },
+    ({ level, active }) => `${level}-${active}`,
+  ),
+});
+expectType<{ combined: string }>(fields_bare({ level: 5, active: true }));
+
+// always as fallback in union with bare literal POJO
+const with_default = union({ status: 'ok' as const, code: 200 }, always({ status: 'error' as const, code: 0 }));
+expectAssignable<{ status: 'ok'; code: number } | { status: 'error'; code: number }>(
+  with_default({ status: 'ok', code: 200 }),
+);
+
+// union mixing bare literals, decoder functions, and POJOs
+const mixed_union = union(42, string, { tag: true });
+expectAssignable<number | string | { tag: true }>(mixed_union(42));
+
+// nullable intersection with bare literal POJO
+const nullable_intersect = nullable(intersection(
+  { type: 'x' as const, level: 42 },
+  { name: string },
+));
+expectAssignable<{ type: 'x'; level: number; name: string } | null>(
+  nullable_intersect({ type: 'x', level: 42, name: 'hi' }),
+);
+
+// optional array of bare literal tuples
+const opt_array_tuples = optional(array(decode([number, true])));
+expectAssignable<[number, boolean][] | undefined>(
+  opt_array_tuples([[1, true]]),
+);
+
+// map keyed by field from bare literal POJO
+const map_bare = map({ id: number, active: true }, (x: { id: number; active: true }) => x.id);
+expectAssignable<Map<number, { id: number; active: true }>>(
+  map_bare([{ id: 1, active: true }]),
+);

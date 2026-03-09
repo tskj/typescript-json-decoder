@@ -6,18 +6,19 @@ import { literal, tuple, record } from './literal-decoders';
  * of themselves
  */
 
-type PrimitiveJsonLiteralForm = string;
+export type PrimitiveJsonLiteralForm = string | number | boolean;
 const isPrimitiveJsonLiteralForm = (
   v: unknown,
-): v is PrimitiveJsonLiteralForm => typeof v === 'string';
+): v is PrimitiveJsonLiteralForm =>
+  typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
 
-type TupleJsonLiteralForm = [BaseDecoder<unknown>, BaseDecoder<unknown>];
+type TupleJsonLiteralForm = [Decoder<unknown>, Decoder<unknown>];
 const isTupleJsonLiteralForm = (v: unknown): v is TupleJsonLiteralForm =>
-  Array.isArray(v) && v.length === 2 && v.every(isBaseDecoder);
+  Array.isArray(v) && v.length === 2 && v.every(isDecoder);
 
-type RecordJsonLiteralForm = { [key: string]: BaseDecoder<unknown> };
+type RecordJsonLiteralForm = { [key: string]: Decoder<unknown> };
 const isRecordJsonLiteralForm = (v: unknown): v is RecordJsonLiteralForm =>
-  typeof v === 'object' && v !== null && Object.values(v).every(isBaseDecoder);
+  typeof v === 'object' && v !== null && Object.values(v).every(isDecoder);
 
 export type JsonLiteralForm =
   | PrimitiveJsonLiteralForm
@@ -62,11 +63,11 @@ type evalJsonLiteralForm<decoder> =
   [decoder] extends [PrimitiveJsonLiteralForm] ?
     decoder :
   [decoder] extends [[infer decoderA, infer decoderB]] ?
-    [ decodeTypeRecur<decoderA>, decodeTypeRecur<decoderB> ] :
+    [ decodeType<decoderA>, decodeType<decoderB> ] :
 
     addQuestionmarksToRecordFields<
     {
-      [key in keyof decoder]: decodeTypeRecur<decoder[key]>;
+      [key in keyof decoder]: decodeType<decoder[key]>;
     }
     >
 const decodeJsonLiteralForm = <json extends JsonLiteralForm>(
@@ -86,17 +87,21 @@ const decodeJsonLiteralForm = <json extends JsonLiteralForm>(
 
 /**
  * General decoder definition
+ *
+ * A Decoder<T> is one of:
+ * - a primitive literal (string, number, boolean) — decodes to that exact value
+ * - a tuple [Decoder, Decoder] — decodes to a pair
+ * - a record { key: Decoder, ... } — decodes to an object
+ * - a decoder function (input: unknown) => T — arbitrary decoding logic
  */
 
 export type DecoderFunction<T> = (input: unknown) => T;
 const isDecoderFunction = (f: unknown): f is DecoderFunction<unknown> =>
   typeof f === 'function';
 
-type BaseDecoder<T> = JsonLiteralForm | DecoderFunction<T>;
-const isBaseDecoder = <T>(decoder: unknown): decoder is BaseDecoder<T> =>
+export type Decoder<T> = JsonLiteralForm | DecoderFunction<T>;
+const isDecoder = <T>(decoder: unknown): decoder is Decoder<T> =>
   isJsonLiteralForm(decoder) || isDecoderFunction(decoder);
-
-export type Decoder<T> = BaseDecoder<T> | string | number | boolean;
 
 /**
  * Run evaluation of decoder at both type and
@@ -105,38 +110,29 @@ export type Decoder<T> = BaseDecoder<T> | string | number | boolean;
 
 export type primitive = string | boolean | number | null | undefined;
 // prettier-ignore
-type decodeTypeRecur<decoder> =
+// the [X][0] wrapping is needed to avoid a circular type reference error in TS 4.x
+export type decodeType<decoder> =
   (decoder extends DecoderFunction<infer T> ?
-    [decodeTypeRecur<T>] :
+    // If T is itself a DecoderFunction, recurse to unwrap it.
+    // Otherwise T is already a fully decoded type — return as-is.
+    // This prevents re-evaluation of decoded output types through
+    // evalJsonLiteralForm, which would cause TS to hit recursion limits.
+    [T extends DecoderFunction<any> ? decodeType<T> : T] :
   decoder extends string ? [decoder] :
   decoder extends number ? [decoder] :
   decoder extends boolean ? [decoder] :
   decoder extends JsonLiteralForm ?
-    // only tuples and records reach here now
-    [evalJsonLiteralForm<decoder>]:
-
+    [evalJsonLiteralForm<decoder>] :
     [decoder]
-  // needs a bit of indirection to avoid
-  // circular type reference compiler error
   )[0];
-// export type decodeType<decoder> =
-// decodeTypeRecur<decoder>;
-
-export type decodeType<T> =
-  // removeA<
-  decodeTypeRecur<T>;
-// >
 
 export const decode = <D extends Decoder<unknown>>(
   decoder: D,
 ): DecoderFunction<decodeType<D>> => {
-  if (typeof decoder === 'number' || typeof decoder === 'boolean') {
-    return literal(decoder) as any;
+  if (isDecoderFunction(decoder)) {
+    return decoder as any;
   }
-  if (!isDecoderFunction(decoder)) {
-    return decodeJsonLiteralForm(decoder as any);
-  }
-  return decoder as any;
+  return decodeJsonLiteralForm(decoder as any);
 };
 
 export const safeDecode = <D extends Decoder<unknown>>(
