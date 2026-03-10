@@ -11,6 +11,146 @@ Try it here: [sandbox](https://codesandbox.io/s/typescript-json-decoder-playgrou
 
 I've also written a piece about how it works internally and the underlying idea [here.](article.md)
 
+See the [examples/](examples/) folder for runnable code.
+
+## Why this library?
+
+There are several runtime validation libraries for TypeScript. Here's how they compare.
+
+| | typescript-json-decoder | Zod | io-ts | Runtypes |
+|---|---|---|---|---|
+| **Looks like TS?** | `{ name: string, age: number }` | `z.object({ name: z.string() })` | `t.type({ name: t.string })` | `Object({ name: String })` |
+| **Type extraction** | `decodeType<>` or `Decoder()` class | `z.infer<>` | `t.TypeOf<>` | `Static<>` |
+| **Decoders are functions?** | Yes — `(unknown) => T` | No | No | No |
+| **Composable with `.then()`?** | Yes, directly | No | No | No |
+| **Transform/map** | `.map()`, `.chain()` | `.transform()` | Via fp-ts | None |
+| **Dependencies** | 0 | 0 | fp-ts (peer) | 0 |
+
+The key difference: your decoder declarations look like the types they produce. Instead of learning a DSL, you write what looks like regular TypeScript.
+
+```typescript
+// typescript-json-decoder — reads like a type definition
+const userDecoder = record({ name: string, age: number, banned: boolean });
+
+// Zod — every field needs a z.* wrapper
+const userSchema = z.object({ name: z.string(), age: z.number(), banned: z.boolean() });
+```
+
+Bare values work as decoders directly — nested records, tuples, and string literals all just work without any wrapper functions:
+
+```typescript
+// Nested objects, tuples, and literals — no record() or tuple() needed
+const decoder = record({
+    name: string,
+    role: 'admin',
+    address: { city: string, zip: string },
+    coordinates: [number, number],
+});
+```
+
+The `Decoder()` class API gives you both a type and a decoder in one declaration — no `z.infer<>` or separate type alias needed:
+
+```typescript
+// One line — User is a type AND a decoder
+class User extends Decoder({ name: string, age: number }) {}
+
+const user: User = User.decode(json);   // decode
+const u: User = { name: 'A', age: 1 };  // plain object — structural typing
+```
+
+Decoders double as factories — attach defaults and construct values with a type-safe patch. The type system enforces that you provide all fields that don't have defaults:
+
+```typescript
+const userDecoder = record({
+    name: string.default('John'),
+    age: integer,
+    role: always('member'),
+});
+
+userDecoder.create({ age: 25 });              // { name: 'John', age: 25, role: 'member' }
+userDecoder.create({ age: 25, name: 'Alice' }); // or override a default
+userDecoder.create();                          // TS error — age is required (no default)
+```
+
+When every field has a default, `.create()` takes no arguments:
+
+```typescript
+const configDecoder = record({
+    env: 'production',
+    debug: always(false),
+    retries: integer.default(3),
+    name: string.default('app'),
+});
+
+configDecoder.create();               // { env: 'production', debug: false, retries: 3, name: 'app' }
+configDecoder.create({ retries: 5 }); // or override just what you need { env: 'production', debug: false, retries: 5, name: 'app' }
+```
+
+This works with `Decoder()` classes too, of course:
+
+```typescript
+class Config extends Decoder({
+    env: 'production',
+    debug: always(false),
+    retries: integer.default(3),
+    name: string.default('app'),
+}) {}
+
+Config.create();               // { env: 'production', debug: false, retries: 3, name: 'app' }
+Config.create({ retries: 5 }); // { env: 'production', debug: false, retries: 5, name: 'app' }
+```
+
+Every decoder has `.map()` and `.chain()` for reshaping data inline — no separate transform step:
+
+```typescript
+const decoder = record({
+    name: string,
+    birthday: string.chain(date).map(d => d.getFullYear()),
+    score: field('stats', { score: number }).map(s => s.score),
+    displayName: fields({ first: string, last: string })
+        .map(({ first, last }) => `${first} ${last}`),
+});
+// { name: string, birthday: number, score: number, displayName: string }
+```
+
+Unions just work — no discriminator config, no special API. Each branch is tried in order, and TypeScript narrows the result automatically:
+
+```typescript
+// Tagged union — just list the variants
+const eventDecoder = union(
+    { type: 'click', x: number, y: number },
+    { type: 'keypress', key: string },
+    { type: 'scroll', offset: number },
+);
+
+// Primitives, literals, records, tuples — mix freely
+const idDecoder = union(string, number);
+const statusDecoder = union('active', 'inactive', 'pending');
+const responseDecoder = union(
+    { status: 'ok', data: string },
+    always({ status: 'error', data: '' }),  // catch-all fallback
+);
+
+// Tuple-tagged style
+const messageDecoder = union(
+    ['text', string],
+    ['image', { url: string, width: number }],
+);
+```
+
+Decoders are plain functions `(unknown) => T`, so they compose naturally with the rest of JavaScript:
+
+```typescript
+// Pass a decoder directly to .then() — no .parse() ceremony
+fetch('/user').then(r => r.json()).then(userDecoder);
+
+// Or with a Decoder() class
+fetch('/user').then(r => r.json()).then(User.decode);
+
+// Use decoders in Array.map, Promise.all, etc.
+items.map(userDecoder);
+```
+
 ## The idea
 
 The following is an example of a simple decoder which defines a decoder of type `User`.
@@ -171,23 +311,22 @@ import { decodeType, record, string, number } from 'typescript-json-decoder';
 type Config = decodeType<typeof configDecoder>;
 const configDecoder = record({
     version: 2,
-    env: 'production' as const,
+    env: 'production',
     debug: false,
     name: string,
     retries: number,
 });
-// Config = { version: number; env: 'production'; debug: false; name: string; retries: number }
+// Config = { version: 2; env: 'production'; debug: false; name: string; retries: number }
 ```
 
-Bare literals work everywhere - in records, nested objects, unions, tuples, and any other combinator. If you want to preserve the exact numeric literal type (e.g. `2` instead of `number`), use `as const` or the `literal()` function.
+Bare literals work everywhere — in records, nested objects, unions, tuples, and any other combinator. Literal types are preserved automatically, and `literal()` is equivalent to a bare value. Both carry defaults for `.create()`:
 
 ```typescript
 import { literal, record, string } from 'typescript-json-decoder';
 
-// These are equivalent:
-record({ level: literal(42), name: string })  // level: 42
-record({ level: 42 as const, name: string })  // level: 42
-record({ level: 42, name: string })           // level: number (TS widens bare numbers)
+// These are equivalent — both decode to { level: 42, name: string } and both auto-default
+record({ level: 42, name: string })
+record({ level: literal(42), name: string })
 ```
 
 This is especially powerful for discriminated unions. Consider two kinds of API responses:
@@ -195,8 +334,8 @@ This is especially powerful for discriminated unions. Consider two kinds of API 
 ```typescript
 import { decodeType, record, string, number, union } from 'typescript-json-decoder';
 
-const coolDecoder = record({ type: 'cool' as const, somestuff: string });
-const dumbDecoder = record({ type: 'dumb' as const, otherstuff: string });
+const coolDecoder = record({ type: 'cool', somestuff: string });
+const dumbDecoder = record({ type: 'dumb', otherstuff: string });
 
 type Stuff = decodeType<typeof stuffDecoder>;
 const stuffDecoder = union(coolDecoder, dumbDecoder);
@@ -222,7 +361,7 @@ const decoder = record({
     config: {
         level: 42,
         active: true,
-        env: 'prod' as const,
+        env: 'prod',
     }
 });
 ```
@@ -248,7 +387,7 @@ However we know that `createdDate` is a string representing a date, and at some 
 ```typescript
 import { string } from 'typescript-json-decoder';
 
-const date = (value: Pojo) => {
+const date = (value: unknown) => {
   const dateString = string(value);
   const timeStampSinceEpoch = Date.parse(dateString);
   if (isNaN(timeStampSinceEpoch)) {
@@ -261,7 +400,7 @@ const date = (value: Pojo) => {
 I provide this decoder with the library, and we can use it as follows.
 
 ```typescript
-import { decodeType, record, date } from 'typescript-json-decoder';
+import { decodeType, record, string, date } from 'typescript-json-decoder';
 
 type blogpost = decodeType<typeof blogpostdecoder>;
 const blogpostdecoder = record({
@@ -276,7 +415,7 @@ Look at that: actual, type safe, automatic parsing of a date encoded as a Json s
 At this point I went a little crazy implementing fun data structures. How about a dictionary? A dictionary is a map from strings to your type `T`, that is, the type `Map<string, T>`. The function `dict` then takes a decoder of `T` and creates a decoder which parses *JavaScript object literals* as maps. Take a look at the following example to understand how it works.
 
 ```typescript
-import { dict } from 'typescript-json-decoder';
+import { dict, number } from 'typescript-json-decoder';
 
 const myDictionary = {
     one: 1,
@@ -302,7 +441,7 @@ console.log(result.math); // 90
 You can also constrain the allowed keys:
 
 ```typescript
-const sizes = objectOf(number, ['small', 'medium', 'large'] as const);
+const sizes = objectOf(number, ['small', 'medium', 'large']);
 // Record<'small' | 'medium' | 'large', number>
 ```
 
@@ -424,8 +563,8 @@ const decoder = record({ name: string, metadata: unknown });
 import { union, record, string, number, always } from 'typescript-json-decoder';
 
 const decoder = union(
-    record({ status: 'ok' as const, data: string }),
-    always({ status: 'error' as const, data: '' }),
+    record({ status: 'ok', data: string }),
+    always({ status: 'error', data: '' }),
 );
 // If the input doesn't match the first case, you get the default
 ```
@@ -564,7 +703,7 @@ import { set, objectOf, dict, union, intersection, number, string } from 'typesc
 
 const countUnique = set(string).map(s => s.size);
 const totalScore = objectOf(number).map(r => Object.values(r).reduce((a, b) => a + b, 0));
-const joined = dict(string, ['a', 'b'] as const).map(m => Array.from(m.values()).join(','));
+const joined = dict(string, ['a', 'b']).map(m => Array.from(m.values()).join(','));
 const asString = union(string, number).map(x => String(x));
 const combined = intersection({ a: string }, { b: number }).map(x => `${x.a}-${x.b}`);
 ```
@@ -783,7 +922,7 @@ const user: User = User.create({ age: 25 });
 `Decoder()` also accepts tuple literal forms and existing decoders:
 
 ```typescript
-import { Decoder, tuple, array, dict, literal } from 'typescript-json-decoder';
+import { Decoder, string, number, tuple, array, dict, literal } from 'typescript-json-decoder';
 
 class Pair extends Decoder([string, number]) {}
 class TextMsg extends Decoder(['text', string]) {}

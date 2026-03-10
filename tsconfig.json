@@ -11,7 +11,11 @@
     "alwaysStrict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "typescript-json-decoder": ["./src"]
+    }
   },
   "include": ["src/*"]
 }

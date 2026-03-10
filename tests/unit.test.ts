@@ -92,7 +92,7 @@ test('nested tuple literal', () => {
 });
 
 test('literal string', () => {
-  const l1: 'a' = 'a' as const;
+  const l1: 'a' = 'a';
 
   type literal = decodeType<typeof literal_decoder>;
   const literal_decoder = literal(l1);
@@ -102,7 +102,7 @@ test('literal string', () => {
 });
 
 test('literal number', () => {
-  const l1: 1 = 1 as const;
+  const l1: 1 = 1;
 
   type literal = decodeType<typeof literal_decoder>;
   const literal_decoder = literal(1);
@@ -228,7 +228,7 @@ test('deep intersection', () => {
 })
 
 test('decode string', () => {
-  const l1: 'a' = 'a' as const;
+  const l1: 'a' = 'a';
 
   type literal = decodeType<typeof literal_decoder>;
   const literal_decoder = decoder(l1);
@@ -238,7 +238,7 @@ test('decode string', () => {
 });
 
 test('decode record', () => {
-  const l1: {} = {} as const;
+  const l1: {} = {};
 
   type literal = decodeType<typeof literal_decoder>;
   const literal_decoder = decoder({});
@@ -248,7 +248,7 @@ test('decode record', () => {
 });
 
 test('record decoder', () => {
-  const l1: {} = {} as const;
+  const l1: {} = {};
 
   type record = decodeType<typeof record_decoder>;
   const record_decoder = record({});
@@ -529,7 +529,7 @@ test('dict decoder with typed key', () => {
   const l1 = { small: true, medium: false };
   const l2 = { xlarge: true, small: false };
 
-  const SizeValues = ['small', 'medium', 'large'] as const;
+  const SizeValues = ['small', 'medium', 'large'];
 
   type dict_with_typed_keys = decodeType<typeof dict_with_typed_keys_decoder>;
   const dict_with_typed_keys_decoder = dict(boolean, SizeValues);
@@ -1011,8 +1011,8 @@ test('safeDecode with union and literal forms', () => {
   // Literal forms
   expect(safeDecode({ name: string }, { name: 'test' }).ok).toBe(true);
   expect(safeDecode({ name: string }, { name: 42 }).ok).toBe(false);
-  expect(safeDecode('hello' as const, 'hello').ok).toBe(true);
-  expect(safeDecode('hello' as const, 'world').ok).toBe(false);
+  expect(safeDecode('hello', 'hello').ok).toBe(true);
+  expect(safeDecode('hello', 'world').ok).toBe(false);
 });
 
 test('record with literal() wrapper', () => {
@@ -1039,7 +1039,7 @@ test('record with literal() wrapper', () => {
 
 test('record with bare literals', () => {
   const decoder = record({
-    type: 'admin' as const,
+    type: 'admin',
     level: 42,
     active: true,
     name: string,
@@ -1060,22 +1060,14 @@ test('record with bare literals', () => {
   ).toThrow();
 });
 
-test('record with as const preserves literal types', () => {
-  // per-property as const
-  const decoder1 = record({ level: 42 as const, name: string });
-  type decoded1 = decodeType<typeof decoder1>;
-  const r1: decoded1 = decoder1({ level: 42, name: 'test' });
-  expect(r1).toEqual({ level: 42, name: 'test' });
+test('record with bare literals preserves literal types', () => {
+  const decoder = record({ level: 42, active: true, name: string });
+  type decoded = decodeType<typeof decoder>;
+  const r: decoded = decoder({ level: 42, active: true, name: 'test' });
+  expect(r).toEqual({ level: 42, active: true, name: 'test' });
 
-  // whole-object as const
-  const decoder2 = record({ level: 42, active: true, name: string } as const);
-  type decoded2 = decodeType<typeof decoder2>;
-  const r2: decoded2 = decoder2({ level: 42, active: true, name: 'test' });
-  expect(r2).toEqual({ level: 42, active: true, name: 'test' });
-
-  // all approaches reject wrong values the same way at runtime
-  expect(() => decoder1({ level: 43, name: 'test' })).toThrow();
-  expect(() => decoder2({ level: 43, active: true, name: 'test' })).toThrow();
+  // rejects wrong values at runtime
+  expect(() => decoder({ level: 43, active: true, name: 'test' })).toThrow();
 });
 
 test('record with bare literal edge cases: 0, false, -1', () => {
@@ -1124,7 +1116,7 @@ test('nested bare POJO with string literals', () => {
   // bare POJOs support string literals and decoder functions
   const decoder = record({
     name: string,
-    config: { type: 'admin' as const, city: string },
+    config: { type: 'admin', city: string },
   });
 
   expect(
@@ -1139,7 +1131,7 @@ test('nested bare POJO with number and boolean literals', () => {
   // bare numbers and booleans work in nested POJOs — no literal() wrapper needed
   const decoder = record({
     name: string,
-    config: { level: 42, active: true, type: 'admin' as const },
+    config: { level: 42, active: true, type: 'admin' },
   });
 
   expect(
@@ -1241,8 +1233,8 @@ test('nested bare POJO with nullable containing bare literals', () => {
 
 test('union of bare POJOs with number/boolean literals', () => {
   const decoder = union(
-    { type: 'a' as const, level: 1 },
-    { type: 'b' as const, active: true },
+    { type: 'a', level: 1 },
+    { type: 'b', active: true },
   );
 
   expect(decoder({ type: 'a', level: 1 })).toEqual({ type: 'a', level: 1 });
@@ -1270,7 +1262,7 @@ test('deeply nested bare POJOs with mixed literal types', () => {
       level2: {
         value: 42,
         flag: true,
-        tag: 'deep' as const,
+        tag: 'deep',
       },
     },
   });
@@ -1306,7 +1298,7 @@ test('record nesting record with optional fields preserves types', () => {
 
 test('intersection of bare POJO with number literals', () => {
   const decoder = intersection(
-    { type: 'admin' as const, level: 42 },
+    { type: 'admin', level: 42 },
     { name: string },
   );
 
@@ -1341,7 +1333,7 @@ test('kitchen sink: bare literals across all combinators', () => {
   expect(() => fieldsDecoder({ level: 5, active: false })).toThrow();
 
   // always as fallback in union with bare literal POJO
-  const withDefault = union({ status: 'ok' as const, code: 200 }, always({ status: 'error' as const, code: 0 }));
+  const withDefault = union({ status: 'ok', code: 200 }, always({ status: 'error', code: 0 }));
   expect(withDefault({ status: 'ok', code: 200 })).toEqual({ status: 'ok', code: 200 });
   expect(withDefault('anything')).toEqual({ status: 'error', code: 0 });
 
@@ -1355,7 +1347,7 @@ test('kitchen sink: bare literals across all combinators', () => {
 
   // nullable intersection with bare literal POJO
   const nullableIntersect = nullable(intersection(
-    { type: 'x' as const, level: 42 },
+    { type: 'x', level: 42 },
     { name: string },
   ));
   expect(nullableIntersect(null)).toBe(null);
@@ -1380,7 +1372,7 @@ test('README examples: bare literals, unions, and new decoders', () => {
   // Config decoder with mixed bare literals (README "bare literals" section)
   const configDecoder = record({
     version: 2,
-    env: 'production' as const,
+    env: 'production',
     debug: false,
     name: string,
     retries: number,
@@ -1391,17 +1383,14 @@ test('README examples: bare literals, unions, and new decoders', () => {
   expect(() => configDecoder({ version: 2, env: 'staging', debug: false, name: 'app', retries: 3 })).toThrow();
   expect(() => configDecoder({ version: 2, env: 'production', debug: true, name: 'app', retries: 3 })).toThrow();
 
-  // literal(42) vs 42 as const vs bare 42 — all decode the same at runtime
+  // literal(42) and bare 42 are equivalent — both decode and auto-default
   const d1 = record({ level: literal(42), name: string });
-  const d2 = record({ level: 42 as const, name: string });
-  const d3 = record({ level: 42, name: string });
+  const d2 = record({ level: 42, name: string });
   const input = { level: 42, name: 'test' };
   expect(d1(input)).toEqual(input);
   expect(d2(input)).toEqual(input);
-  expect(d3(input)).toEqual(input);
   expect(() => d1({ level: 43, name: 'test' })).toThrow();
   expect(() => d2({ level: 43, name: 'test' })).toThrow();
-  expect(() => d3({ level: 43, name: 'test' })).toThrow();
 
   // union of bare number literals (README "enum-like" example)
   const statusCodeDecoder = union(200, 404, 500);
@@ -1425,8 +1414,8 @@ test('README examples: bare literals, unions, and new decoders', () => {
 
   // always as fallback in union of records (README "always" example)
   const withFallback = union(
-    record({ status: 'ok' as const, data: string }),
-    always({ status: 'error' as const, data: '' }),
+    record({ status: 'ok', data: string }),
+    always({ status: 'error', data: '' }),
   );
   expect(withFallback({ status: 'ok', data: 'hello' })).toEqual({ status: 'ok', data: 'hello' });
   expect(withFallback('garbage')).toEqual({ status: 'error', data: '' });
@@ -1470,9 +1459,9 @@ test('README examples: bare literals, unions, and new decoders', () => {
 
   // tagged union with always fallback — different shapes
   const taggedWithFallback = union(
-    record({ tag: 'success' as const, data: string }),
-    record({ tag: 'error' as const, code: number }),
-    always({ tag: 'unknown' as const }),
+    record({ tag: 'success', data: string }),
+    record({ tag: 'error', code: number }),
+    always({ tag: 'unknown' }),
   );
   expect(taggedWithFallback({ tag: 'success', data: 'hi' })).toEqual({ tag: 'success', data: 'hi' });
   expect(taggedWithFallback({ tag: 'error', code: 404 })).toEqual({ tag: 'error', code: 404 });
@@ -1481,16 +1470,16 @@ test('README examples: bare literals, unions, and new decoders', () => {
 
   // same-shape fallback — record with always providing defaults for same keys
   const sameShapeFallback = union(
-    record({ status: 'active' as const, score: number }),
-    always({ status: 'inactive' as const, score: 0 }),
+    record({ status: 'active', score: number }),
+    always({ status: 'inactive', score: 0 }),
   );
   expect(sameShapeFallback({ status: 'active', score: 99 })).toEqual({ status: 'active', score: 99 });
   expect(sameShapeFallback({ status: 'inactive', score: 'bad' })).toEqual({ status: 'inactive', score: 0 });
   expect(sameShapeFallback(undefined)).toEqual({ status: 'inactive', score: 0 });
 
   // Discriminated union with bare string literals in records (README "cool/dumb" example)
-  const coolDecoder = record({ type: 'cool' as const, somestuff: string });
-  const dumbDecoder = record({ type: 'dumb' as const, otherstuff: string });
+  const coolDecoder = record({ type: 'cool', somestuff: string });
+  const dumbDecoder = record({ type: 'dumb', otherstuff: string });
   const stuffDecoder = union(coolDecoder, dumbDecoder);
   expect(stuffDecoder({ type: 'cool', somestuff: 'yes' })).toEqual({ type: 'cool', somestuff: 'yes' });
   expect(stuffDecoder({ type: 'dumb', otherstuff: 'no' })).toEqual({ type: 'dumb', otherstuff: 'no' });
@@ -1502,7 +1491,7 @@ test('README examples: bare literals, unions, and new decoders', () => {
     config: {
       level: 42,
       active: true,
-      env: 'prod' as const,
+      env: 'prod',
     },
   });
   expect(nestedDecoder({ name: 'x', config: { level: 42, active: true, env: 'prod' } }))
@@ -1595,10 +1584,10 @@ test('withDefault with union — fallback only on total failure', () => {
 test('withDefault with tagged union — fallback on no match', () => {
   const decoder = withDefault(
     union(
-      record({ tag: 'ok' as const, data: string }),
-      record({ tag: 'err' as const, code: number }),
+      record({ tag: 'ok', data: string }),
+      record({ tag: 'err', code: number }),
     ),
-    { tag: 'err' as const, code: 0 },
+    { tag: 'err', code: 0 },
   );
   expect(decoder({ tag: 'ok', data: 'hi' })).toEqual({ tag: 'ok', data: 'hi' });
   expect(decoder({ tag: 'err', code: 404 })).toEqual({ tag: 'err', code: 404 });
@@ -1638,7 +1627,7 @@ test('withDefault with fallback type different from decoder type', () => {
   expect(decoder(42)).toBe(null);
 
   // fallback is a different string literal
-  const decoder2 = withDefault(number, 'N/A' as const);
+  const decoder2 = withDefault(number, 'N/A');
   expect(decoder2(42)).toBe(42);
   expect(decoder2('bad')).toBe('N/A');
 
@@ -1708,7 +1697,7 @@ test('objectOf validates values', () => {
 });
 
 test('objectOf with constrained keys', () => {
-  const decoder = objectOf(number, ['small', 'medium', 'large'] as const);
+  const decoder = objectOf(number, ['small', 'medium', 'large']);
   expect(decoder({ small: 1, medium: 2, large: 3 })).toEqual({ small: 1, medium: 2, large: 3 });
   expect(() => decoder({ small: 1, xl: 4 })).toThrow();
 });
@@ -1886,7 +1875,7 @@ test('5-tuple', () => {
 });
 
 test('3-tuple with bare literals', () => {
-  const decoder = tuple('hello' as const, 42, true);
+  const decoder = tuple('hello', 42, true);
   expect(decoder(['hello', 42, true])).toEqual(['hello', 42, true]);
   expect(() => decoder(['hello', 43, true])).toThrow();
 });
@@ -2141,7 +2130,7 @@ test('objectOf with .map() — transform record', () => {
 });
 
 test('objectOf with keys and .map()', () => {
-  const dec = objectOf(number, ['x', 'y'] as const).map(r => r.x + r.y);
+  const dec = objectOf(number, ['x', 'y']).map(r => r.x + r.y);
   expect(dec({ x: 10, y: 20 })).toBe(30);
 });
 
@@ -2153,7 +2142,7 @@ test('dict with .map() — transform map', () => {
 });
 
 test('dict with keys and .map()', () => {
-  const dec = dict(string, ['a', 'b'] as const).map(m => Array.from(m.values()).join(','));
+  const dec = dict(string, ['a', 'b']).map(m => Array.from(m.values()).join(','));
   expect(dec({ a: 'hello', b: 'world' })).toBe('hello,world');
 });
 
@@ -2258,7 +2247,7 @@ test('README: objectOf', () => {
 });
 
 test('README: objectOf constrained keys', () => {
-  const sizes = objectOf(number, ['small', 'medium', 'large'] as const);
+  const sizes = objectOf(number, ['small', 'medium', 'large']);
   expect(sizes({ small: 1, medium: 2, large: 3 })).toEqual({ small: 1, medium: 2, large: 3 });
   expect(() => sizes({ small: 1, xl: 4 })).toThrow();
 });
@@ -2323,8 +2312,8 @@ test('README: unknown in record', () => {
 
 test('README: always in union', () => {
   const decoder = union(
-    record({ status: 'ok' as const, data: string }),
-    always({ status: 'error' as const, data: '' }),
+    record({ status: 'ok', data: string }),
+    always({ status: 'error', data: '' }),
   );
   expect(decoder({ status: 'ok', data: 'hello' }))
     .toEqual({ status: 'ok', data: 'hello' });
@@ -2497,7 +2486,7 @@ test('README: .map() — objectOf totalScore', () => {
 });
 
 test('README: .map() — dict joined', () => {
-  const joined = dict(string, ['a', 'b'] as const).map(m => Array.from(m.values()).join(','));
+  const joined = dict(string, ['a', 'b']).map(m => Array.from(m.values()).join(','));
   expect(joined({ a: 'hello', b: 'world' })).toBe('hello,world');
 });
 
@@ -2763,7 +2752,7 @@ test('chain unknown through a decoder pipeline', () => {
 
 test('chain with a string literal form', () => {
   // decode something as unknown, then assert it's the exact string 'ok'
-  const dec = unknown.chain('ok' as const);
+  const dec = unknown.chain('ok');
   expect(dec('ok')).toBe('ok');
   expect(() => dec('nope')).toThrow();
 });
@@ -4124,6 +4113,113 @@ test('README: Decoder() with schema-aware create', () => {
 
   const user: User = User.create({ age: 25 });
   expect(user).toEqual({ name: 'John', age: 25, role: 'member' });
+});
+
+test('README: Why — unions just work', () => {
+  const eventDecoder = union(
+    { type: 'click', x: number, y: number },
+    { type: 'keypress', key: string },
+    { type: 'scroll', offset: number },
+  );
+  expect(eventDecoder({ type: 'click', x: 10, y: 20 })).toEqual({ type: 'click', x: 10, y: 20 });
+  expect(eventDecoder({ type: 'keypress', key: 'a' })).toEqual({ type: 'keypress', key: 'a' });
+  expect(eventDecoder({ type: 'scroll', offset: 100 })).toEqual({ type: 'scroll', offset: 100 });
+
+  const idDecoder = union(string, number);
+  expect(idDecoder('abc')).toBe('abc');
+  expect(idDecoder(42)).toBe(42);
+
+  const statusDecoder = union('active', 'inactive', 'pending');
+  expect(statusDecoder('active')).toBe('active');
+  expect(() => statusDecoder('deleted')).toThrow();
+
+  const responseDecoder = union(
+    { status: 'ok', data: string },
+    always({ status: 'error', data: '' }),
+  );
+  expect(responseDecoder({ status: 'ok', data: 'hi' })).toEqual({ status: 'ok', data: 'hi' });
+  expect(responseDecoder('anything')).toEqual({ status: 'error', data: '' });
+
+  const messageDecoder = union(
+    ['text', string],
+    ['image', { url: string, width: number }],
+  );
+  expect(messageDecoder(['text', 'hello'])).toEqual(['text', 'hello']);
+  expect(messageDecoder(['image', { url: 'a.png', width: 100 }])).toEqual(['image', { url: 'a.png', width: 100 }]);
+});
+
+test('README: Why — map and chain transformations', () => {
+  const decoder = record({
+    name: string,
+    birthday: string.chain(date).map(d => d.getFullYear()),
+    score: field('stats', { score: number }).map(s => s.score),
+    displayName: fields({ first: string, last: string })
+      .map(({ first, last }) => `${first} ${last}`),
+  });
+  expect(decoder({
+    name: 'Alice',
+    first: 'Alice',
+    last: 'Smith',
+    birthday: '1990-01-15',
+    stats: { score: 42 },
+  })).toEqual({ name: 'Alice', birthday: 1990, score: 42, displayName: 'Alice Smith' });
+});
+
+test('README: Why — bare literals with nested records and tuples', () => {
+  const decoder = record({
+    name: string,
+    role: 'admin',
+    address: { city: string, zip: string },
+    coordinates: [number, number],
+  });
+  expect(decoder({
+    name: 'Alice',
+    role: 'admin',
+    address: { city: 'Oslo', zip: '0101' },
+    coordinates: [59.9, 10.7],
+  })).toEqual({
+    name: 'Alice',
+    role: 'admin',
+    address: { city: 'Oslo', zip: '0101' },
+    coordinates: [59.9, 10.7],
+  });
+  expect(() => decoder({ name: 'Alice', role: 'member', address: { city: 'Oslo', zip: '0101' }, coordinates: [0, 0] })).toThrow();
+});
+
+test('README: Why — create with required and default fields', () => {
+  const userDecoder = record({
+    name: string.default('John'),
+    age: integer,
+    role: always('member'),
+  });
+
+  expect(userDecoder.create({ age: 25 })).toEqual({ name: 'John', age: 25, role: 'member' });
+  expect(userDecoder.create({ age: 25, name: 'Alice' })).toEqual({ name: 'Alice', age: 25, role: 'member' });
+  // userDecoder.create() would be a TS error — age is required (no default)
+});
+
+test('README: Why — create with all defaults (record)', () => {
+  const configDecoder = record({
+    env: 'production',
+    debug: always(false),
+    retries: integer.default(3),
+    name: string.default('app'),
+  });
+
+  expect(configDecoder.create()).toEqual({ env: 'production', debug: false, retries: 3, name: 'app' });
+  expect(configDecoder.create({ retries: 5 })).toEqual({ env: 'production', debug: false, retries: 5, name: 'app' });
+});
+
+test('README: Why — create with all defaults (Decoder class)', () => {
+  class Config extends Decoder({
+    env: 'production',
+    debug: always(false),
+    retries: integer.default(3),
+    name: string.default('app'),
+  }) {}
+
+  expect(Config.create()).toEqual({ env: 'production', debug: false, retries: 3, name: 'app' });
+  expect(Config.create({ retries: 5 })).toEqual({ env: 'production', debug: false, retries: 5, name: 'app' });
 });
 
 test('README: Decoder() with tuple, array, dict', () => {
