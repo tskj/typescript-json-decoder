@@ -811,3 +811,15 @@ expectType<Decoder<bigint>>(chained_decoder);
 // chain into a string literal
 const chained_literal = unknown.chain('ok');
 expectType<Decoder<'ok'>>(chained_literal);
+
+// .default() returns the same Decoder type
+const string_with_default = string.default('John');
+expectType<Decoder<string>>(string_with_default);
+
+// .create() returns T
+expectType<string>(string_with_default.create());
+expectType<string>(string.create('hello'));
+
+// record .create() returns the record type
+const user_dec = record({ name: string.default('John'), age: integer });
+expectType<{ name: string; age: number }>(user_dec.create({ age: 25 }));

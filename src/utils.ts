@@ -5,6 +5,11 @@ export const tag = <T extends unknown, S extends Symbol>(
   (thing as any)[symbol] = true;
 };
 
+export const defaultTag: unique symbol = Symbol('default');
+export const recordSchemaTag: unique symbol = Symbol('record-schema');
+export const fieldDecoder: unique symbol = Symbol('field-decoder');
+export const missingKey: unique symbol = Symbol('missing-key');
+
 /**
  * Tagged template for decoder error messages.
  * Interpolated values are wrapped in backticks.

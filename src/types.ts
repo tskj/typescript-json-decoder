@@ -1,5 +1,5 @@
 import { literal, tuple, record } from './literal-decoders';
-import { err } from './utils';
+import { err, defaultTag, recordSchemaTag, fieldDecoder, missingKey } from './utils';
 import { DecodeError } from './decode-error';
 
 /**
@@ -126,11 +126,20 @@ const isDecoderInput = <T>(decoder: unknown): decoder is DecoderInput<T> =>
  * A Decoder<T> is a callable object that decodes unknown input to T.
  * It supports chaining via .map() and safe invocation via .safeDecode().
  */
+
+type DeepPartial<T> =
+  T extends Date | RegExp | Map<any, any> | Set<any> ? T :
+  T extends Array<infer U> ? Array<DeepPartial<U>> :
+  T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } :
+  T;
+
 export interface Decoder<T> {
   (input: unknown): T;
   map<U>(k: (x: T) => U): Decoder<U>;
   chain<D extends DecoderInput<unknown>>(dec: D): Decoder<decodeType<D>>;
   safeDecode(input: unknown): { ok: true; value: T } | { ok: false; error: DecodeError };
+  default(value: T): Decoder<T>;
+  create(patch?: DeepPartial<T>): T;
 }
 
 /**
@@ -167,7 +176,11 @@ export const makeDecoder = <T>(fn: DecoderFunction<T>): Decoder<T> => {
         const mapped = makeDecoder((input: unknown) => k(fn(input)));
         // propagate symbol tags (e.g. fieldDecoder) through .map()
         for (const sym of Object.getOwnPropertySymbols(dec)) {
-          (mapped as any)[sym] = (dec as any)[sym];
+          if (sym === defaultTag) {
+            (mapped as any)[defaultTag] = k((dec as any)[defaultTag]);
+          } else {
+            (mapped as any)[sym] = (dec as any)[sym];
+          }
         }
         return mapped;
       },
@@ -175,6 +188,7 @@ export const makeDecoder = <T>(fn: DecoderFunction<T>): Decoder<T> => {
         const resolved = decoder(d);
         const chained = makeDecoder((input: unknown) => resolved(fn(input) as any));
         for (const sym of Object.getOwnPropertySymbols(dec)) {
+          if (sym === defaultTag) continue;
           (chained as any)[sym] = (dec as any)[sym];
         }
         return chained as any;
@@ -186,6 +200,45 @@ export const makeDecoder = <T>(fn: DecoderFunction<T>): Decoder<T> => {
           const decodeError = error instanceof DecodeError ? error : new DecodeError(String(error));
           return { ok: false, error: decodeError };
         }
+      },
+      default: (value: T): Decoder<T> => {
+        const withDef = makeDecoder(fn);
+        for (const sym of Object.getOwnPropertySymbols(dec)) {
+          (withDef as any)[sym] = (dec as any)[sym];
+        }
+        (withDef as any)[defaultTag] = value;
+        return withDef;
+      },
+      create: (patch?: any): T => {
+        // Record decoder: recursively construct from schema + patch
+        if (recordSchemaTag in dec) {
+          const schema = (dec as any)[recordSchemaTag] as Record<string, any>;
+          const recordDefault = defaultTag in dec ? (dec as any)[defaultTag] : undefined;
+          const effectivePatch = patch && recordDefault
+            ? { ...recordDefault, ...patch }
+            : patch ?? recordDefault;
+          const result: any = {};
+          for (const [key, fieldDec] of Object.entries(schema)) {
+            if (fieldDec[missingKey] === true) continue;
+            const resolved = (typeof fieldDec === 'function' && 'create' in fieldDec)
+              ? fieldDec as any
+              : decoder(fieldDec as any) as any;
+            try {
+              if (effectivePatch && key in effectivePatch) {
+                result[key] = resolved.create(effectivePatch[key]);
+              } else {
+                result[key] = resolved.create();
+              }
+            } catch {
+              throw new Error(`No default value for field '${key}'`);
+            }
+          }
+          return result;
+        }
+        // Non-record: use patch or default
+        if (patch !== undefined) return patch;
+        if (defaultTag in dec) return (dec as any)[defaultTag];
+        throw new Error('Decoder has no default value');
       },
     },
   ) as unknown as Decoder<T>;

@@ -178,3 +178,26 @@ const decoder = record({
     name: field('response').chain(at('data', 'user', 'name')).chain(string),
 });
 ```
+
+## New: `.default()` and `.create()` for constructing values
+
+Every decoder now has `.default(value)` to attach a default value and `.create(patch?)` to construct values from defaults.
+
+```typescript
+const name = string.default('John');
+name.create();        // 'John'
+name.create('Alice'); // 'Alice'
+```
+
+For record decoders, `.create()` recursively constructs from field-level defaults. Fields without defaults must be provided in the patch:
+
+```typescript
+const user = record({
+    name: string.default('John'),
+    age: integer,
+    role: always('member'),
+});
+user.create({ age: 25 }); // { name: 'John', age: 25, role: 'member' }
+```
+
+`always(v)` and `withDefault(dec, v)` automatically carry their value as a default. `.map()` transforms the default along with the decoder.

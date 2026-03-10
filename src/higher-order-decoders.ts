@@ -2,10 +2,13 @@ import { nil, undef } from './primitive-decoders';
 import { assert_is_pojo, isPojoObject } from './pojo';
 import { decodeType, decoder, Decoder, DecoderInput, makeDecoder, isKey } from './types';
 import { DecodeError, asDecodeError } from './decode-error';
-import { err } from './utils';
+import { err, defaultTag } from './utils';
 
-export const always = <const T>(value: T): Decoder<T> =>
-  makeDecoder((_input: unknown) => value);
+export const always = <const T>(value: T): Decoder<T> => {
+  const dec = makeDecoder((_input: unknown) => value);
+  (dec as any)[defaultTag] = value;
+  return dec;
+};
 
 export const lazy = <const T>(thunk: () => DecoderInput<T>): Decoder<T> =>
   makeDecoder((value: unknown) => decoder(thunk())(value) as T);
@@ -58,13 +61,15 @@ export function withDefault<T extends DecoderInput<unknown>, const F>(
 ): Decoder<decodeType<T> | F>;
 export function withDefault(dec: any, fallback: any) {
   const d = decoder(dec);
-  return makeDecoder((value: unknown) => {
+  const result = makeDecoder((value: unknown) => {
     try {
       return d(value);
     } catch {
       return fallback;
     }
   });
+  (result as any)[defaultTag] = fallback;
+  return result;
 }
 
 export function array<const D extends DecoderInput<unknown>>(

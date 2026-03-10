@@ -2890,3 +2890,326 @@ test('chain with nested record literal', () => {
   const input = { user: { name: 'eve', scores: [90, 85] }, active: true };
   expect(dec(input)).toEqual(input);
 });
+
+// .default() and .create() tests
+
+test('create with primitive default', () => {
+  expect(string.default('John').create()).toBe('John');
+  expect(number.default(42).create()).toBe(42);
+  expect(boolean.default(true).create()).toBe(true);
+});
+
+test('create with explicit value overrides default', () => {
+  expect(string.default('John').create('Alice')).toBe('Alice');
+  expect(number.default(42).create(99)).toBe(99);
+});
+
+test('create without default throws', () => {
+  expect(() => string.create()).toThrow('Decoder has no default value');
+  expect(() => number.create()).toThrow('Decoder has no default value');
+});
+
+test('create with explicit value and no default', () => {
+  expect(string.create('hello')).toBe('hello');
+  expect(number.create(7)).toBe(7);
+});
+
+test('always has automatic default', () => {
+  expect(always('member').create()).toBe('member');
+  expect(always(42).create()).toBe(42);
+});
+
+test('withDefault has automatic default', () => {
+  expect(withDefault(string, 'fallback').create()).toBe('fallback');
+});
+
+test('record create with all field defaults', () => {
+  const User = record({
+    name: string.default('John'),
+    role: always('member'),
+  });
+  expect(User.create()).toEqual({ name: 'John', role: 'member' });
+});
+
+test('record create with patch overrides defaults', () => {
+  const User = record({
+    name: string.default('John'),
+    age: integer.default(0),
+    role: always('member'),
+  });
+  expect(User.create({ name: 'Alice', age: 30 })).toEqual({
+    name: 'Alice',
+    age: 30,
+    role: 'member',
+  });
+});
+
+test('record create throws when field has no default', () => {
+  const User = record({
+    name: string.default('John'),
+    age: integer,
+  });
+  expect(() => User.create()).toThrow("No default value for field 'age'");
+});
+
+test('record create with patch for required fields', () => {
+  const User = record({
+    name: string.default('John'),
+    age: integer,
+  });
+  expect(User.create({ age: 25 })).toEqual({ name: 'John', age: 25 });
+});
+
+test('nested record create recursively constructs', () => {
+  const Address = record({
+    city: string.default('Unknown'),
+    zip: string,
+  });
+  const User = record({
+    name: string.default('John'),
+    address: Address,
+  });
+  expect(User.create({ address: { zip: '10001' } })).toEqual({
+    name: 'John',
+    address: { city: 'Unknown', zip: '10001' },
+  });
+});
+
+test('nested record create fully defaulted', () => {
+  const Address = record({
+    city: string.default('Unknown'),
+    zip: string.default('00000'),
+  });
+  const User = record({
+    name: string.default('John'),
+    address: Address,
+  });
+  expect(User.create()).toEqual({
+    name: 'John',
+    address: { city: 'Unknown', zip: '00000' },
+  });
+});
+
+test('record create with .default() on the record itself', () => {
+  const User = record({
+    name: string,
+    age: integer,
+  });
+  const DefaultUser = User.default({ name: 'John', age: 0 });
+  expect(DefaultUser.create()).toEqual({ name: 'John', age: 0 });
+});
+
+test('record create with .default() and patch override', () => {
+  const User = record({
+    name: string,
+    age: integer,
+  });
+  const DefaultUser = User.default({ name: 'John', age: 0 });
+  expect(DefaultUser.create({ age: 30 })).toEqual({ name: 'John', age: 30 });
+});
+
+test('record create skips missing-tagged fields', () => {
+  const Strict = record({
+    name: string.default('John'),
+    _extra: missing,
+  });
+  expect(Strict.create()).toEqual({ name: 'John' });
+});
+
+test('map applies to default', () => {
+  const upper = string.default('John').map(s => s.toUpperCase());
+  expect(upper.create()).toBe('JOHN');
+});
+
+test('map without default still has no default', () => {
+  const upper = string.map(s => s.toUpperCase());
+  expect(() => upper.create()).toThrow('Decoder has no default value');
+});
+
+test('map then default uses the explicit default', () => {
+  const dec = string.map(s => s.toUpperCase()).default('ALICE');
+  expect(dec.create()).toBe('ALICE');
+});
+
+test('default then map transforms the default', () => {
+  const dec = string.default('hello').map(s => s.length);
+  expect(dec.create()).toBe(5);
+});
+
+test('default then multiple maps chains transforms on default', () => {
+  const dec = string.default('hello').map(s => s.toUpperCase()).map(s => s + '!');
+  expect(dec.create()).toBe('HELLO!');
+});
+
+test('map then default then map applies last map to explicit default', () => {
+  const dec = string.map(s => s.trim()).default('bob').map(s => s.toUpperCase());
+  expect(dec.create()).toBe('BOB');
+});
+
+test('default overrides previous default', () => {
+  const dec = string.default('first').default('second');
+  expect(dec.create()).toBe('second');
+});
+
+test('default then map that changes type', () => {
+  const dec = string.default('hello').map(s => ({ value: s, length: s.length }));
+  expect(dec.create()).toEqual({ value: 'hello', length: 5 });
+});
+
+test('default then map in record field', () => {
+  const User = record({
+    name: string.default('john').map(s => s.toUpperCase()),
+    age: integer.default(0).map(n => n + 1),
+  });
+  expect(User.create()).toEqual({ name: 'JOHN', age: 1 });
+});
+
+test('default still decodes normally', () => {
+  const dec = string.default('John');
+  expect(dec('hello')).toBe('hello');
+  expect(() => dec(42)).toThrow();
+});
+
+test('create throws for all primitive decoders without defaults', () => {
+  expect(() => integer.create()).toThrow('Decoder has no default value');
+  expect(() => date.create()).toThrow('Decoder has no default value');
+  expect(() => boolean.create()).toThrow('Decoder has no default value');
+  expect(() => unknown.create()).toThrow('Decoder has no default value');
+  expect(() => bigint.create()).toThrow('Decoder has no default value');
+  expect(() => regex(/.*/).create()).toThrow('Decoder has no default value');
+});
+
+test('create throws for combinators without defaults', () => {
+  expect(() => array(string).create()).toThrow('Decoder has no default value');
+  expect(() => optional(string).create()).toThrow('Decoder has no default value');
+  expect(() => nullable(string).create()).toThrow('Decoder has no default value');
+  expect(() => union(string, number).create()).toThrow('Decoder has no default value');
+  expect(() => set(string).create()).toThrow('Decoder has no default value');
+});
+
+test('create with default on all primitive decoders', () => {
+  expect(integer.default(7).create()).toBe(7);
+  expect(date.default(new Date('2024-01-01')).create()).toEqual(new Date('2024-01-01'));
+  expect(boolean.default(false).create()).toBe(false);
+  expect(unknown.default('anything').create()).toBe('anything');
+  expect(bigint.default(BigInt(99)).create()).toBe(BigInt(99));
+  expect(regex(/.*/).default('hello').create()).toBe('hello');
+});
+
+test('create with default on combinators', () => {
+  expect(array(string).default(['a', 'b']).create()).toEqual(['a', 'b']);
+  expect(optional(string).default(undefined).create()).toBe(undefined);
+  expect(nullable(string).default(null).create()).toBe(null);
+  expect(union(string, number).default('hello').create()).toBe('hello');
+  expect(set(string).default(new Set(['x'])).create()).toEqual(new Set(['x']));
+  expect(nonEmptyArray(string).default(['a']).create()).toEqual(['a']);
+});
+
+test('create with default on tuple', () => {
+  expect(tuple(string, number).default(['a', 1]).create()).toEqual(['a', 1]);
+});
+
+test('create with default on intersection', () => {
+  const dec = intersection({ a: string }, { b: number });
+  expect(dec.default({ a: 'x', b: 1 }).create()).toEqual({ a: 'x', b: 1 });
+});
+
+test('create with default on dict and objectOf', () => {
+  expect(dict(number).default(new Map([['a', 1]])).create()).toEqual(new Map([['a', 1]]));
+  expect(objectOf(number).default({ x: 1 }).create()).toEqual({ x: 1 });
+});
+
+test('create with default on field and fields', () => {
+  expect(field('name', string).default('John').create()).toBe('John');
+  expect(fields({ a: string, b: number }).default({ a: 'x', b: 1 }).create()).toEqual({ a: 'x', b: 1 });
+});
+
+test('create with default on lazy', () => {
+  expect(lazy(() => string).default('lazy').create()).toBe('lazy');
+});
+
+test('create with default on decoder()', () => {
+  expect(decoder(string).default('wrapped').create()).toBe('wrapped');
+});
+
+test('record create error names the missing field', () => {
+  const dec = record({ name: string.default('John'), email: string });
+  expect(() => dec.create()).toThrow("No default value for field 'email'");
+});
+
+test('nested record create error names the immediate missing field', () => {
+  const inner = record({ city: string });
+  const outer = record({ name: string.default('John'), address: inner });
+  expect(() => outer.create()).toThrow("No default value for field 'address'");
+});
+
+test('nested record create with partial patch missing inner field', () => {
+  const inner = record({ city: string, zip: string });
+  const outer = record({ name: string.default('John'), address: inner });
+  expect(() => outer.create({ address: { city: 'NY' } })).toThrow("No default value for field 'address'");
+});
+
+// README examples for .default() and .create()
+
+test('README: primitive default and create', () => {
+  const name = string.default('John');
+  expect(name.create()).toBe('John');
+  expect(name.create('Alice')).toBe('Alice');
+});
+
+test('README: always and withDefault auto-default', () => {
+  expect(always('member').create()).toBe('member');
+  expect(withDefault(string, 'fallback').create()).toBe('fallback');
+});
+
+test('README: record create with field defaults', () => {
+  const userDecoder = record({
+    name: string.default('John'),
+    age: integer,
+    role: always('member'),
+  });
+
+  expect(userDecoder.create({ age: 25 })).toEqual({
+    name: 'John',
+    age: 25,
+    role: 'member',
+  });
+});
+
+test('README: nested record create', () => {
+  const addressDecoder = record({
+    city: string.default('Unknown'),
+    zip: string.default('00000'),
+  });
+  const userDecoder2 = record({
+    name: string.default('John'),
+    address: addressDecoder,
+  });
+
+  expect(userDecoder2.create()).toEqual({
+    name: 'John',
+    address: { city: 'Unknown', zip: '00000' },
+  });
+
+  expect(userDecoder2.create({ address: { zip: '10001' } })).toEqual({
+    name: 'John',
+    address: { city: 'Unknown', zip: '10001' },
+  });
+});
+
+test('README: default then map', () => {
+  const upper = string.default('hello').map(s => s.toUpperCase());
+  expect(upper.create()).toBe('HELLO');
+});
+
+test('README: map then default', () => {
+  const dec = string.map(s => s.toUpperCase()).default('ALICE');
+  expect(dec.create()).toBe('ALICE');
+});
+
+test('README: record-level default with patch', () => {
+  const pointDecoder = record({ x: number, y: number });
+  const origin = pointDecoder.default({ x: 0, y: 0 });
+  expect(origin.create()).toEqual({ x: 0, y: 0 });
+  expect(origin.create({ x: 5 })).toEqual({ x: 5, y: 0 });
+});

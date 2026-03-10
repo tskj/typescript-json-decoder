@@ -624,6 +624,80 @@ const result = safeDecode(string, someValue);
 
 Both return `{ ok: true, value: T } | { ok: false, error: DecodeError }`.
 
+## Creating values with defaults
+
+Decoders can carry default values, turning them into factories for constructing new instances. Use `.default()` to attach a default value and `.create()` to build values from defaults.
+
+```typescript
+import { string, number, integer, record, always, withDefault } from 'typescript-json-decoder';
+
+const name = string.default('John');
+name.create();        // 'John'
+name.create('Alice'); // 'Alice'
+```
+
+`always` and `withDefault` automatically carry their value as a default:
+
+```typescript
+always('member').create();             // 'member'
+withDefault(string, 'fallback').create(); // 'fallback'
+```
+
+This is most useful with record decoders. Fields with defaults don't need to be provided in the patch:
+
+```typescript
+const userDecoder = record({
+    name: string.default('John'),
+    age: integer,
+    role: always('member'),
+});
+
+userDecoder.create({ age: 25 });
+// { name: 'John', age: 25, role: 'member' }
+```
+
+Nested records work recursively — each field decoder's `.create()` is called to fill in missing values:
+
+```typescript
+const addressDecoder = record({
+    city: string.default('Unknown'),
+    zip: string.default('00000'),
+});
+const userDecoder2 = record({
+    name: string.default('John'),
+    address: addressDecoder,
+});
+
+userDecoder2.create();
+// { name: 'John', address: { city: 'Unknown', zip: '00000' } }
+
+userDecoder2.create({ address: { zip: '10001' } });
+// { name: 'John', address: { city: 'Unknown', zip: '10001' } }
+```
+
+`.map()` transforms the default along with the decoder, so ordering is flexible:
+
+```typescript
+// default then map — the default is transformed
+const upper = string.default('hello').map(s => s.toUpperCase());
+upper.create(); // 'HELLO'
+
+// map then default — the explicit default is used as-is
+const dec = string.map(s => s.toUpperCase()).default('ALICE');
+dec.create(); // 'ALICE'
+```
+
+You can also set a record-level default with `.default()`. A patch merges on top of it:
+
+```typescript
+const pointDecoder = record({ x: number, y: number });
+const origin = pointDecoder.default({ x: 0, y: 0 });
+origin.create();          // { x: 0, y: 0 }
+origin.create({ x: 5 });  // { x: 5, y: 0 }
+```
+
+Calling `.create()` on a decoder with no default and no patch throws an error.
+
 ## Error structure
 
 When decoding fails, decoders throw a `DecodeError` (extends `Error`) with structured information about what went wrong and where.

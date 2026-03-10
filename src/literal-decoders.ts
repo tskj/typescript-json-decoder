@@ -9,7 +9,7 @@ import {
   addQuestionmarksToRecordFields,
 } from './types';
 import { DecodeError, asDecodeError } from './decode-error';
-import { tag, err } from './utils';
+import { tag, err, fieldDecoder, missingKey, recordSchemaTag } from './utils';
 
 export function literal<const p extends PrimitiveJsonLiteralForm>(lit: p): Decoder<p>;
 export function literal(lit: PrimitiveJsonLiteralForm) {
@@ -60,8 +60,7 @@ export function tuple(...decoders: any[]) {
   });
 }
 
-export const fieldDecoder: unique symbol = Symbol('field-decoder');
-export const missingKey: unique symbol = Symbol('missing-key');
+export { fieldDecoder, missingKey };
 export const fields = <const T extends { [key: string]: DecoderInput<unknown> }>(
   schema: T,
 ): Decoder<evalRecordSchema<T>> => {
@@ -85,6 +84,8 @@ export const missing = Object.assign(
     map: () => missing,
     chain: () => missing,
     safeDecode: () => ({ ok: false as const, error: 'missing should not be called directly' }),
+    default: () => missing,
+    create: () => undefined,
   },
 ) as unknown as Decoder<undefined>;
 
@@ -122,8 +123,8 @@ type evalRecordSchema<schema> = addQuestionmarksToRecordFields<{
 export const record =
   <const schema extends { [key: string]: DecoderInput<unknown> }>(
     s: schema,
-  ): Decoder<evalRecordSchema<schema>> =>
-  makeDecoder((value: unknown): any => {
+  ): Decoder<evalRecordSchema<schema>> => {
+  const dec = makeDecoder((value: unknown): any => {
     assert_is_pojo(value);
     if (!isPojoObject(value)) {
       throw DecodeError.simple(
@@ -168,3 +169,6 @@ export const record =
     }
     return result;
   });
+  (dec as any)[recordSchemaTag] = s;
+  return dec;
+};
