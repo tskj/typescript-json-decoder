@@ -60,16 +60,16 @@ const combineObjectProperties = <A extends Object, B extends Object>(
   ];
   const result = {} as any;
   for (const key of keys) {
-    const inA = key in a;
-    const inB = key in b;
-    if (inA && inB) {
+    if (!(key in a)) {
+      result[key] = (b as any)[key];
+    } else if (!(key in b)) {
+      result[key] = (a as any)[key];
+    } else {
       try {
         result[key] = combineResults((a as any)[key], (b as any)[key]);
       } catch (error) {
         throw asDecodeError(error).withPath(String(key));
       }
-    } else {
-      result[key] = inA ? (a as any)[key] : (b as any)[key];
     }
   }
   return result as A & B;
@@ -144,8 +144,6 @@ export const intersection =
         value,
       );
     }
-    return results.length === 0
-      ? ({} as any)
-      : results.reduce((acc, result) => combineResults(acc, result));
+    return results.reduce(combineResults);
   });
 };
