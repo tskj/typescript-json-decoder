@@ -3,6 +3,7 @@ import {
   boolean,
   date,
   Decoder,
+  DecodeError,
   field,
   fields,
   number,
@@ -160,9 +161,9 @@ expectAssignable<DecoderFunction<boolean>>(always(false));
 // always as default in union
 expectAssignable<DecoderFunction<boolean>>(union(boolean, always(false)));
 
-// safeDecode should return discriminated union result
+// safeDecode should return discriminated union result with DecodeError
 const safeResult = safeDecode(string, 'hello');
-expectType<{ ok: true; value: string } | { ok: false; error: string }>(safeResult);
+expectType<{ ok: true; value: string } | { ok: false; error: DecodeError }>(safeResult);
 if (safeResult.ok) {
   expectType<string>(safeResult.value);
 }
@@ -594,9 +595,9 @@ expectType<{ name: string; balance: bigint }>(
   bigint_record({ name: 'x', balance: '123' }),
 );
 
-// safeDecode returns discriminated union
+// safeDecode returns discriminated union with DecodeError
 const readme_safe = safeDecode(string, 'hello');
-expectType<{ ok: true; value: string } | { ok: false; error: string }>(readme_safe);
+expectType<{ ok: true; value: string } | { ok: false; error: DecodeError }>(readme_safe);
 
 // --- literal ---
 expectType<'admin'>(literal('admin')('admin'));
@@ -763,13 +764,13 @@ expectType<boolean>(chained('hello'));
 const record_mapped = record({ name: string, age: number }).map(x => x.name);
 expectType<Decoder<string>>(record_mapped);
 
-// .safeDecode() returns discriminated union
+// .safeDecode() returns discriminated union with DecodeError
 const safe = string.safeDecode('hello');
-expectType<{ ok: true; value: string } | { ok: false; error: string }>(safe);
+expectType<{ ok: true; value: string } | { ok: false; error: DecodeError }>(safe);
 
 // .safeDecode() on mapped decoder
 const safe_mapped = string.map(s => s.length).safeDecode('hello');
-expectType<{ ok: true; value: number } | { ok: false; error: string }>(safe_mapped);
+expectType<{ ok: true; value: number } | { ok: false; error: DecodeError }>(safe_mapped);
 
 // decoder() wraps to Decoder<T>
 const wrapped = decoder((input: unknown) => String(input));

@@ -1,5 +1,6 @@
 import { literal, tuple, record } from './literal-decoders';
 import { err } from './utils';
+import { DecodeError } from './decode-error';
 
 /**
  * Json Literal Decoder
@@ -129,7 +130,7 @@ export interface Decoder<T> {
   (input: unknown): T;
   map<U>(k: (x: T) => U): Decoder<U>;
   chain<D extends DecoderInput<unknown>>(dec: D): Decoder<decodeType<D>>;
-  safeDecode(input: unknown): { ok: true; value: T } | { ok: false; error: string };
+  safeDecode(input: unknown): { ok: true; value: T } | { ok: false; error: DecodeError };
 }
 
 /**
@@ -178,11 +179,12 @@ export const makeDecoder = <T>(fn: DecoderFunction<T>): Decoder<T> => {
         }
         return chained as any;
       },
-      safeDecode: (input: unknown): { ok: true; value: T } | { ok: false; error: string } => {
+      safeDecode: (input: unknown): { ok: true; value: T } | { ok: false; error: DecodeError } => {
         try {
           return { ok: true, value: fn(input) };
         } catch (error) {
-          return { ok: false, error: String(error) };
+          const decodeError = error instanceof DecodeError ? error : new DecodeError(String(error));
+          return { ok: false, error: decodeError };
         }
       },
     },
@@ -206,11 +208,12 @@ export const decoder = <const D extends DecoderInput<unknown>>(
 export const safeDecode = <const D extends DecoderInput<unknown>>(
   d: D,
   value: unknown,
-): { ok: true; value: decodeType<D> } | { ok: false; error: string } => {
+): { ok: true; value: decodeType<D> } | { ok: false; error: DecodeError } => {
   try {
     return { ok: true, value: decoder(d)(value) };
   } catch (error) {
-    return { ok: false, error: String(error) };
+    const decodeError = error instanceof DecodeError ? error : new DecodeError(String(error));
+    return { ok: false, error: decodeError };
   }
 };
 

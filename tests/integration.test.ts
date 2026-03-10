@@ -750,7 +750,7 @@ test('safeDecode on the full project', () => {
   const failure = safeDecode(projectDecoder, { name: 'incomplete' });
   expect(failure.ok).toBe(false);
   if (!failure.ok) {
-    expect(typeof failure.error).toBe('string');
+    expect(failure.error).toBeInstanceOf(Error);
   }
 });
 

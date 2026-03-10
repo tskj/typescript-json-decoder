@@ -3,6 +3,7 @@ import {
   boolean,
   decodeType,
   safeDecode,
+  DecodeError,
   number,
   string,
   tuple,
@@ -977,7 +978,7 @@ test('safeDecode returns error on failure', () => {
   const result = safeDecode(string, 42);
   expect(result.ok).toBe(false);
   if (!result.ok) {
-    expect(result.error).toContain('not of type `string`');
+    expect(result.error.message).toContain('not of type `string`');
   }
 });
 
@@ -2393,7 +2394,7 @@ test('README: .safeDecode() method', () => {
   const failure = string.safeDecode(42);
   expect(failure.ok).toBe(false);
   if (!failure.ok) {
-    expect(typeof failure.error).toBe('string');
+    expect(failure.error).toBeInstanceOf(DecodeError);
   }
 });
 

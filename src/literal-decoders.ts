@@ -8,6 +8,7 @@ import {
   PrimitiveJsonLiteralForm,
   addQuestionmarksToRecordFields,
 } from './types';
+import { DecodeError } from './decode-error';
 import { tag, err } from './utils';
 
 export function literal<const p extends PrimitiveJsonLiteralForm>(lit: p): Decoder<p>;
@@ -15,7 +16,10 @@ export function literal(lit: PrimitiveJsonLiteralForm) {
   return makeDecoder((value: unknown) => {
     assert_is_pojo(value);
     if (lit !== value) {
-      throw err`The value ${value} is not the literal ${lit}`;
+      throw DecodeError.simple(
+        err`The value ${value} is not the literal ${lit}`,
+        JSON.stringify(lit),
+      );
     }
     return lit;
   });
