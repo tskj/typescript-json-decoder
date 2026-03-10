@@ -2,7 +2,8 @@ import { nil, undef } from './primitive-decoders';
 import { assert_is_pojo, isPojoObject } from './pojo';
 import { decodeType, decoder, Decoder, DefaultDecoder, DecoderInput, makeDecoder, isKey } from './types';
 import { DecodeError, asDecodeError } from './decode-error';
-import { err, defaultTag } from './utils';
+import { err, defaultTag, regexPattern } from './utils';
+import { RegexPart, makeRegexPart } from './regex-part';
 
 export const always = <const T>(value: T): DefaultDecoder<T> => {
   const dec = makeDecoder((_input: unknown) => value);
@@ -33,9 +34,42 @@ const unionImpl = (decoders: DecoderInput<unknown>[], value: unknown): any => {
   );
 };
 
-export const union =
-  <const decoders extends DecoderInput<unknown>[]>(...decoders: decoders): Decoder<evalOver<getSumOfArray<decoders>>> =>
-  makeDecoder((value: unknown) => unionImpl(decoders, value));
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Extract the regex pattern string from a union arg, or null if not regex-able */
+function getPattern(d: unknown): string | null {
+  if (typeof d === 'string') return escapeRegex(d);
+  if (typeof d === 'number' || typeof d === 'boolean') return escapeRegex(String(d));
+  if (d != null && (typeof d === 'object' || typeof d === 'function') && regexPattern in d) return (d as any)[regexPattern];
+  return null;
+}
+
+type RegexUnionMember<T> =
+  T extends RegexPart<infer U> ? U :
+  T extends string ? T :
+  never;
+
+export function union<const T extends (RegexPart<any> | string)[]>(...decoders: T): RegexPart<RegexUnionMember<T[number]>>;
+export function union<const decoders extends DecoderInput<unknown>[]>(...decoders: decoders): Decoder<evalOver<getSumOfArray<decoders>>>;
+export function union(...decoders: any[]): any {
+  const dec = makeDecoder((value: unknown) => unionImpl(decoders, value));
+  // When all args have regex patterns (strings, numbers, booleans, or RegexParts), add regex support
+  const patterns = decoders.map(getPattern);
+  if (patterns.every((p): p is string => p !== null)) {
+    const combined = `(?:${patterns.join('|')})`;
+    (dec as any)[regexPattern] = combined;
+    (dec as any).zeroOrOne = () => makeRegexPart(`(?:${combined})?`);
+    (dec as any).oneOrMore = () => makeRegexPart(`(?:${combined})+`);
+    (dec as any).zeroOrMore = () => makeRegexPart(`(?:${combined})*`);
+    (dec as any).repeat = (min: number, max?: number) => {
+      const q = max !== undefined ? `{${min},${max}}` : `{${min}}`;
+      return makeRegexPart(`(?:${combined})${q}`);
+    };
+  }
+  return dec;
+}
 
 export { intersection } from './intersection';
 

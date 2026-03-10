@@ -18,3 +18,7 @@ test('decoder-class example runs', () => {
 test('transform-and-reshape example runs', () => {
   require('../examples/transform-and-reshape');
 });
+
+test('regex-dsl example runs', () => {
+  require('../examples/regex-dsl');
+});

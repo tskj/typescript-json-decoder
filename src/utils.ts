@@ -9,6 +9,7 @@ export const defaultTag: unique symbol = Symbol('default');
 export const recordSchemaTag: unique symbol = Symbol('record-schema');
 export const fieldDecoder: unique symbol = Symbol('field-decoder');
 export const missingKey: unique symbol = Symbol('missing-key');
+export const regexPattern: unique symbol = Symbol('regex-pattern');
 
 /**
  * Tagged template for decoder error messages.

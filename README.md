@@ -597,6 +597,106 @@ const userDecoder = record({
 });
 ```
 
+### Typed regex DSL
+
+The `regex` function also works as a composable, type-safe regex DSL. Instead of a `RegExp`, pass building blocks from the `regex` namespace:
+
+```typescript
+import { regex, record, string } from 'typescript-json-decoder';
+
+const { digits, digit, letter } = regex;
+
+// Compose parts — the return type reflects the pattern structure
+const semver = regex('v', digits, '.', digits, '.', digits);
+// RegexPart<`v${number}.${number}.${number}`>
+
+semver('v1.2.3');  // 'v1.2.3'
+semver('hello');   // throws
+```
+
+All building blocks live under the `regex` namespace:
+
+| Part | Pattern | Type |
+|------|---------|------|
+| `regex.digit` | `\d` | `'0'\|'1'\|...\|'9'` |
+| `regex.digits` | `\d+` | `` `${number}` `` |
+| `regex.letter` | `[a-zA-Z]` | union of all letters |
+| `regex.lower` | `[a-z]` | lowercase letters |
+| `regex.upper` | `[A-Z]` | uppercase letters |
+| `regex.w` | `\w` | `string` |
+| `regex.dot` | `.` | `string` |
+| `regex.chars(c)` | `[c]` | `string` |
+| `regex.range(a, b)` | `[a-b]` | `string` |
+
+Every `RegexPart` has quantifier methods:
+
+```typescript
+const { letter, digit } = regex;
+
+letter.oneOrMore();   // [a-zA-Z]+
+digit.zeroOrMore();   // \d*
+digit.zeroOrOne();    // \d?  (type: Digit | '')
+digit.repeat(4);      // \d{4}
+digit.repeat(2, 4);   // \d{2,4}
+```
+
+Note: `.zeroOrOne()` is the regex `?` quantifier (type becomes `T | ''`). This is different from `.optional()` which gives decoder semantics (`T | undefined`).
+
+Results are composable — `regex()` returns a `RegexPart`, so it can be nested:
+
+```typescript
+const { digits, digit } = regex;
+
+const datePart = regex(digits, '-', digits, '-', digits);
+const timePart = regex(digit.repeat(2), ':', digit.repeat(2));
+const datetime = regex(datePart, 'T', timePart);
+
+datetime('2024-01-15T09:30'); // '2024-01-15T09:30'
+```
+
+`union()` of strings and regex parts produces a `RegexPart` usable in compositions:
+
+```typescript
+import { regex, union } from 'typescript-json-decoder';
+
+const { digits } = regex;
+
+const cssLength = regex(digits, union('px', 'em', 'rem'));
+cssLength('42px'); // '42px'
+
+// zeroOrOne for optional suffixes
+const maybeUnit = regex(digits, union('px', 'em').zeroOrOne());
+maybeUnit('42');   // '42'
+maybeUnit('42px'); // '42px'
+```
+
+Custom character classes with `regex.chars()` and `regex.range()`:
+
+```typescript
+import { regex } from 'typescript-json-decoder';
+
+const hex = regex('#', regex.chars('0-9a-fA-F').repeat(6));
+hex('#ff9900'); // '#ff9900'
+hex('#xyz');    // throws
+```
+
+Since `RegexPart` extends `Decoder`, all decoder methods work — `.map()`, `.optional()`, `.array()`, etc.:
+
+```typescript
+import { regex } from 'typescript-json-decoder';
+
+const { digits } = regex;
+
+// .map() transforms the result
+const px = regex(digits, 'px').map(s => parseInt(s, 10));
+px('42px'); // 42
+
+// .optional() gives decoder semantics (T | undefined)
+const optionalVersion = regex('v', digits).optional();
+optionalVersion(undefined); // undefined
+optionalVersion('v2');      // 'v2'
+```
+
 `fallback` wraps any decoder with a fallback value. If the decoder throws, the fallback is returned instead. The fallback type can differ from the decoder type, in which case the return type is the union of both. Every decoder also has a fluent `.fallback()` method with the same behavior.
 
 ```typescript

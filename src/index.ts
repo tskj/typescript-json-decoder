@@ -32,7 +32,7 @@ export {
   date,
   integer,
   bigint,
-  regex,
   unknown,
 } from './primitive-decoders';
+export { regex, RegexPart, makeRegexPart, regexPattern } from './regex-dsl';
 export { Pojo } from './pojo';
