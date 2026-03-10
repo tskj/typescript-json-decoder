@@ -3982,3 +3982,262 @@ test('empty tuple auto-creates to []', () => {
   const t = tuple();
   expect(t.create()).toEqual([]);
 });
+
+// ============================================================
+// Decoder() class API
+// ============================================================
+
+test('Decoder() with record: decode', () => {
+  class User extends Decoder(record({ name: string, age: number })) {}
+  const user: User = User.decode({ name: 'Alice', age: 30 });
+  expect(user).toEqual({ name: 'Alice', age: 30 });
+});
+
+test('Decoder() with record: new', () => {
+  class User extends Decoder(record({ name: string, age: number })) {}
+  const user: User = new User({ name: 'Bob', age: 25 });
+  expect(user).toEqual({ name: 'Bob', age: 25 });
+});
+
+test('Decoder() with record: safeDecode', () => {
+  class User extends Decoder(record({ name: string, age: number })) {}
+  const ok = User.safeDecode({ name: 'Alice', age: 30 });
+  expect(ok).toEqual({ ok: true, value: { name: 'Alice', age: 30 } });
+  const fail = User.safeDecode({ name: 'Alice', age: 'bad' });
+  expect(fail.ok).toBe(false);
+});
+
+test('Decoder() with record: create with defaults', () => {
+  class User extends Decoder(record({
+    name: string.default('John'),
+    age: integer,
+    role: always('member'),
+  })) {}
+  const user: User = User.create({ age: 25 });
+  expect(user).toEqual({ name: 'John', age: 25, role: 'member' });
+});
+
+test('Decoder() with record: create all defaults', () => {
+  class Config extends Decoder(record({
+    type: literal('app'),
+    debug: always(false),
+    name: string.default('unnamed'),
+  })) {}
+  const config: Config = Config.create();
+  expect(config).toEqual({ type: 'app', debug: false, name: 'unnamed' });
+});
+
+test('Decoder() with record: plain object is assignable to type', () => {
+  class Point extends Decoder(record({ x: number, y: number })) {}
+  // structural typing: a plain object is a valid Point
+  const p: Point = { x: 1, y: 2 };
+  expect(p).toEqual({ x: 1, y: 2 });
+});
+
+test('Decoder() with tuple: decode', () => {
+  class Pair extends Decoder(tuple(string, number)) {}
+  const pair: Pair = Pair.decode(['hello', 42]);
+  expect(pair).toEqual(['hello', 42]);
+});
+
+test('Decoder() with tuple: create with defaults', () => {
+  class Origin extends Decoder(tuple(number.default(0), number.default(0))) {}
+  const origin: Origin = Origin.create();
+  expect(origin).toEqual([0, 0]);
+});
+
+test('Decoder() with array: decode', () => {
+  class Names extends Decoder(array(string)) {}
+  const names: Names = Names.decode(['Alice', 'Bob']);
+  expect(names).toEqual(['Alice', 'Bob']);
+});
+
+// Note: Decoder() only works with class extends when the decoded type is a
+// single object type (record, tuple, array). Unions and primitives cause
+// TS2509 because class extends requires an object type, not a union or
+// primitive. For those, continue using decodeType<typeof decoder>.
+
+test('Decoder() with set: decode', () => {
+  class Tags extends Decoder(set(string)) {}
+  const tags: Tags = Tags.decode(['a', 'b', 'a']);
+  expect(tags).toEqual(new Set(['a', 'b']));
+});
+
+test('Decoder() with dict: decode', () => {
+  class Scores extends Decoder(dict(number)) {}
+  const scores: Scores = Scores.decode({ math: 90, english: 85 });
+  expect(scores).toEqual(new Map([['math', 90], ['english', 85]]));
+});
+
+test('Decoder() with objectOf: decode', () => {
+  class Config extends Decoder(objectOf(string)) {}
+  const config: Config = Config.decode({ a: 'x', b: 'y' });
+  expect(config).toEqual({ a: 'x', b: 'y' });
+});
+
+test('Decoder() nested: Type inside Type record', () => {
+  class Address extends Decoder(record({
+    city: string.default('Unknown'),
+    zip: string.default('00000'),
+  })) {}
+
+  // Use the underlying decoder in another Type
+  const addressDecoder = record({
+    city: string.default('Unknown'),
+    zip: string.default('00000'),
+  });
+  class User extends Decoder(record({
+    name: string.default('John'),
+    address: addressDecoder,
+  })) {}
+
+  const user: User = User.create();
+  expect(user).toEqual({
+    name: 'John',
+    address: { city: 'Unknown', zip: '00000' },
+  });
+});
+
+// README examples for Decoder()
+
+test('README: Decoder() as type and decoder', () => {
+  class User extends Decoder(record({ name: string, age: number })) {}
+
+  // As a type — plain objects are assignable
+  const user: User = { name: 'Alice', age: 30 };
+  expect(user).toEqual({ name: 'Alice', age: 30 });
+
+  // As a decoder
+  const decoded: User = User.decode({ name: 'Bob', age: 25 });
+  expect(decoded).toEqual({ name: 'Bob', age: 25 });
+});
+
+test('README: Decoder() with schema-aware create', () => {
+  class User extends Decoder(record({
+    name: string.default('John'),
+    age: integer,
+    role: always('member'),
+  })) {}
+
+  const user: User = User.create({ age: 25 });
+  expect(user).toEqual({ name: 'John', age: 25, role: 'member' });
+});
+
+test('README: Decoder() with tuple, array, dict', () => {
+  class Pair extends Decoder(tuple(string, number)) {}
+  expect(Pair.decode(['a', 1])).toEqual(['a', 1]);
+
+  class Names extends Decoder(array(string)) {}
+  expect(Names.decode(['Alice', 'Bob'])).toEqual(['Alice', 'Bob']);
+
+  class Scores extends Decoder(dict(number)) {}
+  expect(Scores.decode({ math: 90 })).toEqual(new Map([['math', 90]]));
+});
+
+// Decoder() with plain schema (no record() wrapper needed)
+
+test('Decoder() with plain schema: decode', () => {
+  class User extends Decoder({ name: string, age: number }) {}
+  const user: User = User.decode({ name: 'Alice', age: 30 });
+  expect(user).toEqual({ name: 'Alice', age: 30 });
+});
+
+test('Decoder() with plain schema: new', () => {
+  class User extends Decoder({ name: string, age: number }) {}
+  const user: User = new User({ name: 'Bob', age: 25 });
+  expect(user).toEqual({ name: 'Bob', age: 25 });
+});
+
+test('Decoder() with plain schema: safeDecode', () => {
+  class User extends Decoder({ name: string, age: number }) {}
+  expect(User.safeDecode({ name: 'A', age: 1 })).toEqual({ ok: true, value: { name: 'A', age: 1 } });
+  expect(User.safeDecode('bad').ok).toBe(false);
+});
+
+test('Decoder() with plain schema: schema-aware create', () => {
+  class User extends Decoder({
+    name: string.default('John'),
+    age: integer,
+    role: always('member'),
+  }) {}
+  const user: User = User.create({ age: 25 });
+  expect(user).toEqual({ name: 'John', age: 25, role: 'member' });
+});
+
+test('Decoder() with plain schema: all defaults', () => {
+  class Config extends Decoder({
+    type: literal('app'),
+    debug: always(false),
+    name: string.default('unnamed'),
+  }) {}
+  expect(Config.create()).toEqual({ type: 'app', debug: false, name: 'unnamed' });
+});
+
+test('Decoder() with plain schema: plain object assignable', () => {
+  class Point extends Decoder({ x: number, y: number }) {}
+  const p: Point = { x: 1, y: 2 };
+  expect(p).toEqual({ x: 1, y: 2 });
+});
+
+// Decoder() with tuple literal form
+
+test('Decoder() with tuple literal: decode', () => {
+  class Pair extends Decoder([string, number]) {}
+  const pair: Pair = Pair.decode(['hello', 42]);
+  expect(pair).toEqual(['hello', 42]);
+});
+
+test('Decoder() with tuple literal: new', () => {
+  class Pair extends Decoder([string, number]) {}
+  const pair: Pair = new Pair(['hello', 42]);
+  expect(pair).toEqual(['hello', 42]);
+});
+
+test('Decoder() with tuple literal: create with defaults', () => {
+  class Origin extends Decoder([number.default(0), number.default(0)]) {}
+  expect(Origin.create()).toEqual([0, 0]);
+});
+
+test('Decoder() with tagged tuple literal', () => {
+  class TextMsg extends Decoder([literal('text'), string]) {}
+  const msg: TextMsg = TextMsg.decode(['text', 'hello']);
+  expect(msg).toEqual(['text', 'hello']);
+});
+
+test('Decoder() with bare literal in tuple', () => {
+  class TextMsg extends Decoder(['text', string]) {}
+  const msg: TextMsg = TextMsg.decode(['text', 'hello']);
+  expect(msg).toEqual(['text', 'hello']);
+});
+
+test('Decoder() with bare literals in record schema', () => {
+  class Event extends Decoder({ type: 'click', x: number, y: number }) {}
+  const event: Event = Event.decode({ type: 'click', x: 10, y: 20 });
+  expect(event).toEqual({ type: 'click', x: 10, y: 20 });
+  expect(Event.create({ x: 1, y: 2 })).toEqual({ type: 'click', x: 1, y: 2 });
+});
+
+test('Decoder is both a type and a value', () => {
+  // Decoder as a type annotation (existing usage)
+  const dec: Decoder<string> = string;
+  expect(dec('hello')).toBe('hello');
+
+  // Decoder as a class-producing function (new usage)
+  class User extends Decoder({ name: string, age: number }) {}
+  const user: User = User.decode({ name: 'Alice', age: 30 });
+  expect(user).toEqual({ name: 'Alice', age: 30 });
+
+  // Both in the same scope
+  const strDec: Decoder<string> = string;
+  const created: User = User.decode({ name: strDec('Bob'), age: 25 });
+  expect(created).toEqual({ name: 'Bob', age: 25 });
+});
+
+test('Decoder() plain schema matches record() behavior exactly', () => {
+  const viaRecord = record({ name: string, age: number });
+  class ViaDecoder extends Decoder({ name: string, age: number }) {}
+
+  const input = { name: 'Alice', age: 30 };
+  expect(ViaDecoder.decode(input)).toEqual(viaRecord(input));
+  expect(new ViaDecoder(input)).toEqual(viaRecord(input));
+});

@@ -877,3 +877,91 @@ expectType<{ pair: [number, string]; label: string }>(tuple_defaulted_rec.create
 // bare tuple with bare literals: auto-defaults in record
 const tuple_lit_rec = record({ tag: ['event', 42], name: string.default('x') });
 expectType<{ tag: ['event', 42]; name: string }>(tuple_lit_rec.create());
+
+// ============================================================
+// Decoder() class API
+// ============================================================
+
+// Decoder() with record: decoded value is the record type
+class TypeUser extends Decoder(record({ name: string, age: number })) {}
+expectType<{ name: string; age: number }>(TypeUser.decode({} as unknown));
+expectType<{ name: string; age: number }>(new TypeUser({} as unknown));
+
+// Plain objects are assignable to the class type (structural typing)
+const type_user_plain: TypeUser = { name: 'Alice', age: 30 };
+expectType<TypeUser>(type_user_plain);
+
+// Decoder() with record: schema-aware .create()
+class TypeUserWithDefaults extends Decoder(record({
+  name: string.default('John'),
+  age: integer,
+  role: always('member'),
+})) {}
+// age is required, name/role are optional
+expectType<{ name: string; age: number; role: 'member' }>(TypeUserWithDefaults.create({ age: 25 }));
+// all defaults: no patch needed
+class TypeAllDefaults extends Decoder(record({
+  name: string.default('x'),
+  active: always(true),
+})) {}
+expectType<{ name: string; active: true }>(TypeAllDefaults.create());
+
+// Decoder() with tuple
+class TypePair extends Decoder(tuple(string, number)) {}
+expectType<[string, number]>(TypePair.decode({} as unknown));
+
+// Decoder() with array
+class TypeNames extends Decoder(array(string)) {}
+expectType<string[]>(TypeNames.decode({} as unknown));
+
+// Decoder() safeDecode returns the right result type
+const type_safe = TypeUser.safeDecode({} as unknown);
+if (type_safe.ok) {
+  expectType<{ name: string; age: number }>(type_safe.value);
+} else {
+  expectType<DecodeError>(type_safe.error);
+}
+
+// Decoder() with record: missing required field is a type error
+// @ts-expect-error — age is required
+TypeUserWithDefaults.create();
+// @ts-expect-error — age has wrong type
+TypeUserWithDefaults.create({ age: 'bad' });
+
+// Decoder() with plain schema (literal form, no record() needed)
+class TypePlainUser extends Decoder({ name: string, age: number }) {}
+expectType<{ name: string; age: number }>(TypePlainUser.decode({} as unknown));
+const type_plain_user: TypePlainUser = { name: 'Alice', age: 30 };
+expectType<TypePlainUser>(type_plain_user);
+
+// Decoder() with plain schema: schema-aware create
+class TypePlainDefaults extends Decoder({
+  name: string.default('John'),
+  age: integer,
+  role: always('member'),
+}) {}
+expectType<{ name: string; age: number; role: 'member' }>(TypePlainDefaults.create({ age: 25 }));
+// @ts-expect-error — age is required
+TypePlainDefaults.create();
+
+// Decoder() with tuple literal form
+class TypeTuplePair extends Decoder([string, number]) {}
+expectType<[string, number]>(TypeTuplePair.decode({} as unknown));
+
+// Decoder() with bare literal in tuple
+class TypeTaggedTuple extends Decoder(['text', string]) {}
+expectType<['text', string]>(TypeTaggedTuple.decode({} as unknown));
+
+// Decoder() with bare literal in record schema
+class TypeBareEvent extends Decoder({ type: 'click', x: number, y: number }) {}
+expectType<{ type: 'click'; x: number; y: number }>(TypeBareEvent.decode({} as unknown));
+// type auto-defaults, so only x and y are required
+expectType<{ type: 'click'; x: number; y: number }>(TypeBareEvent.create({ x: 1, y: 2 }));
+
+// Decoder works as both a type and a value in the same file
+const dual_dec: Decoder<string> = string;
+class DualUser extends Decoder({ name: string, age: number }) {}
+expectType<Decoder<string>>(dual_dec);
+expectType<{ name: string; age: number }>(DualUser.decode({} as unknown));
+const dual_plain: DualUser = { name: 'x', age: 0 };
+expectType<DualUser>(dual_plain);

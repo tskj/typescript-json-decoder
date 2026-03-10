@@ -739,6 +739,65 @@ origin.create({ x: 5 });  // { x: 5, y: 0 }
 
 Calling `.create()` on a decoder with no default and no patch throws an error.
 
+## Using decoders as types
+
+Normally, you need two declarations to define a decoded type and its decoder:
+
+```typescript
+type User = decodeType<typeof userDecoder>;
+const userDecoder = record({ name: string, age: number });
+```
+
+`Decoder()` lets you combine both into a single name using a class declaration. You can pass a record schema directly — no need for `record()`:
+
+```typescript
+import { Decoder, string, number, integer, always } from 'typescript-json-decoder';
+
+class User extends Decoder({ name: string, age: number }) {}
+```
+
+Now `User` is both a type and a decoder:
+
+```typescript
+// As a type — plain objects are assignable (structural typing)
+const user: User = { name: 'Alice', age: 30 };
+
+// As a decoder
+const decoded: User = User.decode(jsonData);
+const result = User.safeDecode(jsonData);
+```
+
+Schema-aware `.create()` works too — required fields are enforced at the type level:
+
+```typescript
+class User extends Decoder({
+    name: string.default('John'),
+    age: integer,
+    role: always('member'),
+}) {}
+
+const user: User = User.create({ age: 25 });
+// { name: 'John', age: 25, role: 'member' }
+```
+
+`Decoder()` also accepts tuple literal forms and existing decoders:
+
+```typescript
+import { Decoder, tuple, array, dict, literal } from 'typescript-json-decoder';
+
+class Pair extends Decoder([string, number]) {}
+class TextMsg extends Decoder(['text', string]) {}
+class Names extends Decoder(array(string)) {}
+class Scores extends Decoder(dict(number)) {}
+```
+
+Note: `Decoder()` cannot be used with unions or primitives (TypeScript requires `class extends` targets to be single object types). For those, continue using `decodeType`:
+
+```typescript
+type Direction = decodeType<typeof directionDecoder>;
+const directionDecoder = union('north', 'south', 'east', 'west');
+```
+
 ## Error structure
 
 When decoding fails, decoders throw a `DecodeError` (extends `Error`) with structured information about what went wrong and where.

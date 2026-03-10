@@ -219,3 +219,20 @@ record({ pair: [number.default(0), number.default(0)], tag: 'point' }).create();
 ```
 
 `.map()` transforms the default along with the decoder.
+
+## New: `Decoder()` for using decoders as types
+
+`Decoder()` wraps a decoder into a class, giving you a single name that serves as both a type and a decoder — eliminating the `decodeType<typeof x>` boilerplate:
+
+```typescript
+// Before: two declarations
+type User = decodeType<typeof userDecoder>;
+const userDecoder = record({ name: string, age: number });
+
+// After: one declaration
+class User extends Decoder({ name: string, age: number }) {}
+```
+
+`User` works as both a type and a decoder with `.decode()`, `.safeDecode()`, and schema-aware `.create()`. Decoded values are plain objects — no class instances.
+
+`Decoder()` accepts record schemas, tuple literal forms, and existing decoder objects. It cannot be used with unions or primitives (TypeScript limitation).

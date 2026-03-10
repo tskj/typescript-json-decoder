@@ -1,4 +1,10 @@
-export { decoder, decodeType, Decoder, DefaultDecoder, RecordDecoder, DecoderInput, DecoderFunction, safeDecode } from './types';
+export { decoder, decodeType, DefaultDecoder, RecordDecoder, DecoderInput, DecoderFunction, safeDecode } from './types';
+import type { Decoder as _DecoderType } from './types';
+import { Decoder as _DecoderValue } from './class-api';
+// Merge the Decoder interface (type) and Decoder function (value) under one name.
+// TypeScript allows a single export to occupy both the type and value namespace.
+export const Decoder: typeof _DecoderValue = _DecoderValue;
+export type Decoder<T> = _DecoderType<T>;
 export { DecodeError, asDecodeError } from './decode-error';
 export { tuple, literal, record, field, fields, at, missing } from './literal-decoders';
 export {
