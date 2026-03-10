@@ -22,7 +22,7 @@ In v2, `Decoder<T>` is an interface — a callable object with `.map()` and `.sa
 // v2: Decoder<T> has .map() and .safeDecode()
 const user = record({ name: string, age: number });
 const name = user.map(u => u.name);
-const result = name.safeDecode('bad input'); // { ok: false, error: '...' }
+const result = name.safeDecode('bad input'); // { ok: false, error: DecodeError }
 ```
 
 **If you annotate custom decoders as `Decoder<T>`**, wrap them with `decoder()`:
@@ -114,11 +114,35 @@ const result = string.safeDecode(input);
 if (result.ok) {
   console.log(result.value); // string
 } else {
-  console.log(result.error); // string
+  console.log(result.error); // DecodeError
 }
 ```
 
 The standalone `safeDecode(decoder, value)` function still works too.
+
+## Structured errors with `DecodeError`
+
+In v1, decoders threw plain strings on failure. In v2, decoders throw `DecodeError` (extends `Error`) with structured information:
+
+```typescript
+import { DecodeError, safeDecode, record, string, number } from 'typescript-json-decoder';
+
+const result = safeDecode(record({ name: string, age: number }), { name: 'Alice', age: '30' });
+if (!result.ok) {
+  result.error.message;  // 'The value `30` is not of type `number`, but is of type `string`'
+  result.error.path;     // ['age']
+  result.error.expected; // 'number'
+  result.error.received; // '30'
+}
+```
+
+- `message` — the leaf error description
+- `path` — array of keys/indices tracing the location (built automatically through record, array, tuple, etc.)
+- `expected` — the expected type
+- `received` — the actual value
+- `children` — for union/intersection failures, the error from each branch
+- `getPathString()` — path formatted as `/users/1/age`
+- `toString()` — formatted message with path prefix, e.g. `at /age: The value ...`
 
 ## New: `.chain()` on all decoders
 

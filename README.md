@@ -597,13 +597,13 @@ const yearFromString = string.chain(date).map(d => d.getFullYear());
 By default, decoders throw on failure. Every decoder has a `.safeDecode()` method that returns a result type instead:
 
 ```typescript
-import { string, record, number } from 'typescript-json-decoder';
+import { string, record, number, DecodeError } from 'typescript-json-decoder';
 
 const result = string.safeDecode(someValue);
 if (result.ok) {
     console.log(result.value); // string
 } else {
-    console.log(result.error); // error message
+    console.log(result.error); // DecodeError
 }
 ```
 
@@ -622,4 +622,61 @@ import { safeDecode, string } from 'typescript-json-decoder';
 const result = safeDecode(string, someValue);
 ```
 
-Both return `{ ok: true, value: T } | { ok: false, error: string }`.
+Both return `{ ok: true, value: T } | { ok: false, error: DecodeError }`.
+
+## Error structure
+
+When decoding fails, decoders throw a `DecodeError` (extends `Error`) with structured information about what went wrong and where.
+
+```typescript
+import { DecodeError } from 'typescript-json-decoder';
+```
+
+A `DecodeError` has the following properties:
+
+- **`message`** — what went wrong (e.g. `'The value \`42\` is not of type \`string\`'`)
+- **`path`** — where it went wrong, as an array of keys and indices (e.g. `['users', 1, 'email']`)
+- **`expected`** — the expected type (e.g. `'string'`)
+- **`received`** — the actual value that was received (e.g. `42`)
+- **`children`** — for compound errors (union, intersection), the errors from each branch
+
+The path is built up automatically as errors propagate through `record`, `array`, `tuple`, `objectOf`, and `dict`. For example:
+
+```typescript
+import { safeDecode, record, array, string, number } from 'typescript-json-decoder';
+
+const decoder = record({
+    users: array({ name: string, age: number }),
+});
+
+const result = safeDecode(decoder, {
+    users: [
+        { name: 'Alice', age: 30 },
+        { name: 'Bob', age: 'not a number' },
+    ],
+});
+
+if (!result.ok) {
+    const error = result.error;
+    error.message;       // 'The value `not a number` is not of type `number`, but is of type `string`'
+    error.path;          // ['users', 1, 'age']
+    error.getPathString(); // '/users/1/age'
+    error.expected;      // 'number'
+    error.received;      // 'not a number'
+    error.toString();    // 'at /users/1/age: The value `not a number` is not of type `number`...'
+}
+```
+
+When a union fails (none of the branches match), the error has `children` — one per branch:
+
+```typescript
+import { safeDecode, union, literal } from 'typescript-json-decoder';
+
+const result = safeDecode(union('active', 'inactive'), 'unknown');
+if (!result.ok) {
+    result.error.message;  // 'None of the union cases matched'
+    result.error.children; // [DecodeError for 'active', DecodeError for 'inactive']
+    result.error.toString();
+    // 'None of the union cases matched:\n  - The value `unknown` is not the literal `active`\n  - ...'
+}
+```

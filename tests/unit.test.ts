@@ -2409,6 +2409,42 @@ test('README: standalone safeDecode', () => {
   expect(result).toEqual({ ok: true, value: 'hello' });
 });
 
+test('README: error structure — path through record > array', () => {
+  const dec = record({
+    users: array({ name: string, age: number }),
+  });
+
+  const result = safeDecode(dec, {
+    users: [
+      { name: 'Alice', age: 30 },
+      { name: 'Bob', age: 'not a number' },
+    ],
+  });
+
+  expect(result.ok).toBe(false);
+  if (!result.ok) {
+    const error = result.error;
+    expect(error.message).toBe('The value `not a number` is not of type `number`, but is of type `string`');
+    expect(error.path).toEqual(['users', 1, 'age']);
+    expect(error.getPathString()).toBe('/users/1/age');
+    expect(error.expected).toBe('number');
+    expect(error.received).toBe('not a number');
+    expect(error.toString()).toBe('at /users/1/age: The value `not a number` is not of type `number`, but is of type `string`');
+  }
+});
+
+test('README: error structure — union children', () => {
+  const result = safeDecode(union('active', 'inactive'), 'unknown');
+  expect(result.ok).toBe(false);
+  if (!result.ok) {
+    expect(result.error.message).toBe('None of the union cases matched');
+    expect(result.error.children).toHaveLength(2);
+    expect(result.error.toString()).toContain('None of the union cases matched');
+    expect(result.error.toString()).toContain('not the literal `active`');
+    expect(result.error.toString()).toContain('not the literal `inactive`');
+  }
+});
+
 test('README: .map() — field extract/transform', () => {
   const dec = record({
     thing: field('nested', { theThingIWant: string }).map(x => x.theThingIWant),
