@@ -1,4 +1,4 @@
-export { decoder, decodeType, Decoder, DecoderInput, DecoderFunction, safeDecode } from './types';
+export { decoder, decodeType, Decoder, DefaultDecoder, RecordDecoder, DecoderInput, DecoderFunction, safeDecode } from './types';
 export { DecodeError, asDecodeError } from './decode-error';
 export { tuple, literal, record, field, fields, at, missing } from './literal-decoders';
 export {

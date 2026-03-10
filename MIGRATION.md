@@ -200,4 +200,22 @@ const user = record({
 user.create({ age: 25 }); // { name: 'John', age: 25, role: 'member' }
 ```
 
-`always(v)` and `withDefault(dec, v)` automatically carry their value as a default. `.map()` transforms the default along with the decoder.
+`always(v)` and `withDefault(dec, v)` automatically carry their value as a default. `literal(v)` and bare literals also auto-default since they have exactly one valid value. Tuples auto-default when all elements have defaults.
+
+```typescript
+// literal auto-defaults
+literal('admin').create(); // 'admin'
+
+// bare literals auto-default in records
+record({ type: 'event', name: string.default('x') }).create();
+// { type: 'event', name: 'x' }
+
+// tuples auto-default when all elements have defaults
+tuple(number.default(0), string.default('')).create(); // [0, '']
+
+// bare tuple literal forms auto-default in records
+record({ pair: [number.default(0), number.default(0)], tag: 'point' }).create();
+// { pair: [0, 0], tag: 'point' }
+```
+
+`.map()` transforms the default along with the decoder.

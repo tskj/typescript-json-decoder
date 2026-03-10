@@ -3,6 +3,8 @@ import {
   boolean,
   date,
   Decoder,
+  DefaultDecoder,
+  RecordDecoder,
   DecodeError,
   field,
   fields,
@@ -812,14 +814,66 @@ expectType<Decoder<bigint>>(chained_decoder);
 const chained_literal = unknown.chain('ok');
 expectType<Decoder<'ok'>>(chained_literal);
 
-// .default() returns the same Decoder type
+// .default() returns DefaultDecoder which extends Decoder
 const string_with_default = string.default('John');
-expectType<Decoder<string>>(string_with_default);
+expectType<DefaultDecoder<string>>(string_with_default);
+expectAssignable<Decoder<string>>(string_with_default);
+
+// .map() on DefaultDecoder preserves default
+const mapped_default = string.default('John').map(s => s.length);
+expectType<DefaultDecoder<number>>(mapped_default);
 
 // .create() returns T
 expectType<string>(string_with_default.create());
 expectType<string>(string.create('hello'));
 
-// record .create() returns the record type
+// record .create() enforces required fields
 const user_dec = record({ name: string.default('John'), age: integer });
 expectType<{ name: string; age: number }>(user_dec.create({ age: 25 }));
+
+// record with all defaults: .create() needs no args
+const all_defaults = record({ name: string.default('John'), role: always('member') });
+expectType<{ name: string; role: 'member' }>(all_defaults.create());
+
+// nested record: fully-defaulted inner is auto-optional
+const inner_dec = record({ city: string.default('X'), zip: string.default('0') });
+const outer_dec = record({ name: string.default('N'), addr: inner_dec });
+expectType<{ name: string; addr: { city: string; zip: string } }>(outer_dec.create());
+
+// nested record: inner with required fields appears in patch
+const inner_req = record({ city: string.default('X'), zip: string });
+const outer_req = record({ name: string.default('N'), addr: inner_req });
+expectType<{ name: string; addr: { city: string; zip: string } }>(outer_req.create({ addr: { zip: '1' } }));
+
+// literal() returns DefaultDecoder
+expectType<DefaultDecoder<'admin'>>(literal('admin'));
+expectType<DefaultDecoder<42>>(literal(42));
+expectType<DefaultDecoder<true>>(literal(true));
+expectAssignable<Decoder<'admin'>>(literal('admin'));
+
+// record with literal fields: all-default, .create() needs no args
+const lit_rec = record({ type: literal('event'), version: literal(2) });
+expectType<{ type: 'event'; version: 2 }>(lit_rec.create());
+
+// bare literals in record are also defaulted — no literal() or as const needed
+const bare_lit_rec = record({ type: 'user', name: string.default('Alice') });
+expectType<{ type: 'user'; name: string }>(bare_lit_rec.create());
+
+// all bare literals: .create() needs no args
+const all_bare = record({ kind: 'event', version: 2, active: true });
+expectType<{ kind: 'event'; version: 2; active: true }>(all_bare.create());
+
+// mixed: bare literal + required field — patch requires only the non-literal
+const mixed_bare = record({ type: 'item', name: string });
+expectType<{ type: 'item'; name: string }>(mixed_bare.create({ name: 'x' }));
+
+// bare tuple with all-defaulted elements: auto-defaults in record
+const tuple_defaulted_rec = record({
+  pair: [number.default(0), string.default('x')],
+  label: string.default('test'),
+});
+expectType<{ pair: [number, string]; label: string }>(tuple_defaulted_rec.create());
+
+// bare tuple with bare literals: auto-defaults in record
+const tuple_lit_rec = record({ tag: ['event', 42], name: string.default('x') });
+expectType<{ tag: ['event', 42]; name: string }>(tuple_lit_rec.create());

@@ -643,6 +643,47 @@ always('member').create();             // 'member'
 withDefault(string, 'fallback').create(); // 'fallback'
 ```
 
+`literal()` also auto-defaults, since it has exactly one valid value:
+
+```typescript
+literal('admin').create(); // 'admin'
+literal(42).create();      // 42
+```
+
+Bare literals in records auto-default too — no `literal()` or `.default()` needed:
+
+```typescript
+import { record, string, literal } from 'typescript-json-decoder';
+
+const eventDecoder = record({
+    type: 'click',           // bare literal — auto-defaults
+    version: literal(2),     // literal() — auto-defaults
+    label: string.default('untitled'),
+});
+
+eventDecoder.create(); // { type: 'click', version: 2, label: 'untitled' }
+```
+
+Tuples auto-default when all their elements have defaults:
+
+```typescript
+import { tuple, number, literal } from 'typescript-json-decoder';
+
+const point = tuple(number.default(0), number.default(0));
+point.create();       // [0, 0]
+point.create([1, 2]); // [1, 2]
+```
+
+This works with bare tuple literal forms in records too:
+
+```typescript
+const decoder = record({
+    origin: [number.default(0), number.default(0)],
+    tag: 'point',
+});
+decoder.create(); // { origin: [0, 0], tag: 'point' }
+```
+
 This is most useful with record decoders. Fields with defaults don't need to be provided in the patch:
 
 ```typescript

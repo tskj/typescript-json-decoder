@@ -138,9 +138,80 @@ export interface Decoder<T> {
   map<U>(k: (x: T) => U): Decoder<U>;
   chain<D extends DecoderInput<unknown>>(dec: D): Decoder<decodeType<D>>;
   safeDecode(input: unknown): { ok: true; value: T } | { ok: false; error: DecodeError };
-  default(value: T): Decoder<T>;
+  default(value: T): DefaultDecoder<T>;
   create(patch?: DeepPartial<T>): T;
 }
+
+/**
+ * A decoder that carries a default value for use with .create().
+ */
+export interface DefaultDecoder<T> extends Decoder<T> {
+  readonly _hasDefault: true;
+  map<U>(k: (x: T) => U): DefaultDecoder<U>;
+}
+
+/**
+ * Type-level helpers for schema-aware .create() on record decoders.
+ */
+// An element that auto-defaults: DefaultDecoder, bare literal, or defaulted tuple
+type _DefaultedInput = DefaultDecoder<any> | PrimitiveJsonLiteralForm;
+type _DefaultedTuple =
+  | []
+  | [_DefaultedInput]
+  | [_DefaultedInput, _DefaultedInput]
+  | [_DefaultedInput, _DefaultedInput, _DefaultedInput]
+  | [_DefaultedInput, _DefaultedInput, _DefaultedInput, _DefaultedInput]
+  | [_DefaultedInput, _DefaultedInput, _DefaultedInput, _DefaultedInput, _DefaultedInput];
+
+// A key is "defaulted" if its decoder has a default, OR if it's a record
+// where all fields recursively have defaults (auto-constructible with no args),
+// OR if it's a bare primitive literal, OR if it's a tuple where all elements are defaulted.
+type _DefaultKeys<S> = {
+  [K in keyof S]:
+    S[K] extends DefaultDecoder<any> ? K :
+    S[K] extends PrimitiveJsonLiteralForm ? K :
+    S[K] extends _DefaultedTuple ? K :
+    S[K] extends { readonly _schema: infer NS }
+      ? [_RequiredCreateKeys<NS>] extends [never] ? K : never
+      : never;
+}[keyof S];
+
+type _RequiredCreateKeys<S> = Exclude<keyof S, _DefaultKeys<S>>;
+
+// Recursively compute the patch type for a field:
+// - defaulted record (.default() on record): all patch fields become optional
+// - non-defaulted record: schema-aware patch with required/optional fields
+// - other decoder: use decodeType
+type _FieldPatchType<D> =
+  D extends DefaultDecoder<any> & { readonly _schema: infer NS }
+    ? { [K in keyof _CreatePatch<NS>]?: _CreatePatch<NS>[K] }
+    : D extends { readonly _schema: infer NS }
+      ? _CreatePatch<NS>
+      : decodeType<D>;
+
+type _CreatePatch<S> =
+  { [K in _RequiredCreateKeys<S>]: _FieldPatchType<S[K]> } &
+  { [K in _DefaultKeys<S>]?: _FieldPatchType<S[K]> } extends infer P
+  ? { [K in keyof P]: P[K] }
+  : never;
+
+type _RecordCreateFn<S, T> =
+  [_RequiredCreateKeys<S>] extends [never]
+    ? (patch?: _CreatePatch<S>) => T
+    : (patch: _CreatePatch<S>) => T;
+
+/**
+ * A record decoder with schema-aware .create() that enforces
+ * required fields (those without defaults) at the type level.
+ * The _schema phantom property enables recursive patch type computation.
+ */
+export type RecordDecoder<S, T> = {
+  (input: unknown): T;
+  readonly _schema: S;
+} & Omit<Decoder<T>, 'create' | 'default'> & {
+  create: _RecordCreateFn<S, T>;
+  default(value: T): DefaultDecoder<T> & { readonly _schema: S };
+};
 
 /**
  * Run evaluation of decoder at both type and
@@ -188,7 +259,7 @@ export const makeDecoder = <T>(fn: DecoderFunction<T>): Decoder<T> => {
         const resolved = decoder(d);
         const chained = makeDecoder((input: unknown) => resolved(fn(input) as any));
         for (const sym of Object.getOwnPropertySymbols(dec)) {
-          if (sym === defaultTag) continue;
+          if (sym === defaultTag || sym === recordSchemaTag) continue;
           (chained as any)[sym] = (dec as any)[sym];
         }
         return chained as any;
@@ -201,13 +272,13 @@ export const makeDecoder = <T>(fn: DecoderFunction<T>): Decoder<T> => {
           return { ok: false, error: decodeError };
         }
       },
-      default: (value: T): Decoder<T> => {
+      default: (value: T): DefaultDecoder<T> => {
         const withDef = makeDecoder(fn);
         for (const sym of Object.getOwnPropertySymbols(dec)) {
           (withDef as any)[sym] = (dec as any)[sym];
         }
         (withDef as any)[defaultTag] = value;
-        return withDef;
+        return withDef as unknown as DefaultDecoder<T>;
       },
       create: (patch?: any): T => {
         // Record decoder: recursively construct from schema + patch
@@ -237,7 +308,13 @@ export const makeDecoder = <T>(fn: DecoderFunction<T>): Decoder<T> => {
         }
         // Non-record: use patch or default
         if (patch !== undefined) return patch;
-        if (defaultTag in dec) return (dec as any)[defaultTag];
+        if (defaultTag in dec) {
+          const val = (dec as any)[defaultTag];
+          // Clone arrays/plain objects to avoid shared mutable references
+          if (Array.isArray(val)) return [...val] as any;
+          if (val !== null && typeof val === 'object' && Object.getPrototypeOf(val) === Object.prototype) return { ...val } as any;
+          return val;
+        }
         throw new Error('Decoder has no default value');
       },
     },
@@ -253,6 +330,8 @@ export const decoder = <const D extends DecoderInput<unknown>>(
   d: D,
 ): Decoder<decodeType<D>> => {
   if (isDecoderFunction(d)) {
+    // If d is already a Decoder (has .map), return as-is to preserve symbols
+    if ('map' in d) return d as any;
     return makeDecoder(d as any);
   }
   return decodeJsonLiteralForm(d as any) as any;

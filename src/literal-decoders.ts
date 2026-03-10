@@ -3,17 +3,19 @@ import {
   decodeType,
   decoder,
   Decoder,
+  DefaultDecoder,
+  RecordDecoder,
   DecoderInput,
   makeDecoder,
   PrimitiveJsonLiteralForm,
   addQuestionmarksToRecordFields,
 } from './types';
 import { DecodeError, asDecodeError } from './decode-error';
-import { tag, err, fieldDecoder, missingKey, recordSchemaTag } from './utils';
+import { tag, err, defaultTag, fieldDecoder, missingKey, recordSchemaTag } from './utils';
 
-export function literal<const p extends PrimitiveJsonLiteralForm>(lit: p): Decoder<p>;
+export function literal<const p extends PrimitiveJsonLiteralForm>(lit: p): DefaultDecoder<p>;
 export function literal(lit: PrimitiveJsonLiteralForm) {
-  return makeDecoder((value: unknown) => {
+  const dec = makeDecoder((value: unknown) => {
     assert_is_pojo(value);
     if (lit !== value) {
       throw DecodeError.simple(
@@ -24,6 +26,8 @@ export function literal(lit: PrimitiveJsonLiteralForm) {
     }
     return lit;
   });
+  (dec as any)[defaultTag] = lit;
+  return dec;
 }
 
 export function tuple(): Decoder<[]>;
@@ -34,7 +38,7 @@ export function tuple<A extends DecoderInput<unknown>, B extends DecoderInput<un
 export function tuple<A extends DecoderInput<unknown>, B extends DecoderInput<unknown>, C extends DecoderInput<unknown>, D extends DecoderInput<unknown>, E extends DecoderInput<unknown>>(a: A, b: B, c: C, d: D, e: E): Decoder<[decodeType<A>, decodeType<B>, decodeType<C>, decodeType<D>, decodeType<E>]>;
 export function tuple(...decoders: any[]) {
   const resolved = decoders.map((d: any) => decoder(d));
-  return makeDecoder((value: unknown) => {
+  const dec = makeDecoder((value: unknown) => {
     assert_is_pojo(value);
     if (!Array.isArray(value)) {
       throw DecodeError.simple(
@@ -58,6 +62,11 @@ export function tuple(...decoders: any[]) {
       }
     });
   });
+  // Auto-default: if all elements can create, set the tuple's default
+  try {
+    (dec as any)[defaultTag] = resolved.map((d: any) => d.create());
+  } catch { /* not all elements have defaults */ }
+  return dec;
 }
 
 export { fieldDecoder, missingKey };
@@ -87,7 +96,7 @@ export const missing = Object.assign(
     default: () => missing,
     create: () => undefined,
   },
-) as unknown as Decoder<undefined>;
+) as unknown as DefaultDecoder<undefined>;
 
 export function field(key: string): Decoder<unknown>;
 export function field<D extends DecoderInput<unknown>>(key: string, d: D): Decoder<decodeType<D>>;
@@ -123,7 +132,7 @@ type evalRecordSchema<schema> = addQuestionmarksToRecordFields<{
 export const record =
   <const schema extends { [key: string]: DecoderInput<unknown> }>(
     s: schema,
-  ): Decoder<evalRecordSchema<schema>> => {
+  ): RecordDecoder<schema, evalRecordSchema<schema>> => {
   const dec = makeDecoder((value: unknown): any => {
     assert_is_pojo(value);
     if (!isPojoObject(value)) {
@@ -170,5 +179,5 @@ export const record =
     return result;
   });
   (dec as any)[recordSchemaTag] = s;
-  return dec;
+  return dec as any;
 };

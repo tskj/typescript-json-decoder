@@ -34,6 +34,7 @@ import {
   lazy,
   at,
   Decoder,
+  DefaultDecoder,
 } from '../src';
 
 test('homogeneous tuple', () => {
@@ -2949,6 +2950,7 @@ test('record create throws when field has no default', () => {
     name: string.default('John'),
     age: integer,
   });
+  // @ts-expect-error — intentionally testing runtime error for missing required field
   expect(() => User.create()).toThrow("No default value for field 'age'");
 });
 
@@ -2984,6 +2986,7 @@ test('nested record create fully defaulted', () => {
     name: string.default('John'),
     address: Address,
   });
+  // address is auto-optional: all its fields have defaults
   expect(User.create()).toEqual({
     name: 'John',
     address: { city: 'Unknown', zip: '00000' },
@@ -3134,18 +3137,21 @@ test('create with default on decoder()', () => {
 
 test('record create error names the missing field', () => {
   const dec = record({ name: string.default('John'), email: string });
+  // @ts-expect-error — intentionally testing runtime error for missing required field
   expect(() => dec.create()).toThrow("No default value for field 'email'");
 });
 
 test('nested record create error names the immediate missing field', () => {
   const inner = record({ city: string });
   const outer = record({ name: string.default('John'), address: inner });
+  // @ts-expect-error — intentionally testing runtime error for missing required field
   expect(() => outer.create()).toThrow("No default value for field 'address'");
 });
 
 test('nested record create with partial patch missing inner field', () => {
   const inner = record({ city: string, zip: string });
   const outer = record({ name: string.default('John'), address: inner });
+  // @ts-expect-error — intentionally testing runtime error for missing inner field
   expect(() => outer.create({ address: { city: 'NY' } })).toThrow("No default value for field 'address'");
 });
 
@@ -3160,6 +3166,35 @@ test('README: primitive default and create', () => {
 test('README: always and withDefault auto-default', () => {
   expect(always('member').create()).toBe('member');
   expect(withDefault(string, 'fallback').create()).toBe('fallback');
+});
+
+test('README: literal auto-default', () => {
+  expect(literal('admin').create()).toBe('admin');
+  expect(literal(42).create()).toBe(42);
+});
+
+test('README: bare literals auto-default in record', () => {
+  const eventDecoder = record({
+    type: 'click',
+    version: literal(2),
+    label: string.default('untitled'),
+  });
+
+  expect(eventDecoder.create()).toEqual({ type: 'click', version: 2, label: 'untitled' });
+});
+
+test('README: tuple auto-default', () => {
+  const point = tuple(number.default(0), number.default(0));
+  expect(point.create()).toEqual([0, 0]);
+  expect(point.create([1, 2])).toEqual([1, 2]);
+});
+
+test('README: bare tuple literal form auto-default in record', () => {
+  const dec = record({
+    origin: [number.default(0), number.default(0)],
+    tag: 'point',
+  });
+  expect(dec.create()).toEqual({ origin: [0, 0], tag: 'point' });
 });
 
 test('README: record create with field defaults', () => {
@@ -3186,6 +3221,7 @@ test('README: nested record create', () => {
     address: addressDecoder,
   });
 
+  // address is auto-optional: all its fields have defaults
   expect(userDecoder2.create()).toEqual({
     name: 'John',
     address: { city: 'Unknown', zip: '00000' },
@@ -3212,4 +3248,737 @@ test('README: record-level default with patch', () => {
   const origin = pointDecoder.default({ x: 0, y: 0 });
   expect(origin.create()).toEqual({ x: 0, y: 0 });
   expect(origin.create({ x: 5 })).toEqual({ x: 5, y: 0 });
+});
+
+// Deep combination tests for .default() / .create() type enforcement
+
+test('three levels of nesting, all defaults', () => {
+  const Coord = record({ x: number.default(0), y: number.default(0) });
+  const Location = record({ name: string.default('here'), coord: Coord });
+  const User = record({ id: string.default('anon'), location: Location });
+  expect(User.create()).toEqual({
+    id: 'anon',
+    location: { name: 'here', coord: { x: 0, y: 0 } },
+  });
+});
+
+test('three levels of nesting, patch at deepest level', () => {
+  const Coord = record({ x: number.default(0), y: number });
+  const Location = record({ name: string.default('here'), coord: Coord });
+  const User = record({ id: string.default('anon'), location: Location });
+  expect(User.create({ location: { coord: { y: 42 } } })).toEqual({
+    id: 'anon',
+    location: { name: 'here', coord: { x: 0, y: 42 } },
+  });
+});
+
+test('three levels, override at every level', () => {
+  const Coord = record({ x: number.default(0), y: number.default(0) });
+  const Location = record({ name: string.default('here'), coord: Coord });
+  const User = record({ id: string.default('anon'), location: Location });
+  expect(User.create({
+    id: 'user-1',
+    location: { name: 'there', coord: { x: 1, y: 2 } },
+  })).toEqual({
+    id: 'user-1',
+    location: { name: 'there', coord: { x: 1, y: 2 } },
+  });
+});
+
+test('mix of defaulted and required fields at multiple levels', () => {
+  const Address = record({
+    street: string,
+    city: string.default('Unknown'),
+    zip: string,
+  });
+  const Person = record({
+    name: string,
+    age: integer.default(0),
+    address: Address,
+  });
+  expect(Person.create({
+    name: 'Alice',
+    address: { street: '123 Main', zip: '10001' },
+  })).toEqual({
+    name: 'Alice',
+    age: 0,
+    address: { street: '123 Main', city: 'Unknown', zip: '10001' },
+  });
+});
+
+test('nested record with always() fields', () => {
+  const Config = record({
+    version: always(2),
+    debug: always(false),
+    name: string,
+  });
+  const App = record({
+    config: Config,
+    env: always('production'),
+  });
+  expect(App.create({ config: { name: 'myapp' } })).toEqual({
+    config: { version: 2, debug: false, name: 'myapp' },
+    env: 'production',
+  });
+});
+
+test('nested record with withDefault() fields', () => {
+  const Settings = record({
+    theme: withDefault(string, 'light'),
+    lang: withDefault(string, 'en'),
+  });
+  const User = record({ name: string.default('anon'), settings: Settings });
+  expect(User.create()).toEqual({
+    name: 'anon',
+    settings: { theme: 'light', lang: 'en' },
+  });
+  expect(User.create({ settings: { theme: 'dark' } })).toEqual({
+    name: 'anon',
+    settings: { theme: 'dark', lang: 'en' },
+  });
+});
+
+test('nested record with .map() on defaulted fields', () => {
+  const Inner = record({
+    label: string.default('hello').map(s => s.toUpperCase()),
+    count: integer.default(1).map(n => n * 10),
+  });
+  const Outer = record({ tag: always('x'), inner: Inner });
+  expect(Outer.create()).toEqual({
+    tag: 'x',
+    inner: { label: 'HELLO', count: 10 },
+  });
+});
+
+test('fully-defaulted inner with required outer sibling', () => {
+  const Meta = record({ created: always('now'), version: always(1) });
+  const Doc = record({ title: string, meta: Meta });
+  // meta is auto-optional (fully defaulted), but title is required
+  expect(Doc.create({ title: 'My Doc' })).toEqual({
+    title: 'My Doc',
+    meta: { created: 'now', version: 1 },
+  });
+});
+
+test('partially-defaulted inner requires inner patch', () => {
+  const Size = record({ width: number, height: number.default(100) });
+  const Box = record({ color: string.default('red'), size: Size });
+  // size is required because width has no default
+  expect(Box.create({ size: { width: 50 } })).toEqual({
+    color: 'red',
+    size: { width: 50, height: 100 },
+  });
+});
+
+test('record .default() at intermediate level', () => {
+  const Inner = record({ a: string, b: number });
+  const Outer = record({
+    x: always(true),
+    inner: Inner.default({ a: 'hi', b: 0 }),
+  });
+  // inner has an explicit .default(), so it's a DefaultDecoder → optional
+  expect(Outer.create()).toEqual({
+    x: true,
+    inner: { a: 'hi', b: 0 },
+  });
+  // patch overrides the default
+  expect(Outer.create({ inner: { a: 'bye', b: 99 } })).toEqual({
+    x: true,
+    inner: { a: 'bye', b: 99 },
+  });
+  // partial patch merges with the record-level default
+  expect(Outer.create({ inner: { a: 'bye' } })).toEqual({
+    x: true,
+    inner: { a: 'bye', b: 0 },
+  });
+});
+
+test('missing field in nested record is skipped', () => {
+  const Strict = record({
+    name: string.default('John'),
+    _removed: missing,
+  });
+  const Outer = record({ item: Strict, tag: always('ok') });
+  expect(Outer.create()).toEqual({
+    item: { name: 'John' },
+    tag: 'ok',
+  });
+});
+
+test('create patch only requires non-default fields', () => {
+  const Dec = record({
+    a: string,
+    b: string.default('B'),
+    c: number,
+    d: always(true),
+    e: withDefault(integer, 0),
+  });
+  expect(Dec.create({ a: 'A', c: 42 })).toEqual({
+    a: 'A', b: 'B', c: 42, d: true, e: 0,
+  });
+  // override all defaults
+  expect(Dec.create({ a: 'X', b: 'Y', c: 1, d: true, e: 99 })).toEqual({
+    a: 'X', b: 'Y', c: 1, d: true, e: 99,
+  });
+});
+
+// ============================================================
+// Bug fix: .chain() should not leak recordSchemaTag
+// ============================================================
+
+test('.chain() does not leak recordSchemaTag', () => {
+  const rec = record({ a: string.default('x') });
+  const chained = rec.chain(string);
+  // chained is a string decoder, not a record — create should not try record logic
+  expect(() => chained.create()).toThrow('Decoder has no default value');
+});
+
+// ============================================================
+// Bug fix: literal() now returns DefaultDecoder (auto-defaults)
+// ============================================================
+
+test('literal() returns DefaultDecoder and auto-creates', () => {
+  const lit = literal('admin');
+  expect(lit.create()).toBe('admin');
+
+  const litNum = literal(42);
+  expect(litNum.create()).toBe(42);
+
+  const litBool = literal(true);
+  expect(litBool.create()).toBe(true);
+});
+
+test('record with literal field auto-creates', () => {
+  const Dec = record({
+    type: literal('user'),
+    name: string.default('Alice'),
+  });
+  expect(Dec.create()).toEqual({ type: 'user', name: 'Alice' });
+});
+
+// ============================================================
+// Bug fix: mutable default reference hazard
+// ============================================================
+
+test('array default is not shared between create calls', () => {
+  const dec = array(string).default([]);
+  const a = dec.create();
+  const b = dec.create();
+  a.push('mutated');
+  expect(b).toEqual([]);
+  expect(a).not.toBe(b);
+});
+
+test('object default is not shared between create calls', () => {
+  const dec = decoder((x: unknown) => x as { n: number }).default({ n: 0 });
+  const a = dec.create();
+  const b = dec.create();
+  a.n = 999;
+  expect(b).toEqual({ n: 0 });
+  expect(a).not.toBe(b);
+});
+
+// ============================================================
+// Combinator + .default() tests
+// ============================================================
+
+test('union() + .default()', () => {
+  const dec = union(string, number).default('hello');
+  expect(dec.create()).toBe('hello');
+  expect(dec.create(42)).toBe(42);
+  expect(dec('world')).toBe('world');
+});
+
+test('nullable() + .default()', () => {
+  const dec = nullable(string).default(null);
+  expect(dec.create()).toBeNull();
+  expect(dec.create('hi')).toBe('hi');
+  expect(dec(null)).toBeNull();
+  expect(dec('test')).toBe('test');
+});
+
+test('optional() + .default()', () => {
+  const dec = optional(number).default(undefined);
+  expect(dec.create()).toBeUndefined();
+  expect(dec.create(5)).toBe(5);
+});
+
+test('set() + .default()', () => {
+  const dec = set(string).default(new Set(['a', 'b']));
+  expect(dec.create()).toEqual(new Set(['a', 'b']));
+  const custom = new Set(['x']);
+  expect(dec.create(custom)).toEqual(new Set(['x']));
+});
+
+test('map() + .default()', () => {
+  const dec = map(string, (s) => s.length).default(new Map([[5, 'hello']]));
+  expect(dec.create()).toEqual(new Map([[5, 'hello']]));
+});
+
+test('dict() + .default()', () => {
+  const m = new Map<string, number>([['x', 1]]);
+  const dec = dict(number).default(m);
+  expect(dec.create()).toEqual(new Map([['x', 1]]));
+});
+
+test('array() + .default()', () => {
+  const dec = array(number).default([1, 2, 3]);
+  expect(dec.create()).toEqual([1, 2, 3]);
+  expect(dec.create([99])).toEqual([99]);
+});
+
+test('nonEmptyArray() + .default()', () => {
+  const dec = nonEmptyArray(string).default(['hello']);
+  expect(dec.create()).toEqual(['hello']);
+});
+
+test('intersection() + .default()', () => {
+  const A = record({ a: string.default('A') });
+  const B = record({ b: number.default(0) });
+  const dec = intersection(A, B).default({ a: 'X', b: 42 });
+  expect(dec.create()).toEqual({ a: 'X', b: 42 });
+});
+
+test('objectOf() + .default()', () => {
+  const dec = objectOf(number).default({ x: 1, y: 2 });
+  expect(dec.create()).toEqual({ x: 1, y: 2 });
+});
+
+// ============================================================
+// lazy() wrapping record decoder
+// ============================================================
+
+test('lazy() wrapping record decoder', () => {
+  const Inner = record({ x: number.default(0) });
+  const dec = lazy(() => Inner);
+  expect(dec({ x: 5 })).toEqual({ x: 5 });
+});
+
+// ============================================================
+// at() + .default()
+// ============================================================
+
+test('at() + .default()', () => {
+  const dec = at('a', 'b').default('fallback');
+  expect(dec.create()).toBe('fallback');
+  expect(dec({ a: { b: 'nested' } })).toBe('nested');
+});
+
+// ============================================================
+// Empty record .create()
+// ============================================================
+
+test('empty record .create()', () => {
+  const dec = record({});
+  expect(dec.create()).toEqual({});
+});
+
+// ============================================================
+// .chain() + .default() interaction
+// ============================================================
+
+test('.chain() drops default from source decoder', () => {
+  const dec = string.default('hello').chain(string);
+  // .chain() drops defaultTag, so create should fail
+  expect(() => dec.create()).toThrow('Decoder has no default value');
+});
+
+// ============================================================
+// Primitive decoders + .default()
+// ============================================================
+
+test('date + .default()', () => {
+  const d = new Date('2024-01-01');
+  const dec = date.default(d);
+  expect(dec.create()).toEqual(d);
+});
+
+test('integer + .default()', () => {
+  const dec = integer.default(0);
+  expect(dec.create()).toBe(0);
+});
+
+test('bigint + .default()', () => {
+  const dec = bigint.default(BigInt(0));
+  expect(dec.create()).toBe(BigInt(0));
+});
+
+test('regex() + .default()', () => {
+  const dec = regex(/abc/).default('abc');
+  expect(dec.create()).toBe('abc');
+});
+
+test('boolean + .default()', () => {
+  const dec = boolean.default(false);
+  expect(dec.create()).toBe(false);
+  expect(dec.create(true)).toBe(true);
+});
+
+test('nil + .default()', () => {
+  const dec = nil.default(null);
+  expect(dec.create()).toBeNull();
+});
+
+test('undef + .default()', () => {
+  const dec = undef.default(undefined);
+  expect(dec.create()).toBeUndefined();
+});
+
+// ============================================================
+// Record with all literal fields auto-creates with no args
+// ============================================================
+
+test('record with all literal fields auto-creates', () => {
+  const Dec = record({
+    type: literal('event'),
+    version: literal(2),
+    active: literal(true),
+  });
+  expect(Dec.create()).toEqual({ type: 'event', version: 2, active: true });
+});
+
+test('record with bare literal fields auto-creates (no literal() needed)', () => {
+  const Dec = record({
+    type: 'user',
+    name: string.default('Alice'),
+  });
+  expect(Dec.create()).toEqual({ type: 'user', name: 'Alice' });
+});
+
+test('record with all bare literals auto-creates', () => {
+  const Dec = record({
+    kind: 'event',
+    version: 2,
+    active: true,
+  });
+  expect(Dec.create()).toEqual({ kind: 'event', version: 2, active: true });
+});
+
+// ============================================================
+// Mixed record: literal + always + withDefault + string.default
+// ============================================================
+
+test('record with mixed defaulted fields', () => {
+  const Dec = record({
+    type: literal('item'),
+    count: always(0),
+    label: string.default('untitled'),
+    enabled: withDefault(boolean, true),
+  });
+  expect(Dec.create()).toEqual({
+    type: 'item',
+    count: 0,
+    label: 'untitled',
+    enabled: true,
+  });
+  expect(Dec.create({ label: 'custom' })).toEqual({
+    type: 'item',
+    count: 0,
+    label: 'custom',
+    enabled: true,
+  });
+});
+
+test('all combinations: required, defaulted-kept, defaulted-overridden, literal, always', () => {
+  const Dec = record({
+    // required — must provide
+    name: string,
+    age: number,
+    // defaulted — will rely on default
+    role: string.default('user'),
+    score: withDefault(integer, 0),
+    // defaulted — will override
+    email: string.default('none@example.com'),
+    active: withDefault(boolean, true),
+    // literal — auto-defaults
+    type: literal('person'),
+    version: literal(1),
+    // always — auto-defaults
+    tag: always('v2'),
+  });
+
+  // provide required + override some defaults
+  const result = Dec.create({
+    name: 'Alice',
+    age: 30,
+    email: 'alice@example.com',
+    active: false,
+  });
+  expect(result).toEqual({
+    name: 'Alice',
+    age: 30,
+    role: 'user',        // kept default
+    score: 0,            // kept default
+    email: 'alice@example.com', // overridden
+    active: false,       // overridden
+    type: 'person',      // literal auto-default
+    version: 1,          // literal auto-default
+    tag: 'v2',           // always auto-default
+  });
+
+  // override everything
+  const full = Dec.create({
+    name: 'Bob',
+    age: 25,
+    role: 'admin',
+    score: 100,
+    email: 'bob@example.com',
+    active: true,
+    type: 'person',
+    version: 1,
+    tag: 'v2',
+  });
+  expect(full).toEqual({
+    name: 'Bob',
+    age: 25,
+    role: 'admin',
+    score: 100,
+    email: 'bob@example.com',
+    active: true,
+    type: 'person',
+    version: 1,
+    tag: 'v2',
+  });
+
+  // missing required field throws
+  // @ts-expect-error
+  expect(() => Dec.create({ name: 'X' })).toThrow("No default value for field 'age'");
+  // @ts-expect-error
+  expect(() => Dec.create({})).toThrow("No default value for field 'name'");
+  // @ts-expect-error
+  expect(() => Dec.create()).toThrow("No default value for field 'name'");
+});
+
+test('all combinations with bare literals instead of literal()', () => {
+  const Dec = record({
+    // required — must provide
+    name: string,
+    age: number,
+    // defaulted — will rely on default
+    role: string.default('user'),
+    score: withDefault(integer, 0),
+    // defaulted — will override
+    email: string.default('none@example.com'),
+    // bare literals — auto-default
+    type: 'person',
+    version: 2,
+    active: true,
+    // always — auto-default
+    tag: always('v2'),
+  });
+
+  const result = Dec.create({
+    name: 'Alice',
+    age: 30,
+    email: 'alice@example.com',
+  });
+  expect(result).toEqual({
+    name: 'Alice',
+    age: 30,
+    role: 'user',
+    score: 0,
+    email: 'alice@example.com',
+    type: 'person',
+    version: 2,
+    active: true,
+    tag: 'v2',
+  });
+});
+
+test('bare literal in patch is accepted (only the literal value is allowed)', () => {
+  const Dec = record({
+    type: 'default',
+    name: string,
+  });
+  // providing the literal value explicitly works
+  expect(Dec.create({ name: 'X', type: 'default' })).toEqual({
+    type: 'default',
+    name: 'X',
+  });
+  // omitting it also works — it auto-defaults
+  expect(Dec.create({ name: 'Y' })).toEqual({
+    type: 'default',
+    name: 'Y',
+  });
+});
+
+test('nested record with bare literals auto-creates from outer', () => {
+  const Inner = record({ kind: 'leaf', value: number.default(0) });
+  const Outer = record({ label: string.default('root'), child: Inner });
+  expect(Outer.create()).toEqual({
+    label: 'root',
+    child: { kind: 'leaf', value: 0 },
+  });
+});
+
+test('tuple default in record field', () => {
+  const Dec = record({
+    point: tuple(number, number).default([0, 0]),
+    name: string.default('origin'),
+  });
+  expect(Dec.create()).toEqual({ point: [0, 0], name: 'origin' });
+  expect(Dec.create({ point: [1, 2] })).toEqual({ point: [1, 2], name: 'origin' });
+});
+
+test('safeDecode still works on DefaultDecoder', () => {
+  const dec = string.default('hi');
+  expect(dec.safeDecode('hello')).toEqual({ ok: true, value: 'hello' });
+  expect(dec.safeDecode(42)).toEqual({
+    ok: false,
+    error: expect.any(Error),
+  });
+});
+
+test('decoder() wrapper preserves default', () => {
+  const dec = decoder(string.default('wrapped'));
+  expect(dec.create()).toBe('wrapped');
+});
+
+test('decoder() wrapper preserves record schema', () => {
+  const Dec = record({ x: number.default(0) });
+  const wrapped = decoder(Dec);
+  expect(wrapped.create()).toEqual({ x: 0 });
+});
+
+// ============================================================
+// Bare literal tuples in .default() / .create()
+// ============================================================
+
+test('bare tuple in record: create with patch', () => {
+  const Dec = record({ pair: [string, number] });
+  expect(Dec.create({ pair: ['hi', 5] })).toEqual({ pair: ['hi', 5] });
+});
+
+test('bare tuple in record: no default, create throws', () => {
+  const Dec = record({
+    pair: [string, number],
+    name: string.default('x'),
+  });
+  // @ts-expect-error — pair is required
+  expect(() => Dec.create()).toThrow("No default value for field 'pair'");
+});
+
+test('bare tuple with .default() in record auto-creates', () => {
+  const Dec = record({
+    pair: decoder([string, number]).default(['a', 0]),
+    name: string.default('x'),
+  });
+  expect(Dec.create()).toEqual({ pair: ['a', 0], name: 'x' });
+  expect(Dec.create({ pair: ['b', 1] })).toEqual({ pair: ['b', 1], name: 'x' });
+});
+
+test('nested record with bare tuple field', () => {
+  const Inner = record({
+    coords: decoder([number, number]).default([0, 0]),
+    label: literal('point'),
+  });
+  const Outer = record({
+    name: string.default('origin'),
+    pos: Inner,
+  });
+  expect(Outer.create()).toEqual({
+    name: 'origin',
+    pos: { coords: [0, 0], label: 'point' },
+  });
+  expect(Outer.create({ pos: { coords: [1, 2] } })).toEqual({
+    name: 'origin',
+    pos: { coords: [1, 2], label: 'point' },
+  });
+});
+
+test('deeply nested record with bare tuple', () => {
+  const Leaf = record({
+    values: decoder([number, number]).default([0, 0]),
+    tag: 'leaf',
+  });
+  const Mid = record({
+    child: Leaf,
+    kind: 'mid',
+  });
+  const Root = record({
+    item: Mid,
+    version: literal(1),
+  });
+  expect(Root.create()).toEqual({
+    item: { child: { values: [0, 0], tag: 'leaf' }, kind: 'mid' },
+    version: 1,
+  });
+});
+
+// ============================================================
+// Tuple auto-default from element defaults
+// ============================================================
+
+test('tuple auto-creates when all elements have defaults', () => {
+  const t = tuple(number.default(1), string.default('hi'));
+  expect(t.create()).toEqual([1, 'hi']);
+});
+
+test('tuple auto-create with literal elements', () => {
+  const t = tuple(literal('a'), literal(1));
+  expect(t.create()).toEqual(['a', 1]);
+});
+
+test('tuple auto-create with bare literal elements', () => {
+  const t = decoder(['hello', 42, true]);
+  expect(t.create()).toEqual(['hello', 42, true]);
+});
+
+test('tuple does NOT auto-create when some elements lack defaults', () => {
+  const t = tuple(number.default(1), string);
+  expect(() => t.create()).toThrow();
+});
+
+test('tuple auto-create with mixed default sources', () => {
+  const t = tuple(literal('tag'), always(0), string.default('x'));
+  expect(t.create()).toEqual(['tag', 0, 'x']);
+});
+
+test('bare tuple with defaulted elements in record auto-creates', () => {
+  const Dec = record({
+    pair: [number.default(0), string.default('x')],
+    name: string.default('test'),
+  });
+  expect(Dec.create()).toEqual({ pair: [0, 'x'], name: 'test' });
+});
+
+test('bare tuple with literals in record auto-creates', () => {
+  const Dec = record({
+    tag: [literal('a'), literal(1)],
+    name: string.default('test'),
+  });
+  expect(Dec.create()).toEqual({ tag: ['a', 1], name: 'test' });
+});
+
+test('nested record with auto-defaulting bare tuple', () => {
+  const Inner = record({
+    coords: [number.default(0), number.default(0)],
+    label: 'point',
+  });
+  const Outer = record({
+    name: string.default('origin'),
+    pos: Inner,
+  });
+  expect(Outer.create()).toEqual({
+    name: 'origin',
+    pos: { coords: [0, 0], label: 'point' },
+  });
+});
+
+test('3-level nesting with auto-defaulting tuples', () => {
+  const Leaf = record({
+    pair: [number.default(1), number.default(2)],
+    kind: 'leaf',
+  });
+  const Mid = record({ child: Leaf, kind: 'mid' });
+  const Root = record({ item: Mid, version: literal(1) });
+  expect(Root.create()).toEqual({
+    item: { child: { pair: [1, 2], kind: 'leaf' }, kind: 'mid' },
+    version: 1,
+  });
+});
+
+test('empty tuple auto-creates to []', () => {
+  const t = tuple();
+  expect(t.create()).toEqual([]);
 });
