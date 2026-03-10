@@ -3,6 +3,7 @@
  * These are not Json which are strings (javascript (literal) notation),
  * these are plain old javascript objects
  */
+import { DecodeError } from './decode-error';
 import { err } from './utils';
 
 export type PojoPrimitive = string | boolean | number | bigint | null | undefined;
@@ -28,6 +29,10 @@ export const isPojo = (value: unknown): value is Pojo =>
 
 export function assert_is_pojo(value: unknown): asserts value is Pojo {
   if (!isPojo(value)) {
-    throw err`Value ${value} is not a type that can be parsed by this library. Only primitive JS values and regular JS objects or arrays can be parsed, not classes (think anything that is valid JSON).`;
+    throw DecodeError.simple(
+      err`Value ${value} is not a type that can be parsed by this library. Only primitive JS values and regular JS objects or arrays can be parsed, not classes (think anything that is valid JSON).`,
+      'JSON-compatible value',
+      value,
+    );
   }
 }

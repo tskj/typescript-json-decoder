@@ -16,6 +16,7 @@ export const tag = <T extends unknown, S extends Symbol>(
 const fmt = (v: unknown): string =>
   typeof v === 'string' ? v :
   v === undefined ? 'undefined' :
+  v instanceof RegExp ? String(v) :
   JSON.stringify(v);
 
 export const err = (strings: TemplateStringsArray, ...values: unknown[]): string =>

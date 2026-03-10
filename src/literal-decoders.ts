@@ -8,7 +8,7 @@ import {
   PrimitiveJsonLiteralForm,
   addQuestionmarksToRecordFields,
 } from './types';
-import { DecodeError } from './decode-error';
+import { DecodeError, asDecodeError } from './decode-error';
 import { tag, err } from './utils';
 
 export function literal<const p extends PrimitiveJsonLiteralForm>(lit: p): Decoder<p>;
@@ -19,6 +19,7 @@ export function literal(lit: PrimitiveJsonLiteralForm) {
       throw DecodeError.simple(
         err`The value ${value} is not the literal ${lit}`,
         JSON.stringify(lit),
+        value,
       );
     }
     return lit;
@@ -36,12 +37,26 @@ export function tuple(...decoders: any[]) {
   return makeDecoder((value: unknown) => {
     assert_is_pojo(value);
     if (!Array.isArray(value)) {
-      throw err`The value ${value} is not a list and can therefore not be parsed as a tuple`;
+      throw DecodeError.simple(
+        err`The value ${value} is not a list and can therefore not be parsed as a tuple`,
+        `tuple of length ${decoders.length}`,
+        value,
+      );
     }
     if (value.length !== decoders.length) {
-      throw err`The array ${value} is not the proper length for a ${decoders.length}-tuple`;
+      throw DecodeError.simple(
+        err`The array ${value} is not the proper length for a ${decoders.length}-tuple`,
+        `tuple of length ${decoders.length}`,
+        value,
+      );
     }
-    return resolved.map((d, i) => d(value[i]));
+    return resolved.map((d, i) => {
+      try {
+        return d(value[i]);
+      } catch (error) {
+        throw asDecodeError(error).withPath(i);
+      }
+    });
   });
 }
 
@@ -84,7 +99,10 @@ const pickKey = (key: string): Decoder<unknown> =>
   makeDecoder((value: unknown) => {
     assert_is_pojo(value);
     if (typeof value !== 'object' || value === null || !((key) in value)) {
-      throw err`The key ${key} is missing in ${value}`;
+      throw new DecodeError(
+        err`The key ${key} is missing`,
+        [key],
+      );
     }
     return (value as any)[key];
   });
@@ -108,31 +126,44 @@ export const record =
   makeDecoder((value: unknown): any => {
     assert_is_pojo(value);
     if (!isPojoObject(value)) {
-      throw err`Value ${value} is not of type ${'object'} but rather ${typeof value}`;
+      throw DecodeError.simple(
+        err`Value ${value} is not of type ${'object'} but rather ${typeof value}`,
+        'object',
+        value,
+      );
     }
     const result: any = {};
     for (const [key, dec] of Object.entries(s) as [string, any][]) {
       if (dec[missingKey] === true) {
         if (key in (value as any)) {
-          throw err`The key ${key} is present in ${value} but was expected to be missing`;
+          throw new DecodeError(
+            err`The key ${key} is present but was expected to be missing`,
+            [key],
+            'missing key',
+            (value as any)[key],
+          );
         }
         continue;
       }
       if (dec[fieldDecoder] === true) {
-        result[key] = decoder(dec)(value);
+        try {
+          result[key] = decoder(dec)(value);
+        } catch (error) {
+          throw asDecodeError(error).withPath(key);
+        }
         continue;
       }
       try {
         const jsonvalue = (value as any)[key];
         result[key] = decoder(dec)(jsonvalue);
-      } catch (message) {
+      } catch (error) {
         if (!(key in (value as any))) {
-          throw err`The key ${key} is missing in ${value}`;
+          throw new DecodeError(
+            err`The key ${key} is missing`,
+            [key],
+          );
         }
-        throw (
-          message +
-          err`\nwhen trying to decode the key ${key} in ${value}`
-        );
+        throw asDecodeError(error).withPath(key);
       }
     }
     return result;

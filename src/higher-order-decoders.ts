@@ -1,6 +1,7 @@
 import { nil, undef } from './primitive-decoders';
 import { assert_is_pojo, isPojoObject } from './pojo';
 import { decodeType, decoder, Decoder, DecoderInput, makeDecoder, isKey } from './types';
+import { DecodeError, asDecodeError } from './decode-error';
 import { err } from './utils';
 
 export const always = <const T>(value: T): Decoder<T> =>
@@ -14,19 +15,19 @@ type getSumOfArray<arr> = arr extends (infer elements)[] ? elements : never;
 
 const unionImpl = (decoders: DecoderInput<unknown>[], value: unknown): any => {
   assert_is_pojo(value);
-  if (decoders.length === 0) {
-    throw err`Could not match any of the union cases`;
-  }
-  const [dec, ...rest] = decoders;
-  try {
-    return decoder(dec as any)(value);
-  } catch (messageFromThisDecoder) {
+  const errors: DecodeError[] = [];
+  for (const dec of decoders) {
     try {
-      return unionImpl(rest, value);
-    } catch (message) {
-      throw `${messageFromThisDecoder}\n${message}`;
+      return decoder(dec as any)(value);
+    } catch (error) {
+      errors.push(asDecodeError(error));
     }
   }
+  throw DecodeError.compound(
+    'None of the union cases matched',
+    errors,
+    value,
+  );
 };
 
 export const union =
@@ -73,20 +74,19 @@ export function array<const D extends DecoderInput<unknown>>(
   return makeDecoder((xs: unknown): any => {
     assert_is_pojo(xs);
     if (!Array.isArray(xs)) {
-      throw err`The value ${xs} is not of type ${'array'}, but is of type ${typeof xs}`;
-    }
-    let index = 0;
-    try {
-      return xs.map((x, i) => {
-        index = i;
-        return d(x);
-      });
-    } catch (message) {
-      throw (
-        message +
-        err`\nwhen trying to decode the array (at index ${index}) ${xs}`
+      throw DecodeError.simple(
+        err`The value ${xs} is not of type ${'array'}, but is of type ${typeof xs}`,
+        'array',
+        xs,
       );
     }
+    return xs.map((x, i) => {
+      try {
+        return d(x);
+      } catch (error) {
+        throw asDecodeError(error).withPath(i);
+      }
+    });
   });
 }
 
@@ -97,7 +97,11 @@ export function nonEmptyArray<const D extends DecoderInput<unknown>>(
   return makeDecoder((xs: unknown): any => {
     const result = arr(xs);
     if (result.length === 0) {
-      throw err`Expected a non-empty array, but got an empty array`;
+      throw DecodeError.simple(
+        'Expected a non-empty array, but got an empty array',
+        'non-empty array',
+        xs,
+      );
     }
     return result;
   });
@@ -109,11 +113,7 @@ export function set<const D extends DecoderInput<unknown>>(
   const arr = array(dec);
   return makeDecoder((list: unknown) => {
     assert_is_pojo(list);
-    try {
-      return new Set(arr(list));
-    } catch (message) {
-      throw message + err`\nand can therefore not be parsed as a set`;
-    }
+    return new Set(arr(list));
   });
 }
 
@@ -125,18 +125,14 @@ export const map =
   const arr = array(dec);
   return makeDecoder((listOfObjects: unknown) => {
     assert_is_pojo(listOfObjects);
-    try {
-      const parsedObjects = arr(listOfObjects);
-      const resultMap = new Map(parsedObjects.map((value) => [key(value), value]));
-      if (parsedObjects.length !== resultMap.size) {
-        console.warn(
-          `Probable duplicate key in map: List \`${parsedObjects}\` isn't the same size as the parsed \`${resultMap}\``,
-        );
-      }
-      return resultMap;
-    } catch (message) {
-      throw message + err`\nand can therefore not be parsed as a map`;
+    const parsedObjects = arr(listOfObjects);
+    const resultMap = new Map(parsedObjects.map((value) => [key(value), value]));
+    if (parsedObjects.length !== resultMap.size) {
+      console.warn(
+        `Probable duplicate key in map: List \`${parsedObjects}\` isn't the same size as the parsed \`${resultMap}\``,
+      );
     }
+    return resultMap;
   });
 };
 
@@ -149,17 +145,25 @@ export function objectOf(dec: any, keys?: any) {
   return makeDecoder((obj: unknown) => {
     assert_is_pojo(obj);
     if (!isPojoObject(obj)) {
-      throw err`Value ${obj} is not an object and can therefore not be parsed as a record`;
+      throw DecodeError.simple(
+        err`Value ${obj} is not an object and can therefore not be parsed as a record`,
+        'object',
+        obj,
+      );
     }
     const result = {} as any;
     for (const [key, value] of Object.entries(obj)) {
       try {
         if (keys && !isKey(key, keys)) {
-          throw err`Key ${key} is not in given keys`;
+          throw DecodeError.simple(
+            err`Key ${key} is not in given keys`,
+            `one of [${keys.join(', ')}]`,
+            key,
+          );
         }
         result[key] = d(value);
-      } catch (message) {
-        throw message + err`\nwhen decoding the key ${key} in record ${obj}`;
+      } catch (error) {
+        throw asDecodeError(error).withPath(key);
       }
     }
     return result;
@@ -175,16 +179,24 @@ export function dict(dec: any, keys?: any) {
   return makeDecoder((obj: unknown) => {
     assert_is_pojo(obj);
     if (!isPojoObject(obj)) {
-      throw err`Value ${obj} is not an object and can therefore not be parsed as a map`;
+      throw DecodeError.simple(
+        err`Value ${obj} is not an object and can therefore not be parsed as a map`,
+        'object',
+        obj,
+      );
     }
     const decodedPairs = Object.entries(obj).map(([key, value]) => {
       try {
         if (keys && !isKey(key, keys)) {
-          throw err`Key ${key} is not in given keys`;
+          throw DecodeError.simple(
+            err`Key ${key} is not in given keys`,
+            `one of [${keys.join(', ')}]`,
+            key,
+          );
         }
         return [key, d(value)] as [any, any];
-      } catch (message) {
-        throw message + err`\nwhen decoding the key ${key} in map ${obj}`;
+      } catch (error) {
+        throw asDecodeError(error).withPath(key);
       }
     });
     return new Map(decodedPairs);

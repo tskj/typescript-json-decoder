@@ -1,5 +1,6 @@
 import { assert_is_pojo } from './pojo';
 import { decodeType, decoder, Decoder, DecoderInput, makeDecoder } from './types';
+import { DecodeError, asDecodeError } from './decode-error';
 import { err } from './utils';
 
 // ---------------------------------------------------------------------------
@@ -39,7 +40,11 @@ type getProductOfDecoderArray<arr extends DecoderInput<unknown>[]> = fromObject<
 const validatePrototype = (a: unknown): void => {
   const proto = Object.getPrototypeOf(a);
   if (proto !== Object.prototype && proto !== Array.prototype) {
-    throw err`Only Object, Array, and primitive types are allowed in intersections, but got ${proto.constructor.name}`;
+    throw DecodeError.simple(
+      err`Only Object, Array, and primitive types are allowed in intersections, but got ${proto.constructor.name}`,
+      'Object, Array, or primitive',
+      a,
+    );
   }
 };
 
@@ -60,8 +65,8 @@ const combineObjectProperties = <A extends Object, B extends Object>(
     if (inA && inB) {
       try {
         result[key] = combineResults((a as any)[key], (b as any)[key]);
-      } catch (message) {
-        throw `${message}\n` + err`While trying to combine results for field ${String(key)}`;
+      } catch (error) {
+        throw asDecodeError(error).withPath(String(key));
       }
     } else {
       result[key] = inA ? (a as any)[key] : (b as any)[key];
@@ -73,18 +78,26 @@ const combineObjectProperties = <A extends Object, B extends Object>(
 const combineResults = <A, B>(a: A, b: B): A & B => {
   // Type mismatch
   if (typeof a !== typeof b) {
-    throw err`Cannot form intersection of ${typeof a} and ${typeof b}, but got ${a} and ${b}`;
+    throw DecodeError.simple(
+      err`Cannot form intersection of ${typeof a} and ${typeof b}, but got ${a} and ${b}`,
+      'matching types',
+    );
   }
 
   // Functions not supported
   if (typeof a === 'function') {
-    throw err`Combining functions in intersections is not supported`;
+    throw DecodeError.simple(
+      err`Combining functions in intersections is not supported`,
+    );
   }
 
   // Primitives must be equal
   if (typeof a !== 'object') {
     if ((a as any) !== (b as any)) {
-      throw err`Intersections must produce matching values in all branches, but got ${a} and ${b}`;
+      throw DecodeError.simple(
+        err`Intersections must produce matching values in all branches, but got ${a} and ${b}`,
+        'matching values',
+      );
     }
     return a as A & B;
   }
@@ -93,7 +106,9 @@ const combineResults = <A, B>(a: A, b: B): A & B => {
   if (a === null && b === null) return null as any;
   if (a === null || b === null) {
     const nonNull = a === null ? b : a;
-    throw err`Cannot intersect null with non-null value ${nonNull}`;
+    throw DecodeError.simple(
+      err`Cannot intersect null with non-null value ${nonNull}`,
+    );
   }
 
   // Objects and arrays
@@ -113,18 +128,21 @@ export const intersection =
   const resolved = decoders.map((d) => decoder(d as any));
   return makeDecoder((value: unknown): getProductOfDecoderArray<decoders> => {
     assert_is_pojo(value);
-    const errors: string[] = [];
+    const errors: DecodeError[] = [];
     const results: any[] = [];
     for (const dec of resolved) {
       try {
         results.push(dec(value));
-      } catch (message) {
-        errors.push(String(message));
+      } catch (error) {
+        errors.push(asDecodeError(error));
       }
     }
     if (errors.length > 0) {
-      errors.push(err`Could not match all of the intersection cases`);
-      throw errors.join('\n');
+      throw DecodeError.compound(
+        'Could not match all of the intersection cases',
+        errors,
+        value,
+      );
     }
     return results.length === 0
       ? ({} as any)
