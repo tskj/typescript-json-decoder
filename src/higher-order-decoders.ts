@@ -55,26 +55,28 @@ export function optional<const T extends DecoderInput<unknown>>(
   return d as unknown as DefaultDecoder<decodeType<T> | undefined>;
 }
 
-export function withDefault<T extends DecoderInput<unknown>>(
+export function fallback<T extends DecoderInput<unknown>>(
   dec: T,
-  fallback: decodeType<T>,
+  fallbackValue: decodeType<T>,
 ): DefaultDecoder<decodeType<T>>;
-export function withDefault<T extends DecoderInput<unknown>, const F>(
+export function fallback<T extends DecoderInput<unknown>, const F>(
   dec: T,
-  fallback: F,
+  fallbackValue: F,
 ): DefaultDecoder<decodeType<T> | F>;
-export function withDefault(dec: any, fallback: any) {
+export function fallback(dec: any, fallbackValue: any) {
   const d = decoder(dec);
   const result = makeDecoder((value: unknown) => {
     try {
       return d(value);
     } catch {
-      return fallback;
+      return fallbackValue;
     }
   });
-  (result as any)[defaultTag] = fallback;
+  (result as any)[defaultTag] = fallbackValue;
   return result;
 }
+
+export { fallback as withDefault };
 
 export function array<const D extends DecoderInput<unknown>>(
   dec: D,

@@ -25,7 +25,7 @@ import {
   unknown,
   integer,
   always,
-  withDefault,
+  fallback,
   regex,
   objectOf,
   bigint,
@@ -1333,9 +1333,9 @@ test('kitchen sink: bare literals across all combinators', () => {
   expect(() => fieldsDecoder({ level: 5, active: false })).toThrow();
 
   // always as fallback in union with bare literal POJO
-  const withDefault = union({ status: 'ok', code: 200 }, always({ status: 'error', code: 0 }));
-  expect(withDefault({ status: 'ok', code: 200 })).toEqual({ status: 'ok', code: 200 });
-  expect(withDefault('anything')).toEqual({ status: 'error', code: 0 });
+  const withFallback = union({ status: 'ok', code: 200 }, always({ status: 'error', code: 0 }));
+  expect(withFallback({ status: 'ok', code: 200 })).toEqual({ status: 'ok', code: 200 });
+  expect(withFallback('anything')).toEqual({ status: 'error', code: 0 });
 
   // union mixing bare literals, decoder functions, and POJOs
   const mixedUnion = union(42, string, { tag: true });
@@ -1499,24 +1499,24 @@ test('README examples: bare literals, unions, and new decoders', () => {
   expect(() => nestedDecoder({ name: 'x', config: { level: 42, active: true, env: 'dev' } })).toThrow();
 });
 
-test('withDefault returns fallback when decoder fails', () => {
-  const decoder = withDefault(string, 'fallback');
+test('fallback returns fallback when decoder fails', () => {
+  const decoder = fallback(string, 'fallback');
   expect(decoder('hello')).toBe('hello');
   expect(decoder(undefined)).toBe('fallback');
   expect(decoder(null)).toBe('fallback');
   expect(decoder(42)).toBe('fallback');
 });
 
-test('withDefault with number decoder', () => {
-  const decoder = withDefault(number, 0);
+test('fallback with number decoder', () => {
+  const decoder = fallback(number, 0);
   expect(decoder(42)).toBe(42);
   expect(decoder(undefined)).toBe(0);
   expect(decoder(null)).toBe(0);
   expect(decoder('hello')).toBe(0);
 });
 
-test('withDefault with record decoder', () => {
-  const decoder = withDefault(
+test('fallback with record decoder', () => {
+  const decoder = fallback(
     record({ name: string, level: number }),
     { name: 'anonymous', level: 1 },
   );
@@ -1527,11 +1527,11 @@ test('withDefault with record decoder', () => {
   expect(decoder({ name: 'alice' })).toEqual({ name: 'anonymous', level: 1 });
 });
 
-test('withDefault in a record schema', () => {
+test('fallback in a record schema', () => {
   const decoder = record({
     name: string,
-    role: withDefault(string, 'user'),
-    retries: withDefault(number, 3),
+    role: fallback(string, 'user'),
+    retries: fallback(number, 3),
   });
   expect(decoder({ name: 'alice', role: 'admin', retries: 5 }))
     .toEqual({ name: 'alice', role: 'admin', retries: 5 });
@@ -1541,39 +1541,39 @@ test('withDefault in a record schema', () => {
     .toEqual({ name: 'alice', role: 'user', retries: 3 });
 });
 
-test('withDefault with bare literal decoder', () => {
-  const decoder = withDefault(42, 42);
+test('fallback with bare literal decoder', () => {
+  const decoder = fallback(42, 42);
   expect(decoder(42)).toBe(42);
   expect(decoder(undefined)).toBe(42);
   expect(decoder(null)).toBe(42);
   expect(decoder(43)).toBe(42);
 });
 
-test('withDefault with array decoder', () => {
-  const decoder = withDefault(array(number), []);
+test('fallback with array decoder', () => {
+  const decoder = fallback(array(number), []);
   expect(decoder([1, 2, 3])).toEqual([1, 2, 3]);
   expect(decoder(undefined)).toEqual([]);
   expect(decoder(null)).toEqual([]);
   expect(decoder('not an array')).toEqual([]);
 });
 
-test('withDefault with nullable — null passes through, fallback on throw', () => {
-  const decoder = withDefault(nullable(number), null);
+test('fallback with nullable — null passes through, fallback on throw', () => {
+  const decoder = fallback(nullable(number), null);
   expect(decoder(42)).toBe(42);
   expect(decoder(null)).toBe(null);     // null is valid, not a fallback
   expect(decoder('bad')).toBe(null);    // throws → fallback
   expect(decoder(undefined)).toBe(null); // throws → fallback
 });
 
-test('withDefault with optional — undefined passes through, fallback on throw', () => {
-  const decoder = withDefault(optional(string), undefined);
+test('fallback with optional — undefined passes through, fallback on throw', () => {
+  const decoder = fallback(optional(string), undefined);
   expect(decoder('hello')).toBe('hello');
   expect(decoder(undefined)).toBeUndefined(); // valid decoded value
   expect(decoder(42)).toBeUndefined();        // throws → fallback
 });
 
-test('withDefault with union — fallback only on total failure', () => {
-  const decoder = withDefault(union(string, number, nil), null);
+test('fallback with union — fallback only on total failure', () => {
+  const decoder = fallback(union(string, number, nil), null);
   expect(decoder('hello')).toBe('hello');
   expect(decoder(42)).toBe(42);
   expect(decoder(null)).toBe(null);     // valid union case
@@ -1581,8 +1581,8 @@ test('withDefault with union — fallback only on total failure', () => {
   expect(decoder({})).toBe(null);       // no union case matches → fallback
 });
 
-test('withDefault with tagged union — fallback on no match', () => {
-  const decoder = withDefault(
+test('fallback with tagged union — fallback on no match', () => {
+  const decoder = fallback(
     union(
       record({ tag: 'ok', data: string }),
       record({ tag: 'err', code: number }),
@@ -1595,10 +1595,10 @@ test('withDefault with tagged union — fallback on no match', () => {
   expect(decoder(null)).toEqual({ tag: 'err', code: 0 });
 });
 
-test('withDefault with nullable in a record — null is valid, missing key falls back', () => {
+test('fallback with nullable in a record — null is valid, missing key falls back', () => {
   const decoder = record({
     name: string,
-    data: withDefault(nullable(number), null),
+    data: fallback(nullable(number), null),
   });
   expect(decoder({ name: 'a', data: 42 })).toEqual({ name: 'a', data: 42 });
   expect(decoder({ name: 'a', data: null })).toEqual({ name: 'a', data: null });
@@ -1606,33 +1606,33 @@ test('withDefault with nullable in a record — null is valid, missing key falls
   expect(decoder({ name: 'a', data: 'bad' })).toEqual({ name: 'a', data: null });
 });
 
-test('withDefault in a bare POJO (no record() wrapper)', () => {
-  const dec = decoder({ name: string, score: withDefault(number, 0) });
+test('fallback in a bare POJO (no record() wrapper)', () => {
+  const dec = decoder({ name: string, score: fallback(number, 0) });
   expect(dec({ name: 'alice', score: 42 })).toEqual({ name: 'alice', score: 42 });
   expect(dec({ name: 'alice' })).toEqual({ name: 'alice', score: 0 });
   expect(dec({ name: 'alice', score: 'bad' })).toEqual({ name: 'alice', score: 0 });
 });
 
-test('withDefault in a tuple', () => {
-  const decoder = tuple(string, withDefault(number, 0));
+test('fallback in a tuple', () => {
+  const decoder = tuple(string, fallback(number, 0));
   expect(decoder(['hello', 42])).toEqual(['hello', 42]);
   expect(decoder(['hello', 'bad'])).toEqual(['hello', 0]);
   expect(decoder(['hello', null])).toEqual(['hello', 0]);
 });
 
-test('withDefault with fallback type different from decoder type', () => {
+test('fallback with fallback type different from decoder type', () => {
   // fallback is null, decoder is string → string | null
-  const decoder = withDefault(string, null);
+  const decoder = fallback(string, null);
   expect(decoder('hello')).toBe('hello');
   expect(decoder(42)).toBe(null);
 
   // fallback is a different string literal
-  const decoder2 = withDefault(number, 'N/A');
+  const decoder2 = fallback(number, 'N/A');
   expect(decoder2(42)).toBe(42);
   expect(decoder2('bad')).toBe('N/A');
 
   // fallback is a completely different shape
-  const decoder3 = withDefault(
+  const decoder3 = fallback(
     record({ name: string }),
     { error: 'not found' },
   );
@@ -1674,8 +1674,8 @@ test('regex decoder in a record', () => {
   expect(() => decoder({ name: 'alice', email: 'a@b', zip: '123' })).toThrow();
 });
 
-test('regex decoder with withDefault', () => {
-  const decoder = withDefault(regex(/^\d+$/), 'N/A');
+test('regex decoder with fallback', () => {
+  const decoder = fallback(regex(/^\d+$/), 'N/A');
   expect(decoder('123')).toBe('123');
   expect(decoder('abc')).toBe('N/A');
   expect(decoder(null)).toBe('N/A');
@@ -2347,11 +2347,11 @@ test('README: regex in record', () => {
   expect(() => userDecoder({ name: 'alice', email: 'bad', zip: '12345' })).toThrow();
 });
 
-test('README: withDefault in record', () => {
+test('README: fallback in record', () => {
   const userDecoder = record({
     name: string,
-    role: withDefault(string, 'user'),
-    score: withDefault(number, null),
+    role: fallback(string, 'user'),
+    score: fallback(number, null),
   });
   expect(userDecoder({ name: 'alice', role: 'admin', score: 42 }))
     .toEqual({ name: 'alice', role: 'admin', score: 42 });
@@ -2370,8 +2370,8 @@ test('README: bigint', () => {
     .toEqual({ name: 'alice', balance: BigInt('9007199254740993') });
 });
 
-test('README: withDefault + nullable pass-through', () => {
-  const decoder = withDefault(nullable(number), null);
+test('README: fallback + nullable pass-through', () => {
+  const decoder = fallback(nullable(number), null);
   expect(decoder(42)).toBe(42);
   expect(decoder(null)).toBe(null);    // valid decoded value, not fallback
   expect(decoder('bad')).toBe(null);   // decoder threw, fallback
@@ -2655,8 +2655,8 @@ test('lazy.map()', () => {
   expect(() => dec(42)).toThrow();
 });
 
-test('withDefault.map()', () => {
-  const dec = withDefault(number, 0).map(n => n + 1);
+test('fallback.map()', () => {
+  const dec = fallback(number, 0).map(n => n + 1);
   expect(dec(10)).toBe(11);
   expect(dec('bad')).toBe(1);
 });
@@ -2912,8 +2912,8 @@ test('always has automatic default', () => {
   expect(always(42).create()).toBe(42);
 });
 
-test('withDefault has automatic default', () => {
-  expect(withDefault(string, 'fallback').create()).toBe('fallback');
+test('fallback has automatic default', () => {
+  expect(fallback(string, 'fallback').create()).toBe('fallback');
 });
 
 test('record create with all field defaults', () => {
@@ -3188,9 +3188,9 @@ test('README: primitive default and create', () => {
   expect(name.create('Alice')).toBe('Alice');
 });
 
-test('README: always and withDefault auto-default', () => {
+test('README: always and fallback auto-default', () => {
   expect(always('member').create()).toBe('member');
-  expect(withDefault(string, 'fallback').create()).toBe('fallback');
+  expect(fallback(string, 'fallback').create()).toBe('fallback');
 });
 
 test('README: literal auto-default', () => {
@@ -3201,6 +3201,9 @@ test('README: literal auto-default', () => {
 test('README: optional/nullable auto-default', () => {
   expect(optional(string).create()).toBeUndefined();
   expect(nullable(string).create()).toBeNull();
+  // fluent equivalents
+  expect(string.optional().create()).toBeUndefined();
+  expect(string.nullable().create()).toBeNull();
 });
 
 test('README: optional/nullable .default() override', () => {
@@ -3357,10 +3360,10 @@ test('nested record with always() fields', () => {
   });
 });
 
-test('nested record with withDefault() fields', () => {
+test('nested record with fallback() fields', () => {
   const Settings = record({
-    theme: withDefault(string, 'light'),
-    lang: withDefault(string, 'en'),
+    theme: fallback(string, 'light'),
+    lang: fallback(string, 'en'),
   });
   const User = record({ name: string.default('anon'), settings: Settings });
   expect(User.create()).toEqual({
@@ -3446,7 +3449,7 @@ test('create patch only requires non-default fields', () => {
     b: string.default('B'),
     c: number,
     d: always(true),
-    e: withDefault(integer, 0),
+    e: fallback(integer, 0),
   });
   expect(Dec.create({ a: 'A', c: 42 })).toEqual({
     a: 'A', b: 'B', c: 42, d: true, e: 0,
@@ -3542,6 +3545,208 @@ test('optional() built-in default and .default() override', () => {
   // .default() override
   const dec = optional(number).default(42);
   expect(dec.create()).toBe(42);
+});
+
+// ---------------------------------------------------------------------------
+// Fluent .optional(), .nullable() and .array()
+// ---------------------------------------------------------------------------
+
+test('string.optional() decodes string or undefined', () => {
+  const dec = string.optional();
+  expect(dec('hello')).toBe('hello');
+  expect(dec(undefined)).toBeUndefined();
+  expect(() => dec(42)).toThrow();
+  // has built-in default of undefined
+  expect(dec.create()).toBeUndefined();
+});
+
+test('number.optional() decodes number or undefined', () => {
+  const dec = number.optional();
+  expect(dec(42)).toBe(42);
+  expect(dec(undefined)).toBeUndefined();
+  expect(() => dec('nope')).toThrow();
+});
+
+test('string.nullable() decodes string or null', () => {
+  const dec = string.nullable();
+  expect(dec('hello')).toBe('hello');
+  expect(dec(null)).toBeNull();
+  expect(() => dec(42)).toThrow();
+  // has built-in default of null
+  expect(dec.create()).toBeNull();
+});
+
+test('number.array() decodes number[]', () => {
+  const dec = number.array();
+  expect(dec([1, 2, 3])).toEqual([1, 2, 3]);
+  expect(() => dec('nope')).toThrow();
+  expect(() => dec([1, 'x'])).toThrow();
+});
+
+test('fluent chaining: string.nullable().array()', () => {
+  const dec = string.nullable().array();
+  expect(dec(['a', null, 'b'])).toEqual(['a', null, 'b']);
+});
+
+test('fluent chaining: string.array().nullable()', () => {
+  const dec = string.array().nullable();
+  expect(dec(['a', 'b'])).toEqual(['a', 'b']);
+  expect(dec(null)).toBeNull();
+  expect(() => dec(42)).toThrow();
+});
+
+test('fluent chaining: string.optional().array()', () => {
+  const dec = string.optional().array();
+  expect(dec(['a', undefined, 'b'])).toEqual(['a', undefined, 'b']);
+  expect(() => dec('nope')).toThrow();
+});
+
+test('fluent chaining: string.array().optional()', () => {
+  const dec = string.array().optional();
+  expect(dec(['a', 'b'])).toEqual(['a', 'b']);
+  expect(dec(undefined)).toBeUndefined();
+  expect(() => dec(42)).toThrow();
+});
+
+test('fluent chaining: string.optional().nullable()', () => {
+  const dec = string.optional().nullable();
+  expect(dec('hello')).toBe('hello');
+  expect(dec(null)).toBeNull();
+  expect(dec(undefined)).toBeUndefined();
+});
+
+test('fluent chaining: string.nullable().optional()', () => {
+  const dec = string.nullable().optional();
+  expect(dec('hello')).toBe('hello');
+  expect(dec(null)).toBeNull();
+  expect(dec(undefined)).toBeUndefined();
+});
+
+test('fluent .optional().map()', () => {
+  const dec = string.optional().map((s) => s?.toUpperCase());
+  expect(dec('hello')).toBe('HELLO');
+  expect(dec(undefined)).toBeUndefined();
+});
+
+test('fluent .optional().default() overrides default', () => {
+  const dec = string.optional().default('fallback');
+  expect(dec('hello')).toBe('hello');
+  expect(dec(undefined)).toBeUndefined();
+  expect(dec.create()).toBe('fallback');
+});
+
+test('boolean.optional()', () => {
+  const dec = boolean.optional();
+  expect(dec(true)).toBe(true);
+  expect(dec(false)).toBe(false);
+  expect(dec(undefined)).toBeUndefined();
+  expect(() => dec(null)).toThrow();
+});
+
+test('date.optional()', () => {
+  const dec = date.optional();
+  expect(dec('2024-01-01')).toEqual(new Date('2024-01-01'));
+  expect(dec(undefined)).toBeUndefined();
+});
+
+test('.optional() in record schema', () => {
+  const dec = record({ name: string, age: number.optional() });
+  expect(dec({ name: 'Alice', age: 30 })).toEqual({ name: 'Alice', age: 30 });
+  expect(dec({ name: 'Bob' })).toEqual({ name: 'Bob' });
+  expect(dec({ name: 'Bob', age: undefined })).toEqual({ name: 'Bob' });
+});
+
+test('.optional() in record schema with .create()', () => {
+  const dec = record({ name: string.default('Anonymous'), age: number.optional() });
+  expect(dec.create()).toEqual({ name: 'Anonymous' });
+  expect(dec.create({ age: 25 })).toEqual({ name: 'Anonymous', age: 25 });
+});
+
+// ---------------------------------------------------------------------------
+// Fluent .fallback()
+// ---------------------------------------------------------------------------
+
+test('string.fallback() returns fallback when decoder fails', () => {
+  const dec = string.fallback('oops');
+  expect(dec('hello')).toBe('hello');
+  expect(dec(42)).toBe('oops');
+  expect(dec(undefined)).toBe('oops');
+  expect(dec(null)).toBe('oops');
+});
+
+test('number.fallback() returns fallback when decoder fails', () => {
+  const dec = number.fallback(0);
+  expect(dec(42)).toBe(42);
+  expect(dec('bad')).toBe(0);
+  expect(dec(undefined)).toBe(0);
+});
+
+test('.fallback() with a different type', () => {
+  const dec = string.fallback(null);
+  expect(dec('hello')).toBe('hello');
+  expect(dec(42)).toBe(null);
+});
+
+test('.fallback() carries a default for .create()', () => {
+  const dec = string.fallback('default');
+  expect(dec.create()).toBe('default');
+  expect(dec.create('override')).toBe('override');
+});
+
+test('.fallback() in a record schema', () => {
+  const dec = record({
+    name: string,
+    role: string.fallback('user'),
+    retries: number.fallback(3),
+  });
+  expect(dec({ name: 'alice', role: 'admin', retries: 5 }))
+    .toEqual({ name: 'alice', role: 'admin', retries: 5 });
+  expect(dec({ name: 'alice' }))
+    .toEqual({ name: 'alice', role: 'user', retries: 3 });
+});
+
+test('.fallback() with nullable — null passes through, fallback on throw', () => {
+  const dec = nullable(number).fallback(null);
+  expect(dec(42)).toBe(42);
+  expect(dec(null)).toBe(null);    // valid decoded value, not fallback
+  expect(dec('bad')).toBe(null);   // throws → fallback
+});
+
+test('README: fluent decoder methods', () => {
+  // Standalone
+  expect(string.optional()(undefined)).toBeUndefined();
+  expect(string.optional()('hello')).toBe('hello');
+  expect(number.nullable()(null)).toBeNull();
+  expect(number.nullable()(42)).toBe(42);
+  expect(string.array()(['a', 'b'])).toEqual(['a', 'b']);
+  expect(number.fallback(0)('bad')).toBe(0);
+
+  // Chained
+  expect(string.optional().array()([undefined, 'a'])).toEqual([undefined, 'a']);
+  expect(string.array().nullable()(null)).toBeNull();
+  expect(string.nullable().optional()(undefined)).toBeUndefined();
+
+  // In records
+  const dec = record({
+    name: string,
+    tags: string.array(),
+    nickname: string.optional(),
+    score: number.fallback(0),
+  });
+  expect(dec({ name: 'Alice', tags: ['a'], nickname: undefined, score: 'bad' }))
+    .toEqual({ name: 'Alice', tags: ['a'], score: 0 });
+});
+
+test('README: fluent .optional()/.nullable() create', () => {
+  expect(string.optional().create()).toBeUndefined();
+  expect(string.nullable().create()).toBeNull();
+});
+
+test('README: fluent .fallback() vs .default()', () => {
+  expect(string.fallback('oops')(42)).toBe('oops');
+  expect(string.fallback('oops').create()).toBe('oops');
+  expect(() => string.default('oops')(42)).toThrow();
+  expect(string.default('oops').create()).toBe('oops');
 });
 
 test('set() + .default()', () => {
@@ -3696,7 +3901,7 @@ test('record with all bare literals auto-creates', () => {
 });
 
 // ============================================================
-// Mixed record: literal + always + withDefault + string.default
+// Mixed record: literal + always + fallback + string.default
 // ============================================================
 
 test('record with mixed defaulted fields', () => {
@@ -3704,7 +3909,7 @@ test('record with mixed defaulted fields', () => {
     type: literal('item'),
     count: always(0),
     label: string.default('untitled'),
-    enabled: withDefault(boolean, true),
+    enabled: fallback(boolean, true),
   });
   expect(Dec.create()).toEqual({
     type: 'item',
@@ -3727,10 +3932,10 @@ test('all combinations: required, defaulted-kept, defaulted-overridden, literal,
     age: number,
     // defaulted — will rely on default
     role: string.default('user'),
-    score: withDefault(integer, 0),
+    score: fallback(integer, 0),
     // defaulted — will override
     email: string.default('none@example.com'),
-    active: withDefault(boolean, true),
+    active: fallback(boolean, true),
     // literal — auto-defaults
     type: literal('person'),
     version: literal(1),
@@ -3797,7 +4002,7 @@ test('all combinations with bare literals instead of literal()', () => {
     age: number,
     // defaulted — will rely on default
     role: string.default('user'),
-    score: withDefault(integer, 0),
+    score: fallback(integer, 0),
     // defaulted — will override
     email: string.default('none@example.com'),
     // bare literals — auto-default

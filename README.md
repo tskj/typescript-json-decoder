@@ -23,6 +23,7 @@ There are several runtime validation libraries for TypeScript. Here's how they c
 | **Type extraction** | `decodeType<>` or `Decoder()` class | `z.infer<>` | `t.TypeOf<>` | `Static<>` |
 | **Decoders are functions?** | Yes — `(unknown) => T` | No | No | No |
 | **Composable with `.then()`?** | Yes, directly | No | No | No |
+| **Fluent combinators?** | `string.optional().array()` | `z.string().optional().array()` | No | No |
 | **Transform/map** | `.map()`, `.chain()` | `.transform()` | Via fp-ts | None |
 | **Dependencies** | 0 | 0 | fp-ts (peer) | 0 |
 
@@ -168,7 +169,7 @@ const userDecoder = record({
 
 `userDecoder` is a callable `Decoder<User>` object. It decodes any JavaScript object to `User`, which is the generated type. This type is inferred to be exactly what you expect. `number`, `string`, and `boolean` are also decoders in the same way, and decode values of their respective types. If any of these decoders fail they throw with an appropriate error message.
 
-Every decoder also has `.map()` for transforming results and `.safeDecode()` for error handling without exceptions — more on those below.
+Every decoder also has `.map()`, `.optional()`, `.nullable()`, `.array()`, `.fallback()`, and `.safeDecode()` — more on those below.
 
 The idea is to have one declaration of the types in your system the same way as you would if you only used TypeScript, but also have decoders of those types. Although we declare decoders and infer the corresponding types, I like to think of the declaration as a normal type declaration like you are used to, and incidentally also getting a decoder.
 
@@ -219,6 +220,8 @@ const userDecoder = record({
     ssn: optional(string),
 });
 ```
+
+Every decoder also has fluent `.optional()`, `.nullable()`, and `.array()` methods, so you can write `string.optional()` instead of `optional(string)`, `number.array()` instead of `array(number)`, and chain them: `string.optional().array()` for `(string | undefined)[]`.
 
 I call these higher order decoders, as they are functions accepting any decoder and returning the matching decoder. If you provide a function from any JavaScript object to a type `T`, that is a decoder of T (`Decoder<T>`) and can be used in any combination with each other.
 
@@ -594,15 +597,22 @@ const userDecoder = record({
 });
 ```
 
-`withDefault` wraps any decoder with a fallback value. If the decoder throws, the fallback is returned instead. The fallback type can differ from the decoder type, in which case the return type is the union of both.
+`fallback` wraps any decoder with a fallback value. If the decoder throws, the fallback is returned instead. The fallback type can differ from the decoder type, in which case the return type is the union of both. Every decoder also has a fluent `.fallback()` method with the same behavior.
 
 ```typescript
-import { record, string, number, withDefault } from 'typescript-json-decoder';
+import { record, string, number, fallback } from 'typescript-json-decoder';
 
 const userDecoder = record({
     name: string,
-    role: withDefault(string, 'user'),       // string — missing or invalid key gets 'user'
-    score: withDefault(number, null),         // number | null — fallback is a different type
+    role: fallback(string, 'user'),       // string — missing or invalid key gets 'user'
+    score: fallback(number, null),         // number | null — fallback is a different type
+});
+
+// Equivalent using the fluent method:
+const userDecoder2 = record({
+    name: string,
+    role: string.fallback('user'),
+    score: number.fallback(null),
 });
 ```
 
@@ -658,12 +668,12 @@ const treeDecoder: Decoder<Tree> = record({
 });
 ```
 
-`withDefault` respects the inner decoder's semantics — if the decoder legitimately returns `null` or `undefined` (e.g. via `nullable` or `optional`), those pass through as valid values. The fallback only kicks in when the decoder throws.
+`fallback` respects the inner decoder's semantics — if the decoder legitimately returns `null` or `undefined` (e.g. via `nullable` or `optional`), those pass through as valid values. The fallback only kicks in when the decoder throws.
 
 ```typescript
-import { withDefault, nullable, number } from 'typescript-json-decoder';
+import { fallback, nullable, number } from 'typescript-json-decoder';
 
-const decoder = withDefault(nullable(number), null);
+const decoder = fallback(nullable(number), null);
 decoder(42);    // 42
 decoder(null);  // null (valid decoded value, not fallback)
 decoder('bad'); // null (decoder threw, fallback)
@@ -731,6 +741,49 @@ const payload = field('data', unknown).chain({ name: string, age: number });
 const yearFromString = string.chain(date).map(d => d.getFullYear());
 ```
 
+## Fluent decoder methods
+
+Every decoder has `.optional()`, `.nullable()`, `.array()`, and `.fallback()` methods that create new decoders. These can be chained in any order:
+
+```typescript
+import { string, number, record } from 'typescript-json-decoder';
+
+// Standalone
+string.optional();          // Decoder<string | undefined>
+number.nullable();          // Decoder<number | null>
+string.array();             // Decoder<string[]>
+number.fallback(0);         // Decoder<number> — returns 0 on decode failure
+
+// Chained
+string.optional().array();  // Decoder<(string | undefined)[]>
+string.array().nullable();  // Decoder<string[] | null>
+string.nullable().optional(); // Decoder<string | null | undefined>
+
+// In records
+const decoder = record({
+    name: string,
+    tags: string.array(),
+    nickname: string.optional(),
+    score: number.fallback(0),
+});
+```
+
+`.optional()` and `.nullable()` carry defaults for `.create()`, just like the standalone functions:
+
+```typescript
+string.optional().create();  // undefined
+string.nullable().create();  // null
+```
+
+`.fallback(value)` catches decode errors and returns the fallback — unlike `.default(value)` which only affects `.create()`:
+
+```typescript
+string.fallback('oops')(42);      // 'oops' — decode failure caught
+string.fallback('oops').create(); // 'oops' — also works with .create()
+string.default('oops')(42);       // throws — .default() doesn't catch errors
+string.default('oops').create();  // 'oops' — only affects .create()
+```
+
 ## Safe decoding
 
 By default, decoders throw on failure. Every decoder has a `.safeDecode()` method that returns a result type instead:
@@ -768,18 +821,18 @@ Both return `{ ok: true, value: T } | { ok: false, error: DecodeError }`.
 Decoders can carry default values, turning them into factories for constructing new instances. Use `.default()` to attach a default value and `.create()` to build values from defaults.
 
 ```typescript
-import { string, number, integer, record, always, withDefault } from 'typescript-json-decoder';
+import { string, number, integer, record, always, fallback } from 'typescript-json-decoder';
 
 const name = string.default('John');
 name.create();        // 'John'
 name.create('Alice'); // 'Alice'
 ```
 
-`always` and `withDefault` automatically carry their value as a default:
+`always` and `fallback` automatically carry their value as a default:
 
 ```typescript
 always('member').create();             // 'member'
-withDefault(string, 'fallback').create(); // 'fallback'
+fallback(string, 'fallback').create(); // 'fallback'
 ```
 
 `literal()` also auto-defaults, since it has exactly one valid value:
@@ -789,13 +842,17 @@ literal('admin').create(); // 'admin'
 literal(42).create();      // 42
 ```
 
-`optional` and `nullable` auto-default to `undefined` and `null` respectively:
+`optional` and `nullable` auto-default to `undefined` and `null` respectively. Both the standalone functions and fluent methods work:
 
 ```typescript
 import { optional, nullable, string } from 'typescript-json-decoder';
 
 optional(string).create(); // undefined
 nullable(string).create(); // null
+
+// equivalent fluent style:
+string.optional().create(); // undefined
+string.nullable().create(); // null
 ```
 
 You can override the built-in default with `.default()`:

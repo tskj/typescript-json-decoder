@@ -23,7 +23,7 @@ import {
   integer,
   regex,
   bigint,
-  withDefault,
+  fallback,
   objectOf,
   nonEmptyArray,
   missing,
@@ -83,10 +83,10 @@ const userDecoder = record({
   displayName: fields(
     { firstName: string, lastName: string },
   ).map(({ firstName, lastName }) => `${firstName} ${lastName}`),
-  avatarColor: withDefault(hexColorDecoder, '#000000'),
+  avatarColor: fallback(hexColorDecoder, '#000000'),
   role: roleDecoder,
   tags: set(string),
-  preferences: withDefault(
+  preferences: fallback(
     objectOf(union(string, number, boolean)),
     {} as Record<string, string | number | boolean>,
   ),
@@ -164,11 +164,11 @@ const documentDecoder = record({
   title: string,
   slug: slugDecoder,
   status: union('draft' as const, 'published' as const, 'archived' as const),
-  priority: withDefault(union(literal(1), literal(2), literal(3)), 2 as 1 | 2 | 3),
+  priority: fallback(union(literal(1), literal(2), literal(3)), 2 as 1 | 2 | 3),
   metadata: documentMetaDecoder,
   content: documentContentDecoder,
   tags: nonEmptyArray(string),
-  relatedDocIds: withDefault(array(integer), []),
+  relatedDocIds: fallback(array(integer), []),
   rawPayload: unknown,
   deletedAt: missing,
 });
@@ -230,14 +230,14 @@ const projectDecoder = record({
   documents: map(documentDecoder, d => d.id),
 
   recentActivity: nonEmptyArray(activityDecoder),
-  pinnedDocuments: withDefault(array(integer), []),
+  pinnedDocuments: fallback(array(integer), []),
 
   pauseReason: reasonDecoder,
 
   settings: {
     visibility: union('public' as const, 'private' as const, 'internal' as const),
     notificationSettings: notificationSettingsDecoder,
-    maxDocuments: withDefault(integer, 1000),
+    maxDocuments: fallback(integer, 1000),
     colorScheme: objectOf(hexColorDecoder, ['primary', 'secondary', 'accent'] as const),
   },
 
@@ -483,7 +483,7 @@ test('decodes owner with field merging and continuations', () => {
   expect(owner.id).toBe(BigInt(1001));
   expect(owner.email).toBe('alice@example.com');
   expect(owner.displayName).toBe('Alice Wonderland');
-  expect(owner.avatarColor).toBe('#000000'); // withDefault
+  expect(owner.avatarColor).toBe('#000000'); // fallback
   expect(owner.role).toEqual({ role: 'admin', level: 5, superAdmin: true });
   expect(owner.tags).toEqual(new Set(['frontend', 'lead'])); // set dedupes
   expect(owner.lastLogin).toEqual(new Date(now));
@@ -569,7 +569,7 @@ test('decodes documents with all content type variants', () => {
   // spreadsheet doc — with objectOf cells and tuple dimensions
   const budget = docs.get(2)!;
   expect(budget.status).toBe('draft');
-  expect(budget.priority).toBe(2); // withDefault
+  expect(budget.priority).toBe(2); // fallback
   if (budget.content.type === 'spreadsheet') {
     expect(budget.content.cells).toEqual({
       A1: 'Revenue', B1: 100000, A2: 'Costs', B2: 75000, C1: true,
@@ -613,7 +613,7 @@ test('decodes nested settings with dict, objectOf, and literal forms', () => {
   const settings = project.settings;
 
   expect(settings.visibility).toBe('internal');
-  expect(settings.maxDocuments).toBe(1000); // withDefault
+  expect(settings.maxDocuments).toBe(1000); // fallback
 
   // dict with constrained keys
   const notifs = settings.notificationSettings;

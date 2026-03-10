@@ -200,7 +200,7 @@ const user = record({
 user.create({ age: 25 }); // { name: 'John', age: 25, role: 'member' }
 ```
 
-`always(v)` and `withDefault(dec, v)` automatically carry their value as a default. `literal(v)` and bare literals also auto-default since they have exactly one valid value. Tuples auto-default when all elements have defaults.
+`always(v)` and `fallback(dec, v)` automatically carry their value as a default. `literal(v)` and bare literals also auto-default since they have exactly one valid value. Tuples auto-default when all elements have defaults.
 
 ```typescript
 // literal auto-defaults

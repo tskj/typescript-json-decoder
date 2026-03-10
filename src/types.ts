@@ -140,6 +140,11 @@ export interface Decoder<T> {
   safeDecode(input: unknown): { ok: true; value: T } | { ok: false; error: DecodeError };
   default(value: T): DefaultDecoder<T>;
   create(patch?: DeepPartial<T>): T;
+  optional(): DefaultDecoder<T | undefined>;
+  nullable(): Decoder<T | null>;
+  fallback(value: T): DefaultDecoder<T>;
+  fallback<const F>(value: F): DefaultDecoder<T | F>;
+  array(): Decoder<T[]>;
 }
 
 /**
@@ -279,6 +284,49 @@ export const makeDecoder = <T>(fn: DecoderFunction<T>): Decoder<T> => {
         }
         (withDef as any)[defaultTag] = value;
         return withDef as unknown as DefaultDecoder<T>;
+      },
+      optional: (): DefaultDecoder<T | undefined> => {
+        const opt = makeDecoder((value: unknown) => {
+          if (value === undefined) return undefined as any;
+          return fn(value);
+        });
+        (opt as any)[defaultTag] = undefined;
+        return opt as unknown as DefaultDecoder<T | undefined>;
+      },
+      nullable: (): DefaultDecoder<T | null> => {
+        const nul = makeDecoder((value: unknown) => {
+          if (value === null) return null as any;
+          return fn(value);
+        });
+        (nul as any)[defaultTag] = null;
+        return nul as unknown as DefaultDecoder<T | null>;
+      },
+      fallback: (value: any) => {
+        const fb = makeDecoder((input: unknown) => {
+          try {
+            return fn(input);
+          } catch {
+            return value;
+          }
+        });
+        (fb as any)[defaultTag] = value;
+        return fb as any;
+      },
+      array: (): Decoder<T[]> => {
+        return makeDecoder((xs: unknown): T[] => {
+          if (!Array.isArray(xs)) {
+            throw new DecodeError(
+              `The value \`${JSON.stringify(xs)}\` is not of type \`array\`, but is of type \`${typeof xs}\``,
+            );
+          }
+          return xs.map((x, i) => {
+            try {
+              return fn(x);
+            } catch (error) {
+              throw (error instanceof DecodeError ? error : new DecodeError(String(error))).withPath(i);
+            }
+          });
+        });
       },
       create: (patch?: any): T => {
         // Record decoder: recursively construct from schema + patch
