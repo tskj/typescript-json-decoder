@@ -438,15 +438,15 @@ const userDecoder = record({
 });
 ```
 
-`withDefault` wraps any decoder with a fallback value. If the decoder throws, the fallback is returned instead. The fallback type can differ from the decoder type, in which case the return type is the union of both.
+`fallback` wraps any decoder with a fallback value. If the decoder throws, the fallback is returned instead. The fallback type can differ from the decoder type, in which case the return type is the union of both.
 
 ```typescript
-import { record, string, number, withDefault } from 'typescript-json-decoder';
+import { record, string, number, fallback } from 'typescript-json-decoder';
 
 const userDecoder = record({
     name: string,
-    role: withDefault(string, 'user'),       // string — missing or invalid key gets 'user'
-    score: withDefault(number, null),         // number | null — fallback is a different type
+    role: fallback(string, 'user'),       // string — missing or invalid key gets 'user'
+    score: fallback(number, null),         // number | null — fallback is a different type
 });
 ```
 
@@ -502,12 +502,12 @@ const treeDecoder: Decoder<Tree> = record({
 });
 ```
 
-`withDefault` respects the inner decoder's semantics — if the decoder legitimately returns `null` or `undefined` (e.g. via `nullable` or `optional`), those pass through as valid values. The fallback only kicks in when the decoder throws.
+`fallback` respects the inner decoder's semantics — if the decoder legitimately returns `null` or `undefined` (e.g. via `nullable` or `optional`), those pass through as valid values. The fallback only kicks in when the decoder throws.
 
 ```typescript
-import { withDefault, nullable, number } from 'typescript-json-decoder';
+import { fallback, nullable, number } from 'typescript-json-decoder';
 
-const decoder = withDefault(nullable(number), null);
+const decoder = fallback(nullable(number), null);
 decoder(42);    // 42
 decoder(null);  // null (valid decoded value, not fallback)
 decoder('bad'); // null (decoder threw, fallback)
@@ -576,8 +576,8 @@ const result = safeDecode(string, someValue);
 if (result.ok) {
     console.log(result.value); // string
 } else {
-    console.log(result.error); // error message
+    console.log(result.error); // the thrown error
 }
 ```
 
-`safeDecode` works with any decoder and returns `{ ok: true, value: T } | { ok: false, error: string }`.
+`safeDecode` works with any decoder and returns `{ ok: true, value: T } | { ok: false, error: unknown }`.

@@ -71,20 +71,20 @@ export function optional(decoder: any, k?: (x: any) => any) {
   };
 }
 
-export function withDefault<T extends Decoder<unknown>>(
+export function fallback<T extends Decoder<unknown>>(
   decoder: T,
-  fallback: decodeType<T>,
+  fallbackValue: decodeType<T>,
 ): DecoderFunction<decodeType<T>>;
-export function withDefault<T extends Decoder<unknown>, F>(
+export function fallback<T extends Decoder<unknown>, F>(
   decoder: T,
-  fallback: F,
+  fallbackValue: F,
 ): DecoderFunction<decodeType<T> | F>;
-export function withDefault(decoder: any, fallback: any) {
+export function fallback(decoder: any, fallbackValue: any) {
   return (value: unknown) => {
     try {
       return decode(decoder)(value);
     } catch {
-      return fallback;
+      return fallbackValue;
     }
   };
 }

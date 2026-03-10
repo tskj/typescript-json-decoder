@@ -11,7 +11,7 @@ export {
   dict,
   nullable,
   always,
-  withDefault,
+  fallback,
   objectOf,
   transform,
   lazy,

@@ -23,7 +23,7 @@ import {
   unknown,
   integer,
   always,
-  withDefault,
+  fallback,
   regex,
   objectOf,
   bigint,
@@ -162,7 +162,7 @@ expectAssignable<DecoderFunction<boolean>>(union(boolean, always(false)));
 
 // safeDecode should return discriminated union result
 const safeResult = safeDecode(string, 'hello');
-expectType<{ ok: true; value: string } | { ok: false; error: string }>(safeResult);
+expectType<{ ok: true; value: string } | { ok: false; error: unknown }>(safeResult);
 if (safeResult.ok) {
   expectType<string>(safeResult.value);
 }
@@ -470,45 +470,45 @@ expectAssignable<{ status: 'active'; score: number } | { status: 'inactive'; sco
   same_shape_fallback({ status: 'active', score: 99 }),
 );
 
-// --- withDefault decoder ---
+// --- fallback decoder ---
 
-// withDefault with plain decoder — fallback on throw
-const wd_string = withDefault(string, 'fallback');
+// fallback with plain decoder — fallback on throw
+const wd_string = fallback(string, 'fallback');
 expectType<string>(wd_string('hello'));
 expectAssignable<DecoderFunction<string>>(wd_string);
 
-// withDefault with number
-const wd_number = withDefault(number, 0);
+// fallback with number
+const wd_number = fallback(number, 0);
 expectType<number>(wd_number(42));
 
-// withDefault in record — fields get defaults instead of being optional
+// fallback in record — fields get defaults instead of being optional
 const wd_record = record({
   name: string,
-  role: withDefault(string, 'user'),
-  retries: withDefault(number, 3),
+  role: fallback(string, 'user'),
+  retries: fallback(number, 3),
 });
 expectType<{ name: string; role: string; retries: number }>(
   wd_record({ name: 'alice', role: 'admin', retries: 5 }),
 );
 
-// withDefault with array
-const wd_array = withDefault(array(number), []);
+// fallback with array
+const wd_array = fallback(array(number), []);
 expectType<number[]>(wd_array([1, 2]));
 
-// withDefault preserves nullable — null is a valid decoded value, not stripped
-const wd_nullable = withDefault(nullable(number), null);
+// fallback preserves nullable — null is a valid decoded value, not stripped
+const wd_nullable = fallback(nullable(number), null);
 expectType<number | null>(wd_nullable(42));
 
-// withDefault preserves optional — undefined is a valid decoded value
-const wd_optional = withDefault(optional(string), undefined);
+// fallback preserves optional — undefined is a valid decoded value
+const wd_optional = fallback(optional(string), undefined);
 expectType<string | undefined>(wd_optional('hello'));
 
-// withDefault with union preserves all union cases
-const wd_union = withDefault(union(string, number, nullable(boolean)), null);
+// fallback with union preserves all union cases
+const wd_union = fallback(union(string, number, nullable(boolean)), null);
 expectAssignable<string | number | boolean | null>(wd_union('hello'));
 
-// withDefault with tagged union
-const wd_tagged = withDefault(
+// fallback with tagged union
+const wd_tagged = fallback(
   union(
     record({ tag: 'ok' as const, data: string }),
     record({ tag: 'err' as const, code: number }),
@@ -517,23 +517,23 @@ const wd_tagged = withDefault(
 );
 expectAssignable<{ tag: 'ok'; data: string } | { tag: 'err'; code: number }>(wd_tagged({}));
 
-// withDefault with nullable in a record
+// fallback with nullable in a record
 const wd_nullable_rec = record({
   name: string,
-  data: withDefault(nullable(number), null),
+  data: fallback(nullable(number), null),
 });
 expectAssignable<{ name: string; data: number | null }>(
   wd_nullable_rec({ name: 'a', data: 42 }),
 );
 
-// withDefault where fallback type extends the decoder type
-const wd_string_null = withDefault(string, null);
+// fallback where fallback type extends the decoder type
+const wd_string_null = fallback(string, null);
 expectType<string | null>(wd_string_null('hello'));
 
-const wd_number_na = withDefault(number, 'N/A' as const);
+const wd_number_na = fallback(number, 'N/A' as const);
 expectType<number | 'N/A'>(wd_number_na(42));
 
-const wd_different_shape = withDefault(record({ name: string }), { error: 'not found' });
+const wd_different_shape = fallback(record({ name: string }), { error: 'not found' });
 expectAssignable<{ name: string } | { error: string }>(wd_different_shape({}));
 
 // --- regex decoder ---
@@ -545,12 +545,12 @@ expectAssignable<DecoderFunction<string>>(regex_decoder);
 const regex_record = record({ email: regex(/^[^@]+@[^@]+$/), name: string });
 expectType<{ email: string; name: string }>(regex_record({ email: 'a@b', name: 'x' }));
 
-// regex with withDefault — fallback is a string so type stays string
-const regex_default = withDefault(regex(/^\d+$/), 'N/A');
+// regex with fallback — fallback is a string so type stays string
+const regex_default = fallback(regex(/^\d+$/), 'N/A');
 expectType<string>(regex_default('123'));
 
-// regex with withDefault — fallback is a different type
-const regex_default_null = withDefault(regex(/^\d+$/), null);
+// regex with fallback — fallback is a different type
+const regex_default_null = fallback(regex(/^\d+$/), null);
 expectType<string | null>(regex_default_null('123'));
 
 // --- objectOf decoder ---
@@ -605,7 +605,7 @@ expectType<{ name: string; balance: bigint }>(
 
 // safeDecode returns discriminated union
 const readme_safe = safeDecode(string, 'hello');
-expectType<{ ok: true; value: string } | { ok: false; error: string }>(readme_safe);
+expectType<{ ok: true; value: string } | { ok: false; error: unknown }>(readme_safe);
 
 // --- transform ---
 

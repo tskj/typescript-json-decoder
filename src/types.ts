@@ -155,11 +155,11 @@ export const decode = <D extends Decoder<unknown>>(
 export const safeDecode = <D extends Decoder<unknown>>(
   decoder: D,
   value: unknown,
-): { ok: true; value: decodeType<D> } | { ok: false; error: string } => {
+): { ok: true; value: decodeType<D> } | { ok: false; error: unknown } => {
   try {
     return { ok: true, value: decode(decoder)(value) };
   } catch (error) {
-    return { ok: false, error: String(error) };
+    return { ok: false, error };
   }
 };
 
