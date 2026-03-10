@@ -76,7 +76,14 @@ function patternFor(p: string | number | RegexPart<any> | Decoder<any>): string 
   if (typeof p === 'string') return escapeRegex(p);
   if (typeof p === 'number') return escapeRegex(String(p));
   if (hasPattern(p)) return p[regexPattern];
-  return '.*';
+  // Allow the string decoder as a wildcard (.*)
+  if (p === stringDecoder) return '.*';
+  throw new Error(
+    `regex(): argument is a Decoder without a regex pattern. ` +
+    `Use regex building blocks (regex.digit, regex.letter, etc.), ` +
+    `string/number literals, union() of these, or the string decoder. ` +
+    `Note: .optional() leaves regex-land — use .zeroOrOne() for regex "?".`,
+  );
 }
 
 // ---------------------------------------------------------------------------

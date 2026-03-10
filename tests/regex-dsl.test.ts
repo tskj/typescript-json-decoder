@@ -2,7 +2,7 @@
  * Tests for the typed regex DSL.
  */
 import { regex, makeRegexPart, RegexPart } from '../src/regex-dsl';
-import { record, string, number, union, array, fallback } from '../src';
+import { record, string, number, boolean, union, array, fallback } from '../src';
 
 const { digit, digits, letter, lower, upper, w, dot, chars, range } = regex;
 const word = w.oneOrMore();
@@ -103,6 +103,21 @@ test('string decoder in regex matches anything', () => {
   const dec = regex('https://', string, '/api');
   expect(dec('https://example.com/api')).toBe('https://example.com/api');
   expect(() => dec('http://example.com/api')).toThrow();
+});
+
+test('plain Decoder without regex pattern throws in regex()', () => {
+  expect(() => regex(number as any)).toThrow('without a regex pattern');
+  expect(() => regex(boolean as any, '-end')).toThrow('without a regex pattern');
+});
+
+test('.optional() result throws in regex() (use .zeroOrOne() instead)', () => {
+  expect(() => regex(digit.optional() as any, '-', digits)).toThrow('without a regex pattern');
+});
+
+test('.map() result preserves regex pattern (still composable)', () => {
+  // .map() propagates symbols, so the pattern is still there
+  const dec = regex(digits.map(Number) as any, 'px');
+  expect(dec('42px')).toBe('42px');
 });
 
 // ---------------------------------------------------------------------------
