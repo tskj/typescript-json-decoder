@@ -38,15 +38,13 @@ export { intersection } from './intersection';
 export function nullable<const T extends DecoderInput<unknown>>(
   dec: T,
 ): Decoder<decodeType<T> | null> {
-  const base = union(nil, dec);
-  return makeDecoder((value: unknown) => base(value));
+  return union(nil, dec) as any;
 }
 
 export function optional<const T extends DecoderInput<unknown>>(
   dec: T,
 ): Decoder<decodeType<T> | undefined> {
-  const base = union(undef, dec);
-  return makeDecoder((value: unknown) => base(value));
+  return union(undef, dec) as any;
 }
 
 export function withDefault<T extends DecoderInput<unknown>>(
@@ -95,9 +93,9 @@ export function array<const D extends DecoderInput<unknown>>(
 export function nonEmptyArray<const D extends DecoderInput<unknown>>(
   dec: D,
 ): Decoder<[decodeType<D>, ...decodeType<D>[]]> {
-  const base = array(dec);
+  const arr = array(dec);
   return makeDecoder((xs: unknown): any => {
-    const result = base(xs);
+    const result = arr(xs);
     if (result.length === 0) {
       throw err`Expected a non-empty array, but got an empty array`;
     }
@@ -108,11 +106,11 @@ export function nonEmptyArray<const D extends DecoderInput<unknown>>(
 export function set<const D extends DecoderInput<unknown>>(
   dec: D,
 ): Decoder<Set<decodeType<D>>> {
-  const base = array(dec);
+  const arr = array(dec);
   return makeDecoder((list: unknown) => {
     assert_is_pojo(list);
     try {
-      return new Set(base(list));
+      return new Set(arr(list));
     } catch (message) {
       throw message + err`\nand can therefore not be parsed as a set`;
     }
@@ -124,18 +122,18 @@ export const map =
     dec: D,
     key: (x: decodeType<D>) => K,
   ): Decoder<Map<K, decodeType<D>>> => {
-  const base = array(dec);
+  const arr = array(dec);
   return makeDecoder((listOfObjects: unknown) => {
     assert_is_pojo(listOfObjects);
     try {
-      const parsedObjects = base(listOfObjects);
-      const map = new Map(parsedObjects.map((value) => [key(value), value]));
-      if (parsedObjects.length !== map.size) {
+      const parsedObjects = arr(listOfObjects);
+      const resultMap = new Map(parsedObjects.map((value) => [key(value), value]));
+      if (parsedObjects.length !== resultMap.size) {
         console.warn(
-          `Probable duplicate key in map: List \`${parsedObjects}\` isn't the same size as the parsed \`${map}\``,
+          `Probable duplicate key in map: List \`${parsedObjects}\` isn't the same size as the parsed \`${resultMap}\``,
         );
       }
-      return map;
+      return resultMap;
     } catch (message) {
       throw message + err`\nand can therefore not be parsed as a map`;
     }
