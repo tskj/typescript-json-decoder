@@ -54,7 +54,7 @@ type undefinedKeys<T> = {
 export type addQuestionmarksToRecordFields<R extends { [s: string]: unknown }> = {
   [P in Exclude<keyof R, undefinedKeys<R>>]: R[P];
 } & {
-  [P in undefinedKeys<R>]?: R[P] | typeof a;
+  [P in undefinedKeys<R>]?: Exclude<R[P], undefined> | typeof a;
 } extends infer P
   ? // this last part is just to flatten the intersection (&)
     // { [K in keyof P]: [string | symbol] extends [P[K]] ? string | undefined | symbol : Exclude<P[K], symbol> }
@@ -295,10 +295,14 @@ export const makeDecoder = <T>(fn: DecoderFunction<T>): Decoder<T> => {
               ? fieldDec as any
               : decoder(fieldDec as any) as any;
             try {
+              let created;
               if (effectivePatch && key in effectivePatch) {
-                result[key] = resolved.create(effectivePatch[key]);
+                created = resolved.create(effectivePatch[key]);
               } else {
-                result[key] = resolved.create();
+                created = resolved.create();
+              }
+              if (created !== undefined) {
+                result[key] = created;
               }
             } catch {
               throw new Error(`No default value for field '${key}'`);

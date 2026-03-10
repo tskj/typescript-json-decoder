@@ -165,7 +165,10 @@ export const record =
       }
       try {
         const jsonvalue = (value as any)[key];
-        result[key] = decoder(dec)(jsonvalue);
+        const decoded = decoder(dec)(jsonvalue);
+        if (decoded !== undefined) {
+          result[key] = decoded;
+        }
       } catch (error) {
         if (!(key in (value as any))) {
           throw new DecodeError(

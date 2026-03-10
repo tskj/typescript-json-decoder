@@ -45,7 +45,7 @@ type rec_t = {
   value: number;
   rec: { more: boolean };
   f: string;
-  option?: string | undefined;
+  option?: string;
   list_of_stuff: (string | boolean)[];
   intersect: { a: number; c: boolean } | { a: 'foo'; b: number; c: boolean };
 };
@@ -286,7 +286,7 @@ expectAssignable<[42, boolean]>(bare_literal_tuple([42, true]));
 // 15. record nesting record with optional fields preserves types
 const inner_rec = record({ a: optional(string), b: number });
 const outer_rec = record({ x: inner_rec, y: string });
-expectType<{ x: { a?: string | undefined; b: number }; y: string }>(
+expectType<{ x: { a?: string; b: number }; y: string }>(
   outer_rec({ x: { b: 1 }, y: 'hi' }),
 );
 
@@ -965,3 +965,11 @@ expectType<Decoder<string>>(dual_dec);
 expectType<{ name: string; age: number }>(DualUser.decode({} as unknown));
 const dual_plain: DualUser = { name: 'x', age: 0 };
 expectType<DualUser>(dual_plain);
+
+// Decoder() with optional fields: type has clean `?:` without `| undefined`
+class TypeOptUser extends Decoder({ name: string, nickname: optional(string) }) {}
+expectType<{ name: string; nickname?: string }>(TypeOptUser.decode({} as unknown));
+const type_opt_user: TypeOptUser = { name: 'Alice' };
+expectType<TypeOptUser>(type_opt_user);
+const type_opt_user2: TypeOptUser = { name: 'Alice', nickname: 'Ali' };
+expectType<TypeOptUser>(type_opt_user2);

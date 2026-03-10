@@ -877,9 +877,12 @@ test('better error for missing key', () => {
   expect(() => decoder({ name: 'test' })).toThrow('key `age` is missing');
   expect(() => decoder({})).toThrow('is missing');
 
-  // Optional keys should still work when missing
+  // Optional keys should still work when missing — key is omitted from result
   const optionalDecoder = record({ name: string, nickname: optional(string) });
-  expect(optionalDecoder({ name: 'test' })).toEqual({ name: 'test', nickname: undefined });
+  const optResult = optionalDecoder({ name: 'test' });
+  expect(optResult).toEqual({ name: 'test' });
+  expect(optResult.nickname).toBeUndefined();
+  expect('nickname' in optResult).toBe(false);
 });
 
 test('missing decoder — succeeds when key is absent', () => {
@@ -4240,4 +4243,58 @@ test('Decoder() plain schema matches record() behavior exactly', () => {
   const input = { name: 'Alice', age: 30 };
   expect(ViaDecoder.decode(input)).toEqual(viaRecord(input));
   expect(new ViaDecoder(input)).toEqual(viaRecord(input));
+});
+
+// ============================================================
+// Optional fields omit undefined keys from result
+// ============================================================
+
+test('Decoder() with optional field omits key when undefined', () => {
+  class User extends Decoder({ name: string, nickname: optional(string) }) {}
+
+  const withValue = User.decode({ name: 'Alice', nickname: 'Ali' });
+  expect(withValue).toEqual({ name: 'Alice', nickname: 'Ali' });
+  expect(withValue.nickname).toBe('Ali');
+  expect('nickname' in withValue).toBe(true);
+
+  const withoutValue = User.decode({ name: 'Alice', nickname: undefined });
+  expect(withoutValue).toEqual({ name: 'Alice' });
+  expect(withoutValue.nickname).toBeUndefined();
+  expect('nickname' in withoutValue).toBe(false);
+
+  const missingKey = User.decode({ name: 'Alice' });
+  expect(missingKey).toEqual({ name: 'Alice' });
+  expect(missingKey.nickname).toBeUndefined();
+  expect('nickname' in missingKey).toBe(false);
+});
+
+test('record() with optional field omits key when undefined', () => {
+  const dec = record({ name: string, nickname: optional(string) });
+
+  const withValue = dec({ name: 'Alice', nickname: 'Ali' });
+  expect(withValue).toEqual({ name: 'Alice', nickname: 'Ali' });
+  expect(withValue.nickname).toBe('Ali');
+  expect('nickname' in withValue).toBe(true);
+
+  const withoutValue = dec({ name: 'Alice', nickname: undefined });
+  expect(withoutValue).toEqual({ name: 'Alice' });
+  expect(withoutValue.nickname).toBeUndefined();
+  expect('nickname' in withoutValue).toBe(false);
+});
+
+test('Decoder() with optional field and create omits key', () => {
+  class User extends Decoder({
+    name: string.default('John'),
+    nickname: optional(string).default(undefined),
+  }) {}
+
+  const created = User.create();
+  expect(created).toEqual({ name: 'John' });
+  expect(created.nickname).toBeUndefined();
+  expect('nickname' in created).toBe(false);
+
+  const withPatch = User.create({ nickname: 'JD' });
+  expect(withPatch).toEqual({ name: 'John', nickname: 'JD' });
+  expect(withPatch.nickname).toBe('JD');
+  expect('nickname' in withPatch).toBe(true);
 });
