@@ -709,6 +709,8 @@ expectType<number>(nea_first([1, 2]));
 
 // --- optional ---
 expectType<string | undefined>(optional(string)('hello'));
+// optional returns DefaultDecoder (has built-in default of undefined)
+expectType<DefaultDecoder<string | undefined>>(optional(string));
 
 // optional with .map()
 const opt_upper = optional(string).map(s => s !== undefined ? s.toUpperCase() : undefined);
@@ -716,6 +718,8 @@ expectType<string | undefined>(opt_upper('hello'));
 
 // --- nullable ---
 expectType<string | null>(nullable(string)('hello'));
+// nullable returns DefaultDecoder (has built-in default of null)
+expectType<DefaultDecoder<string | null>>(nullable(string));
 
 // nullable with .map()
 const null_upper = nullable(string).map(s => s !== null ? s.toUpperCase() : null);
@@ -834,6 +838,11 @@ expectType<{ name: string; age: number }>(user_dec.create({ age: 25 }));
 // record with all defaults: .create() needs no args
 const all_defaults = record({ name: string.default('John'), role: always('member') });
 expectType<{ name: string; role: 'member' }>(all_defaults.create());
+
+// record with optional/nullable fields: auto-defaulted in .create()
+const opt_null_rec = record({ name: string, nick: optional(string), tag: nullable(string) });
+// nick and tag have built-in defaults, so only name is required
+expectType<{ name: string; nick?: string; tag: string | null }>(opt_null_rec.create({ name: 'A' }));
 
 // nested record: fully-defaulted inner is auto-optional
 const inner_dec = record({ city: string.default('X'), zip: string.default('0') });

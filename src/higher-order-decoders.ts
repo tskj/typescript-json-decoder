@@ -41,14 +41,18 @@ export { intersection } from './intersection';
 
 export function nullable<const T extends DecoderInput<unknown>>(
   dec: T,
-): Decoder<decodeType<T> | null> {
-  return union(nil, dec) as any;
+): DefaultDecoder<decodeType<T> | null> {
+  const d = union(nil, dec);
+  (d as any)[defaultTag] = null;
+  return d as unknown as DefaultDecoder<decodeType<T> | null>;
 }
 
 export function optional<const T extends DecoderInput<unknown>>(
   dec: T,
-): Decoder<decodeType<T> | undefined> {
-  return union(undef, dec) as any;
+): DefaultDecoder<decodeType<T> | undefined> {
+  const d = union(undef, dec);
+  (d as any)[defaultTag] = undefined;
+  return d as unknown as DefaultDecoder<decodeType<T> | undefined>;
 }
 
 export function withDefault<T extends DecoderInput<unknown>>(

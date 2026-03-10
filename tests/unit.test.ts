@@ -3076,8 +3076,6 @@ test('create throws for all primitive decoders without defaults', () => {
 
 test('create throws for combinators without defaults', () => {
   expect(() => array(string).create()).toThrow('Decoder has no default value');
-  expect(() => optional(string).create()).toThrow('Decoder has no default value');
-  expect(() => nullable(string).create()).toThrow('Decoder has no default value');
   expect(() => union(string, number).create()).toThrow('Decoder has no default value');
   expect(() => set(string).create()).toThrow('Decoder has no default value');
 });
@@ -3093,11 +3091,46 @@ test('create with default on all primitive decoders', () => {
 
 test('create with default on combinators', () => {
   expect(array(string).default(['a', 'b']).create()).toEqual(['a', 'b']);
-  expect(optional(string).default(undefined).create()).toBe(undefined);
-  expect(nullable(string).default(null).create()).toBe(null);
   expect(union(string, number).default('hello').create()).toBe('hello');
   expect(set(string).default(new Set(['x'])).create()).toEqual(new Set(['x']));
   expect(nonEmptyArray(string).default(['a']).create()).toEqual(['a']);
+});
+
+test('optional and nullable have built-in defaults', () => {
+  expect(optional(string).create()).toBeUndefined();
+  expect(nullable(string).create()).toBeNull();
+  expect(optional(number).create()).toBeUndefined();
+  expect(nullable(number).create()).toBeNull();
+
+  // .default() overrides the built-in default
+  expect(optional(string).default('').create()).toBe('');
+  expect(optional(string).default('fallback').create()).toBe('fallback');
+  expect(nullable(string).default('').create()).toBe('');
+  expect(nullable(string).default('fallback').create()).toBe('fallback');
+  expect(nullable(number).default(0).create()).toBe(0);
+
+  // .default(undefined/null) — redundant but valid
+  expect(optional(string).default(undefined).create()).toBeUndefined();
+  expect(nullable(string).default(null).create()).toBeNull();
+
+  // decoding still works as before
+  expect(optional(string)(undefined)).toBeUndefined();
+  expect(optional(string)('hello')).toBe('hello');
+  expect(nullable(string)(null)).toBeNull();
+  expect(nullable(string)('hello')).toBe('hello');
+});
+
+test('optional/nullable auto-default in record .create()', () => {
+  const dec = record({
+    name: string,
+    nick: optional(string),
+    tag: nullable(number),
+  });
+  // only name is required — nick and tag have built-in defaults
+  const created = dec.create({ name: 'Alice' });
+  expect(created).toEqual({ name: 'Alice', tag: null });
+  expect('nick' in created).toBe(false); // undefined keys are omitted
+  expect(created.tag).toBeNull();
 });
 
 test('create with default on tuple', () => {
@@ -3163,6 +3196,16 @@ test('README: always and withDefault auto-default', () => {
 test('README: literal auto-default', () => {
   expect(literal('admin').create()).toBe('admin');
   expect(literal(42).create()).toBe(42);
+});
+
+test('README: optional/nullable auto-default', () => {
+  expect(optional(string).create()).toBeUndefined();
+  expect(nullable(string).create()).toBeNull();
+});
+
+test('README: optional/nullable .default() override', () => {
+  expect(optional(string).default('').create()).toBe('');
+  expect(nullable(string).default('none').create()).toBe('none');
 });
 
 test('README: bare literals auto-default in record', () => {
@@ -3481,18 +3524,24 @@ test('union() + .default()', () => {
   expect(dec('world')).toBe('world');
 });
 
-test('nullable() + .default()', () => {
-  const dec = nullable(string).default(null);
-  expect(dec.create()).toBeNull();
-  expect(dec.create('hi')).toBe('hi');
-  expect(dec(null)).toBeNull();
-  expect(dec('test')).toBe('test');
+test('nullable() built-in default and .default() override', () => {
+  // Built-in default
+  expect(nullable(string).create()).toBeNull();
+  expect(nullable(string).create('hi')).toBe('hi');
+  expect(nullable(string)(null)).toBeNull();
+  expect(nullable(string)('test')).toBe('test');
+  // .default() override
+  const dec = nullable(string).default('override');
+  expect(dec.create()).toBe('override');
 });
 
-test('optional() + .default()', () => {
-  const dec = optional(number).default(undefined);
-  expect(dec.create()).toBeUndefined();
-  expect(dec.create(5)).toBe(5);
+test('optional() built-in default and .default() override', () => {
+  // Built-in default
+  expect(optional(number).create()).toBeUndefined();
+  expect(optional(number).create(5)).toBe(5);
+  // .default() override
+  const dec = optional(number).default(42);
+  expect(dec.create()).toBe(42);
 });
 
 test('set() + .default()', () => {
@@ -4381,7 +4430,7 @@ test('record() with optional field omits key when undefined', () => {
 test('Decoder() with optional field and create omits key', () => {
   class User extends Decoder({
     name: string.default('John'),
-    nickname: optional(string).default(undefined),
+    nickname: optional(string),
   }) {}
 
   const created = User.create();

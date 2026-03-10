@@ -19,7 +19,7 @@ class User extends Decoder({
   name: string.default('Anonymous'),
   age: integer,
   role: always('member'),
-  email: optional(string).default(undefined),
+  email: optional(string),
 }) {}
 
 // As a type — plain objects are assignable (structural typing)

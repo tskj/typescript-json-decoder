@@ -789,6 +789,22 @@ literal('admin').create(); // 'admin'
 literal(42).create();      // 42
 ```
 
+`optional` and `nullable` auto-default to `undefined` and `null` respectively:
+
+```typescript
+import { optional, nullable, string } from 'typescript-json-decoder';
+
+optional(string).create(); // undefined
+nullable(string).create(); // null
+```
+
+You can override the built-in default with `.default()`:
+
+```typescript
+optional(string).default('').create();    // ''
+nullable(string).default('none').create(); // 'none'
+```
+
 Bare literals in records auto-default too — no `literal()` or `.default()` needed:
 
 ```typescript
