@@ -10,7 +10,7 @@ import {
 } from './types';
 import { tag, err } from './utils';
 
-export function literal<p extends PrimitiveJsonLiteralForm>(lit: p): Decoder<p>;
+export function literal<const p extends PrimitiveJsonLiteralForm>(lit: p): Decoder<p>;
 export function literal(lit: PrimitiveJsonLiteralForm) {
   return makeDecoder((value: unknown) => {
     assert_is_pojo(value);
@@ -43,7 +43,7 @@ export function tuple(...decoders: any[]) {
 
 export const fieldDecoder: unique symbol = Symbol('field-decoder');
 export const missingKey: unique symbol = Symbol('missing-key');
-export const fields = <T extends { [key: string]: DecoderInput<unknown> }>(
+export const fields = <const T extends { [key: string]: DecoderInput<unknown> }>(
   schema: T,
 ): Decoder<evalRecordSchema<T>> => {
   const dec = makeDecoder((value: unknown) => {
@@ -98,7 +98,7 @@ type evalRecordSchema<schema> = addQuestionmarksToRecordFields<{
 }>;
 
 export const record =
-  <schema extends { [key: string]: DecoderInput<unknown> }>(
+  <const schema extends { [key: string]: DecoderInput<unknown> }>(
     s: schema,
   ): Decoder<evalRecordSchema<schema>> =>
   makeDecoder((value: unknown): any => {

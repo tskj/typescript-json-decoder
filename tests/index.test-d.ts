@@ -140,7 +140,7 @@ expectType<'a' | 'b' | { test: string }>(a_b_or_r_decoder({ test: '' }));
 
 expectType<Decoder<Map<string, number>>>(dict(number));
 expectType<Decoder<Map<'small' | 'medium', number>>>(
-  dict(number, ['small', 'medium'] as const),
+  dict(number, ['small', 'medium']),
 );
 
 // unknown decoder should resolve to `unknown`
@@ -153,9 +153,9 @@ expectAssignable<DecoderFunction<unknown>>(unknown);
 expectType<number>(integer(42));
 expectAssignable<DecoderFunction<number>>(integer);
 
-// always decoder should resolve to the constant's type
-expectType<boolean>(always(false)('anything'));
-expectType<string>(always('hello')(42));
+// always decoder should resolve to the constant's exact type (with const type param)
+expectType<false>(always(false)('anything'));
+expectType<'hello'>(always('hello')(42));
 expectAssignable<DecoderFunction<boolean>>(always(false));
 // always as default in union
 expectAssignable<DecoderFunction<boolean>>(union(boolean, always(false)));
@@ -180,129 +180,123 @@ expectType<{ type: 'admin'; level: 42; active: true; name: string }>(
   record_literal_wrap({ type: 'admin', level: 42, active: true, name: '' }),
 );
 
-// 2. bare literals — TS 4.x widens numbers to `number`, booleans stay exact (boolean = true | false)
-const record_bare = record({ type: 'admin' as const, level: 42, active: true, name: string });
-expectType<{ type: 'admin'; level: number; active: true; name: string }>(
+// 2. bare literals — TS 5.x with const type parameters preserves all literal types
+const record_bare = record({ type: 'admin', level: 42, active: true, name: string });
+expectType<{ type: 'admin'; level: 42; active: true; name: string }>(
   record_bare({ type: 'admin', level: 42, active: true, name: '' }),
 );
 
-// 3. per-property `as const` — preserves number literal types
-const record_per_const = record({ type: 'admin' as const, level: 42 as const, active: true, name: string });
-expectType<{ type: 'admin'; level: 42; active: true; name: string }>(
-  record_per_const({ type: 'admin', level: 42, active: true, name: '' }),
-);
-
-// 4. whole-object `as const` — preserves all literal types
+// 3. whole-object `as const` — also preserves all literal types (both work in TS 5.x)
 const record_full_const = record({ type: 'admin', level: 42, active: true, name: string } as const);
 expectType<{ type: 'admin'; level: 42; active: true; name: string }>(
   record_full_const({ type: 'admin', level: 42, active: true, name: '' }),
 );
 
-// 5. edge cases: 0, false, -1
-const record_edge = record({ zero: 0, no: false, neg: -1 as const, name: string });
-expectType<{ zero: number; no: false; neg: -1; name: string }>(
+// 4. edge cases: 0, false, -1 — all preserved by const type parameters
+const record_edge = record({ zero: 0, no: false, neg: -1, name: string });
+expectType<{ zero: 0; no: false; neg: -1; name: string }>(
   record_edge({ zero: 0, no: false, neg: -1, name: '' }),
 );
 
-// 6. nested record with bare literals
-const record_nested = record({ name: string, config: record({ level: 42 as const, active: true }) });
+// 5. nested record with bare literals
+const record_nested = record({ name: string, config: record({ level: 42, active: true }) });
 expectType<{ name: string; config: { level: 42; active: true } }>(
   record_nested({ name: '', config: { level: 42, active: true } }),
 );
 
-// 7. optional/nullable with bare literals
+// 6. optional/nullable with bare literals
 expectAssignable<{ level?: number }>(record({ level: optional(42) })({}));
 expectAssignable<{ level: number | null }>(record({ level: nullable(42) })({ level: null }));
 
-// 8. bare number/boolean in nested POJOs (no record() wrapper needed)
-const record_nested_bare = record({ name: string, config: { level: 42, active: true, type: 'admin' as const } });
-expectAssignable<{ name: string; config: { level: number; active: true; type: 'admin' } }>(
+// 7. bare number/boolean in nested POJOs (no record() wrapper needed)
+const record_nested_bare = record({ name: string, config: { level: 42, active: true, type: 'admin' } });
+expectAssignable<{ name: string; config: { level: 42; active: true; type: 'admin' } }>(
   record_nested_bare({ name: '', config: { level: 42, active: true, type: 'admin' } }),
 );
 
-// 9. bare POJO with number/boolean via decoder()
+// 8. bare POJO with number/boolean via decoder()
 const pojo_with_literals = decoder({ level: 42, name: string });
-expectAssignable<{ level: number; name: string }>(
+expectAssignable<{ level: 42; name: string }>(
   pojo_with_literals({ level: 42, name: '' }),
 );
 
 // --- union, tuple: bare literals as direct args always preserve ---
 expectType<1 | 2 | 3>(union(1, 2, 3)(1));
 expectType<true | string>(union(true, string)(true));
-expectType<1 | 'hello' | boolean>(union(1, 'hello' as const, boolean)(1));
+expectType<1 | 'hello' | boolean>(union(1, 'hello', boolean)(1));
 expectType<[42, string]>(tuple(42, string)([42, 'hello']));
 
 // --- type-level tests mirroring runtime combination tests ---
 
-// 10. optional wrapping bare POJO with number/boolean literals
+// 9. optional wrapping bare POJO with number/boolean literals
 const record_optional_pojo = record({
   name: string,
   config: optional({ level: 42, active: true }),
 });
-expectAssignable<{ name: string; config?: { level: number; active: true } }>(
+expectAssignable<{ name: string; config?: { level: 42; active: true } }>(
   record_optional_pojo({ name: '', config: { level: 42, active: true } }),
 );
 
-// 11. nullable wrapping bare POJO with number/boolean literals
+// 10. nullable wrapping bare POJO with number/boolean literals
 const record_nullable_pojo = record({
   name: string,
   config: nullable({ level: 42, active: true }),
 });
-expectAssignable<{ name: string; config: { level: number; active: true } | null }>(
+expectAssignable<{ name: string; config: { level: 42; active: true } | null }>(
   record_nullable_pojo({ name: '', config: { level: 42, active: true } }),
 );
 
-// 12. union of bare POJOs with number/boolean literals
+// 11. union of bare POJOs with number/boolean literals
 const union_bare_pojo = union(
-  { type: 'a' as const, level: 1 },
-  { type: 'b' as const, active: true },
+  { type: 'a', level: 1 },
+  { type: 'b', active: true },
 );
-expectAssignable<{ type: 'a'; level: number } | { type: 'b'; active: true }>(
+expectAssignable<{ type: 'a'; level: 1 } | { type: 'b'; active: true }>(
   union_bare_pojo({ type: 'a', level: 1 }),
 );
 
-// 13. array of bare POJOs with number/boolean literals
+// 12. array of bare POJOs with number/boolean literals
 const array_bare_pojo = array({ id: number, active: true });
 expectAssignable<{ id: number; active: true }[]>(
   array_bare_pojo([{ id: 1, active: true }]),
 );
 
-// 14. deeply nested bare POJOs with mixed literal types
+// 13. deeply nested bare POJOs with mixed literal types
 const deeply_nested = record({
   name: string,
   level1: {
     level2: {
       value: 42,
       flag: true,
-      tag: 'deep' as const,
+      tag: 'deep',
     },
   },
 });
-expectAssignable<{ name: string; level1: { level2: { value: number; flag: true; tag: 'deep' } } }>(
+expectAssignable<{ name: string; level1: { level2: { value: 42; flag: true; tag: 'deep' } } }>(
   deeply_nested({ name: '', level1: { level2: { value: 42, flag: true, tag: 'deep' } } }),
 );
 
-// 15. bare literal tuple with number and boolean
+// 14. bare literal tuple with number and boolean
 const bare_literal_tuple = decoder([42, true]);
-expectAssignable<[number, boolean]>(bare_literal_tuple([42, true]));
+expectAssignable<[42, boolean]>(bare_literal_tuple([42, true]));
 
-// 16. record nesting record with optional fields preserves types
+// 15. record nesting record with optional fields preserves types
 const inner_rec = record({ a: optional(string), b: number });
 const outer_rec = record({ x: inner_rec, y: string });
 expectType<{ x: { a?: string | undefined; b: number }; y: string }>(
   outer_rec({ x: { b: 1 }, y: 'hi' }),
 );
 
-// 17. intersection of bare POJOs with number literals
+// 16. intersection of bare POJOs with number literals
 const intersect_bare_pojo = intersection(
-  { type: 'admin' as const, level: 42 },
+  { type: 'admin', level: 42 },
   { name: string },
 );
-expectAssignable<{ type: 'admin'; level: number; name: string }>(
+expectAssignable<{ type: 'admin'; level: 42; name: string }>(
   intersect_bare_pojo({ type: 'admin', level: 42, name: 'test' }),
 );
 
-// --- 18. kitchen sink: bare literals across all combinators ---
+// --- 17. kitchen sink: bare literals across all combinators ---
 
 // set of bare POJOs with number/boolean literals
 const set_bare = set({ id: number, active: true });
@@ -312,7 +306,7 @@ expectAssignable<Set<{ id: number; active: true }>>(
 
 // dict with bare number literal values
 const dict_bare = dict(42);
-expectAssignable<Map<string, number>>(dict_bare({ a: 42 }));
+expectAssignable<Map<string, 42>>(dict_bare({ a: 42 }));
 
 // fields with bare number/boolean in schema
 const fields_bare = record({
@@ -323,8 +317,8 @@ const fields_bare = record({
 expectType<{ combined: string }>(fields_bare({ level: 5, active: true }));
 
 // always as fallback in union with bare literal POJO
-const with_default = union({ status: 'ok' as const, code: 200 }, always({ status: 'error' as const, code: 0 }));
-expectAssignable<{ status: 'ok'; code: number } | { status: 'error'; code: number }>(
+const with_default = union({ status: 'ok', code: 200 }, always({ status: 'error', code: 0 }));
+expectAssignable<{ status: 'ok'; code: 200 } | { status: 'error'; code: 0 }>(
   with_default({ status: 'ok', code: 200 }),
 );
 
@@ -334,10 +328,10 @@ expectAssignable<number | string | { tag: true }>(mixed_union(42));
 
 // nullable intersection with bare literal POJO
 const nullable_intersect = nullable(intersection(
-  { type: 'x' as const, level: 42 },
+  { type: 'x', level: 42 },
   { name: string },
 ));
-expectAssignable<{ type: 'x'; level: number; name: string } | null>(
+expectAssignable<{ type: 'x'; level: 42; name: string } | null>(
   nullable_intersect({ type: 'x', level: 42, name: 'hi' }),
 );
 
@@ -353,27 +347,25 @@ expectAssignable<Map<number, { id: number; active: true }>>(
   map_bare([{ id: 1, active: true }]),
 );
 
-// --- 19. README examples: type-level verification ---
+// --- 18. README examples: type-level verification ---
 
 // Config decoder with mixed bare literals
 const readme_config = record({
   version: 2,
-  env: 'production' as const,
+  env: 'production',
   debug: false,
   name: string,
   retries: number,
 });
-expectType<{ version: number; env: 'production'; debug: false; name: string; retries: number }>(
+expectType<{ version: 2; env: 'production'; debug: false; name: string; retries: number }>(
   readme_config({ version: 2, env: 'production', debug: false, name: 'app', retries: 3 }),
 );
 
-// literal(42) vs 42 as const vs bare 42 — type differences
+// literal(42) vs bare 42 — both preserve exact type with TS 5 const type parameters
 const readme_literal_wrap = record({ level: literal(42), name: string });
-const readme_as_const = record({ level: 42 as const, name: string });
 const readme_bare = record({ level: 42, name: string });
 expectType<{ level: 42; name: string }>(readme_literal_wrap({ level: 42, name: '' }));
-expectType<{ level: 42; name: string }>(readme_as_const({ level: 42, name: '' }));
-expectType<{ level: number; name: string }>(readme_bare({ level: 42, name: '' }));
+expectType<{ level: 42; name: string }>(readme_bare({ level: 42, name: '' }));
 
 // union of bare number literals
 const readme_status_codes = union(200, 404, 500);
@@ -395,8 +387,8 @@ expectType<{ name: string; deleted?: undefined }>(with_missing({ name: 'alice' }
 
 // always as fallback in union of records — both branches typed
 const readme_with_fallback = union(
-  record({ status: 'ok' as const, data: string }),
-  always({ status: 'error' as const, data: '' }),
+  record({ status: 'ok', data: string }),
+  always({ status: 'error', data: '' }),
 );
 const readme_fallback_result = readme_with_fallback({ status: 'ok', data: 'hi' });
 expectAssignable<{ status: 'ok'; data: string } | { status: 'error'; data: string }>(readme_fallback_result);
@@ -406,8 +398,8 @@ if ('status' in readme_fallback_result && readme_fallback_result.status === 'ok'
 }
 
 // Discriminated union with bare string literals
-const readme_cool = record({ type: 'cool' as const, somestuff: string });
-const readme_dumb = record({ type: 'dumb' as const, otherstuff: string });
+const readme_cool = record({ type: 'cool', somestuff: string });
+const readme_dumb = record({ type: 'dumb', otherstuff: string });
 const readme_stuff = union(readme_cool, readme_dumb);
 expectType<{ type: 'cool'; somestuff: string } | { type: 'dumb'; otherstuff: string }>(
   readme_stuff({ type: 'cool', somestuff: '' }),
@@ -419,10 +411,10 @@ const readme_nested = record({
   config: {
     level: 42,
     active: true,
-    env: 'prod' as const,
+    env: 'prod',
   },
 });
-expectAssignable<{ name: string; config: { level: number; active: true; env: 'prod' } }>(
+expectAssignable<{ name: string; config: { level: 42; active: true; env: 'prod' } }>(
   readme_nested({ name: '', config: { level: 42, active: true, env: 'prod' } }),
 );
 
@@ -452,9 +444,9 @@ expectAssignable<{ level: number; name: string }>(pojo_with_default({ level: 42,
 
 // tagged union with always fallback — different shapes
 const tagged_with_fallback = union(
-  record({ tag: 'success' as const, data: string }),
-  record({ tag: 'error' as const, code: number }),
-  always({ tag: 'unknown' as const }),
+  record({ tag: 'success', data: string }),
+  record({ tag: 'error', code: number }),
+  always({ tag: 'unknown' }),
 );
 expectAssignable<
   { tag: 'success'; data: string } | { tag: 'error'; code: number } | { tag: 'unknown' }
@@ -462,8 +454,8 @@ expectAssignable<
 
 // same-shape fallback — record with always providing defaults for same keys
 const same_shape_fallback = union(
-  record({ status: 'active' as const, score: number }),
-  always({ status: 'inactive' as const, score: 0 }),
+  record({ status: 'active', score: number }),
+  always({ status: 'inactive', score: 0 }),
 );
 expectAssignable<{ status: 'active'; score: number } | { status: 'inactive'; score: number }>(
   same_shape_fallback({ status: 'active', score: 99 }),
@@ -509,10 +501,10 @@ expectAssignable<string | number | boolean | null>(wd_union('hello'));
 // withDefault with tagged union
 const wd_tagged = withDefault(
   union(
-    record({ tag: 'ok' as const, data: string }),
-    record({ tag: 'err' as const, code: number }),
+    record({ tag: 'ok', data: string }),
+    record({ tag: 'err', code: number }),
   ),
-  { tag: 'err' as const, code: 0 },
+  { tag: 'err', code: 0 },
 );
 expectAssignable<{ tag: 'ok'; data: string } | { tag: 'err'; code: number }>(wd_tagged({}));
 
@@ -529,7 +521,7 @@ expectAssignable<{ name: string; data: number | null }>(
 const wd_string_null = withDefault(string, null);
 expectType<string | null>(wd_string_null('hello'));
 
-const wd_number_na = withDefault(number, 'N/A' as const);
+const wd_number_na = withDefault(number, 'N/A');
 expectType<number | 'N/A'>(wd_number_na(42));
 
 const wd_different_shape = withDefault(record({ name: string }), { error: 'not found' });
@@ -557,7 +549,7 @@ const ro_basic = objectOf(number);
 expectType<Record<string, number>>(ro_basic({ a: 1 }));
 
 // objectOf with constrained keys
-const ro_keys = objectOf(number, ['small', 'medium', 'large'] as const);
+const ro_keys = objectOf(number, ['small', 'medium', 'large']);
 expectType<Record<'small' | 'medium' | 'large', number>>(ro_keys({ small: 1 }));
 
 // objectOf with complex value decoder (using record())
@@ -748,7 +740,7 @@ expectType<number>(oo_sum({ a: 1, b: 2 }));
 expectAssignable<Map<string, number>>(dict(number)({ a: 1 }));
 
 // dict with keys
-const dict_keys = dict(number, ['small', 'medium'] as const);
+const dict_keys = dict(number, ['small', 'medium']);
 expectType<Map<'small' | 'medium', number>>(dict_keys({ small: 1, medium: 2 }));
 
 // dict with .map()
@@ -816,5 +808,5 @@ const chained_decoder = string.chain(bigint);
 expectType<Decoder<bigint>>(chained_decoder);
 
 // chain into a string literal
-const chained_literal = unknown.chain('ok' as const);
+const chained_literal = unknown.chain('ok');
 expectType<Decoder<'ok'>>(chained_literal);

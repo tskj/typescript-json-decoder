@@ -99,9 +99,9 @@ const combineResults = <A, B>(a: A, b: B): A & B => {
   // Objects and arrays
   validatePrototype(a);
   validatePrototype(b);
-  const combined = combineObjectProperties(a, b);
+  const combined = combineObjectProperties(a as Object, b as Object);
   const base = Array.isArray(a) || Array.isArray(b) ? [] : {};
-  return Object.assign(base, combined);
+  return Object.assign(base, combined) as A & B;
 };
 
 // ---------------------------------------------------------------------------
@@ -109,7 +109,7 @@ const combineResults = <A, B>(a: A, b: B): A & B => {
 // ---------------------------------------------------------------------------
 
 export const intersection =
-  <decoders extends DecoderInput<unknown>[]>(...decoders: decoders): Decoder<getProductOfDecoderArray<decoders>> => {
+  <const decoders extends DecoderInput<unknown>[]>(...decoders: decoders): Decoder<getProductOfDecoderArray<decoders>> => {
   const resolved = decoders.map((d) => decoder(d as any));
   return makeDecoder((value: unknown): getProductOfDecoderArray<decoders> => {
     assert_is_pojo(value);

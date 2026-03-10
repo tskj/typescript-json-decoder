@@ -22,14 +22,14 @@
   "homepage": "https://github.com/tskj/typescript-json-decoder#readme",
   "prepublish": "tsc",
   "devDependencies": {
-    "@types/jest": "^27.4.0",
+    "@types/jest": "^29.5.14",
     "fast-check": "^2.20.0",
-    "jest": "^27.4.5",
+    "jest": "^29.7.0",
     "npx": "^10.2.2",
-    "ts-jest": "^27.1.2",
+    "ts-jest": "^29.4.6",
     "tsc-watch": "^4.2.9",
-    "tsd": "^0.19.0",
-    "typescript": "^4.2.3"
+    "tsd": "^0.33.0",
+    "typescript": "^5.9.3"
   },
   "prettier": {
     "trailingComma": "all",
@@ -45,13 +45,8 @@
       "ts",
       "js"
     ],
-    "globals": {
-      "ts-jest": {
-        "tsconfig": "tsconfig.json"
-      }
-    },
     "transform": {
-      "^.+\\.(ts|tsx)$": "ts-jest"
+      "^.+\\.(ts|tsx)$": ["ts-jest", { "tsconfig": "tsconfig.json" }]
     }
   },
   "tsd": {

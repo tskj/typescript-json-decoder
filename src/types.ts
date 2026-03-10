@@ -194,7 +194,7 @@ export const makeDecoder = <T>(fn: DecoderFunction<T>): Decoder<T> => {
  * Wrap any decoder input (plain function, literal form, or existing Decoder)
  * into a rich Decoder<T> with .map() and .safeDecode().
  */
-export const decoder = <D extends DecoderInput<unknown>>(
+export const decoder = <const D extends DecoderInput<unknown>>(
   d: D,
 ): Decoder<decodeType<D>> => {
   if (isDecoderFunction(d)) {
@@ -203,7 +203,7 @@ export const decoder = <D extends DecoderInput<unknown>>(
   return decodeJsonLiteralForm(d as any) as any;
 };
 
-export const safeDecode = <D extends DecoderInput<unknown>>(
+export const safeDecode = <const D extends DecoderInput<unknown>>(
   d: D,
   value: unknown,
 ): { ok: true; value: decodeType<D> } | { ok: false; error: string } => {

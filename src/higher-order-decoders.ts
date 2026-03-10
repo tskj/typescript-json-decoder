@@ -3,10 +3,10 @@ import { assert_is_pojo, isPojoObject } from './pojo';
 import { decodeType, decoder, Decoder, DecoderInput, makeDecoder, isKey } from './types';
 import { err } from './utils';
 
-export const always = <T>(value: T): Decoder<T> =>
+export const always = <const T>(value: T): Decoder<T> =>
   makeDecoder((_input: unknown) => value);
 
-export const lazy = <T>(thunk: () => DecoderInput<T>): Decoder<T> =>
+export const lazy = <const T>(thunk: () => DecoderInput<T>): Decoder<T> =>
   makeDecoder((value: unknown) => decoder(thunk())(value) as T);
 
 type evalOver<t> = t extends unknown ? decodeType<t> : never;
@@ -30,19 +30,19 @@ const unionImpl = (decoders: DecoderInput<unknown>[], value: unknown): any => {
 };
 
 export const union =
-  <decoders extends DecoderInput<unknown>[]>(...decoders: decoders): Decoder<evalOver<getSumOfArray<decoders>>> =>
+  <const decoders extends DecoderInput<unknown>[]>(...decoders: decoders): Decoder<evalOver<getSumOfArray<decoders>>> =>
   makeDecoder((value: unknown) => unionImpl(decoders, value));
 
 export { intersection } from './intersection';
 
-export function nullable<T extends DecoderInput<unknown>>(
+export function nullable<const T extends DecoderInput<unknown>>(
   dec: T,
 ): Decoder<decodeType<T> | null> {
   const base = union(nil, dec);
   return makeDecoder((value: unknown) => base(value));
 }
 
-export function optional<T extends DecoderInput<unknown>>(
+export function optional<const T extends DecoderInput<unknown>>(
   dec: T,
 ): Decoder<decodeType<T> | undefined> {
   const base = union(undef, dec);
@@ -53,7 +53,7 @@ export function withDefault<T extends DecoderInput<unknown>>(
   dec: T,
   fallback: decodeType<T>,
 ): Decoder<decodeType<T>>;
-export function withDefault<T extends DecoderInput<unknown>, F>(
+export function withDefault<T extends DecoderInput<unknown>, const F>(
   dec: T,
   fallback: F,
 ): Decoder<decodeType<T> | F>;
@@ -68,7 +68,7 @@ export function withDefault(dec: any, fallback: any) {
   });
 }
 
-export function array<D extends DecoderInput<unknown>>(
+export function array<const D extends DecoderInput<unknown>>(
   dec: D,
 ): Decoder<decodeType<D>[]> {
   const d = decoder(dec);
@@ -92,7 +92,7 @@ export function array<D extends DecoderInput<unknown>>(
   });
 }
 
-export function nonEmptyArray<D extends DecoderInput<unknown>>(
+export function nonEmptyArray<const D extends DecoderInput<unknown>>(
   dec: D,
 ): Decoder<[decodeType<D>, ...decodeType<D>[]]> {
   const base = array(dec);
@@ -105,7 +105,7 @@ export function nonEmptyArray<D extends DecoderInput<unknown>>(
   });
 }
 
-export function set<D extends DecoderInput<unknown>>(
+export function set<const D extends DecoderInput<unknown>>(
   dec: D,
 ): Decoder<Set<decodeType<D>>> {
   const base = array(dec);
@@ -142,7 +142,7 @@ export const map =
   });
 };
 
-export function objectOf<D extends DecoderInput<unknown>, K extends string = string>(
+export function objectOf<D extends DecoderInput<unknown>, const K extends string = string>(
   dec: D,
   keys?: ReadonlyArray<K>,
 ): Decoder<Record<K, decodeType<D>>>;
@@ -168,7 +168,7 @@ export function objectOf(dec: any, keys?: any) {
   });
 }
 
-export function dict<D extends DecoderInput<unknown>, K extends string = string>(
+export function dict<D extends DecoderInput<unknown>, const K extends string = string>(
   dec: D,
   keys?: ReadonlyArray<K>,
 ): Decoder<Map<K, decodeType<D>>>;
